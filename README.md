@@ -1,4 +1,4 @@
-# Inventory API
+# Inventario API
 
 API REST para administrar un catálogo de productos y sus existencias. Está construida con Java, Spring Boot y PostgreSQL siguiendo una arquitectura de monolito modular.
 
