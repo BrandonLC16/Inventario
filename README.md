@@ -4,10 +4,16 @@ API REST para administrar un catálogo de productos y sus existencias. Está con
 
 ## Funcionalidades actuales
 
-- Crear, consultar, actualizar y eliminar productos.
+- Crear, consultar, actualizar y eliminar lógicamente productos.
 - Consultar las existencias de un producto.
 - Registrar entradas y salidas de inventario de forma atómica.
+- Mantener un kardex con el tipo de movimiento, cambio de cantidad, saldo anterior,
+  saldo resultante, referencia de negocio, fecha y usuario responsable.
+- Conservar el inventario y sus movimientos cuando un producto se elimina.
+- Proveer operaciones internas para descontar y restaurar existencias al confirmar o
+  cancelar pedidos.
 - Impedir que las existencias queden en números negativos.
+- Serializar los ajustes concurrentes mediante bloqueo pesimista del inventario.
 - Validar solicitudes y devolver errores HTTP estructurados.
 - Crear y validar el esquema de PostgreSQL mediante Flyway.
 - Documentar y probar la API desde Swagger UI.
@@ -125,6 +131,10 @@ curl -X POST http://localhost:8080/api/products \
 
 La respuesta incluye el identificador `id` del producto. Sustituye `<PRODUCT_ID>` en los siguientes ejemplos.
 
+Los SKU se normalizan automáticamente: se eliminan los espacios exteriores y se
+guardan en mayúsculas. No se permiten SKU repetidos, sin distinguir entre
+mayúsculas y minúsculas.
+
 ### Listar productos
 
 ```bash
@@ -160,6 +170,51 @@ curl -X PATCH http://localhost:8080/api/inventory/<PRODUCT_ID>/adjustments \
 ```
 
 La operación será rechazada con HTTP `400` si el descuento intenta dejar el inventario en negativo.
+
+Cada ajuste exitoso se registra también en `stock_movements`. El primer ingreso de
+un producto se clasifica como `INITIAL_STOCK`; los ingresos posteriores como
+`MANUAL_IN`, y las salidas como `MANUAL_OUT`. El historial se conserva aunque el
+producto sea eliminado.
+
+### Eliminar un producto
+
+```bash
+curl -X DELETE http://localhost:8080/api/products/<PRODUCT_ID>
+```
+
+La respuesta es HTTP `204`. La eliminación es lógica: el producto deja de aparecer
+en listados y consultas, y sus operaciones de inventario pasan a responder HTTP
+`404`, pero sus datos y movimientos históricos permanecen en PostgreSQL. El SKU
+del producto eliminado continúa reservado.
+
+## Endpoints disponibles
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/products` | Lista productos no eliminados, ordenados por nombre |
+| `GET` | `/api/products/{id}` | Consulta un producto no eliminado |
+| `POST` | `/api/products` | Crea un producto |
+| `PUT` | `/api/products/{id}` | Reemplaza los campos editables de un producto |
+| `DELETE` | `/api/products/{id}` | Elimina lógicamente un producto |
+| `GET` | `/api/inventory/{productId}` | Consulta existencias; devuelve cero si aún no hay registro |
+| `PATCH` | `/api/inventory/{productId}/adjustments` | Aplica una entrada o salida y registra el movimiento |
+
+Actualmente no hay un endpoint público para consultar el kardex. Los movimientos
+se almacenan como trazabilidad interna y quedan disponibles para futuros casos de
+uso o endpoints.
+
+## Preparación para pedidos
+
+La migración `V2` crea las tablas `orders`, `order_items` y `stock_movements`. El
+módulo de inventario publica además el contrato interno `InventoryOperations` para:
+
+- `consumeForOrder`: descontar existencias y registrar `ORDER_CONFIRMED`.
+- `restoreForOrder`: devolver existencias y registrar `ORDER_CANCELLED`.
+
+Ambas operaciones validan cantidades positivas, bloquean el inventario durante la
+escritura y guardan la referencia del pedido y el usuario responsable. La
+orquestación del ciclo de vida del pedido y sus endpoints REST todavía no están
+implementados.
 
 ## Ejecutar las pruebas
 
@@ -246,8 +301,8 @@ docker compose down -v
 ```text
 src/main/java/com/example/inventory/
 ├── config/       Configuración de OpenAPI
-├── inventory/    Consultas y ajustes de existencias
-├── products/     Catálogo de productos
+├── inventory/    Existencias, ajustes, kardex y contrato para pedidos
+├── products/     Catálogo y eliminación lógica de productos
 └── shared/       Excepciones y respuestas de error compartidas
 
 src/main/resources/
@@ -281,4 +336,8 @@ Comprueba que el JDK 24 esté instalado, que `JAVA_HOME` apunte al JDK y que su 
 
 ## Estado del proyecto
 
-El catálogo de productos y el control básico de inventario están implementados. La seguridad con JWT, la autorización por roles y el flujo transaccional de pedidos están previstos como siguientes incrementos funcionales.
+El catálogo de productos, la eliminación lógica, el control concurrente de
+existencias y el registro del kardex están implementados. La base de datos y el
+contrato interno de inventario ya preparan la confirmación y cancelación de pedidos,
+pero aún falta el módulo que orqueste y exponga ese flujo. La seguridad con JWT y la
+autorización por roles también permanecen como siguientes incrementos funcionales.
