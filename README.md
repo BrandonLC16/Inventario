@@ -52,15 +52,12 @@ docker compose version
 El motor de Docker debe estar iniciado antes de levantar PostgreSQL o ejecutar las pruebas.
 
 ## Obtener el proyecto
-
-Si el proyecto está publicado en un repositorio Git:
+Git:
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
 cd Inventario
 ```
-
-Si se recibió como archivo comprimido, basta con extraerlo y abrir una terminal dentro de la carpeta que contiene `pom.xml` y `compose.yaml`.
 
 ## Ejecución rápida
 
@@ -111,7 +108,7 @@ Cuando aparezca el mensaje de inicio de Spring Boot, la API estará disponible e
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 - Especificación OpenAPI: `http://localhost:8080/v3/api-docs`
 
-Al iniciar la aplicación, Flyway aplicará automáticamente las migraciones pendientes y Hibernate validará el esquema.
+Al iniciar la aplicación, Flyway aplicará automáticamente las migraciones pendientes e Hibernate validará el esquema.
 
 ## Probar la API
 
@@ -277,8 +274,6 @@ export DB_USERNAME="usuario"
 export DB_PASSWORD="contraseña"
 ./mvnw spring-boot:run
 ```
-
-No se deben guardar credenciales reales dentro del repositorio.
 
 ## Detener el entorno local
 
