@@ -20,7 +20,7 @@ class ProductService implements ProductCatalog {
     }
 
     List<ProductResponse> findAll() {
-        return repository.findAll(Sort.by("name").ascending()).stream()
+        return repository.findAllByDeletedFalse(Sort.by("name").ascending()).stream()
                 .map(ProductResponse::from)
                 .toList();
     }
@@ -50,18 +50,18 @@ class ProductService implements ProductCatalog {
 
     @Transactional
     void delete(UUID id) {
-        repository.delete(findEntity(id));
+        findEntity(id).markDeleted();
     }
 
     @Override
     public void requireProduct(UUID productId) {
-        if (!repository.existsById(productId)) {
+        if (!repository.existsByIdAndDeletedFalse(productId)) {
             throw new NotFoundException("Product %s was not found".formatted(productId));
         }
     }
 
     private Product findEntity(UUID id) {
-        return repository.findById(id)
+        return repository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Product %s was not found".formatted(id)));
     }
 

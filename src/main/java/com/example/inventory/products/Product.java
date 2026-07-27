@@ -33,6 +33,9 @@ class Product {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(nullable = false)
+    private boolean deleted;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -53,6 +56,10 @@ class Product {
         this.description = description;
         this.price = price;
         this.active = active;
+    }
+
+    void markDeleted() {
+        deleted = true;
     }
 
     @PrePersist

@@ -2,6 +2,7 @@ package com.example.inventory.inventory;
 
 import com.example.inventory.products.ProductCatalog;
 import com.example.inventory.shared.BadRequestException;
+import com.example.inventory.shared.ConflictException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,13 +10,16 @@ import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
-class InventoryService {
+class InventoryService implements InventoryOperations {
 
     private final InventoryRepository repository;
+    private final StockMovementRepository movementRepository;
     private final ProductCatalog productCatalog;
 
-    InventoryService(InventoryRepository repository, ProductCatalog productCatalog) {
+    InventoryService(InventoryRepository repository, StockMovementRepository movementRepository,
+                     ProductCatalog productCatalog) {
         this.repository = repository;
+        this.movementRepository = movementRepository;
         this.productCatalog = productCatalog;
     }
 
@@ -29,13 +33,83 @@ class InventoryService {
     @Transactional
     InventoryResponse adjust(UUID productId, int delta) {
         productCatalog.requireProduct(productId);
-        InventoryItem item = repository.findByProductIdForUpdate(productId)
-                .orElseGet(() -> new InventoryItem(productId));
+        if (delta == 0) {
+            throw new BadRequestException("Inventory adjustment must not be zero");
+        }
+        boolean initialStock = repository.ensureExists(productId) == 1;
+        InventoryItem item = lockInventory(productId);
+        int balanceBefore = item.getQuantity();
         try {
             item.changeQuantity(delta);
         } catch (IllegalArgumentException exception) {
+            if (delta < 0) {
+                throw insufficientStock(productId);
+            }
             throw new BadRequestException(exception.getMessage());
         }
-        return InventoryResponse.from(repository.save(item));
+        StockMovementType type = initialStock && delta > 0
+                ? StockMovementType.INITIAL_STOCK
+                : delta > 0 ? StockMovementType.MANUAL_IN : StockMovementType.MANUAL_OUT;
+        recordMovement(item, type, delta, balanceBefore, "MANUAL:" + UUID.randomUUID(), null);
+        return InventoryResponse.from(item);
+    }
+
+    @Override
+    @Transactional
+    public void consumeForOrder(UUID productId, int quantity, UUID orderId,
+                                String responsibleUser) {
+        requirePositive(quantity);
+        productCatalog.requireProduct(productId);
+        repository.ensureExists(productId);
+        InventoryItem item = lockInventory(productId);
+        int balanceBefore = item.getQuantity();
+        try {
+            item.changeQuantity(-quantity);
+        } catch (IllegalArgumentException exception) {
+            throw insufficientStock(productId);
+        }
+        recordMovement(item, StockMovementType.ORDER_CONFIRMED, -quantity,
+                balanceBefore, orderId.toString(), responsibleUser);
+    }
+
+    @Override
+    @Transactional
+    public void restoreForOrder(UUID productId, int quantity, UUID orderId,
+                                String responsibleUser) {
+        requirePositive(quantity);
+        productCatalog.requireProduct(productId);
+        repository.ensureExists(productId);
+        InventoryItem item = lockInventory(productId);
+        int balanceBefore = item.getQuantity();
+        try {
+            item.changeQuantity(quantity);
+        } catch (IllegalArgumentException exception) {
+            throw new ConflictException(exception.getMessage());
+        }
+        recordMovement(item, StockMovementType.ORDER_CANCELLED, quantity,
+                balanceBefore, orderId.toString(), responsibleUser);
+    }
+
+    private InventoryItem lockInventory(UUID productId) {
+        return repository.findByProductIdForUpdate(productId)
+                .orElseThrow(() -> new ConflictException(
+                        "Inventory for product %s could not be initialized".formatted(productId)));
+    }
+
+    private BadRequestException insufficientStock(UUID productId) {
+        return new BadRequestException("Inventory quantity cannot be negative");
+    }
+
+    private void recordMovement(InventoryItem item, StockMovementType type, int delta,
+                                int balanceBefore, String businessReference,
+                                String responsibleUser) {
+        movementRepository.save(new StockMovement(item.getProductId(), type, delta,
+                balanceBefore, item.getQuantity(), businessReference, responsibleUser));
+    }
+
+    private void requirePositive(int quantity) {
+        if (quantity <= 0) {
+            throw new BadRequestException("Quantity must be greater than zero");
+        }
     }
 }

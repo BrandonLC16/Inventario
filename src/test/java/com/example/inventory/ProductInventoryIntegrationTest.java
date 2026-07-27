@@ -85,10 +85,25 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void flywayAppliedInitialMigration() {
+    void productWithStockMovementsCanBeDeletedWithoutLosingHistory() throws Exception {
+        String location = createProduct("DELETE-1", "Deleted product");
+        UUID productId = idFromLocation(location);
+        adjust(productId, 5).andExpect(status().isOk());
+
+        mockMvc.perform(delete(location)).andExpect(status().isNoContent());
+        mockMvc.perform(get(location)).andExpect(status().isNotFound());
+
+        Integer movements = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM stock_movements WHERE product_id = ?",
+                Integer.class, productId);
+        org.junit.jupiter.api.Assertions.assertEquals(1, movements);
+    }
+
+    @Test
+    void flywayAppliedExpectedMigrations() {
         Integer migrations = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        org.junit.jupiter.api.Assertions.assertEquals(1, migrations);
+                "SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version IN ('1', '2', '3')", Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(3, migrations);
     }
 
     private String createProduct(String sku, String name) throws Exception {
