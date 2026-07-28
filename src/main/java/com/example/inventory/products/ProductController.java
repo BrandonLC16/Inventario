@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,6 +43,7 @@ class ProductController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @Operation(summary = "Create a product")
     ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         ProductResponse response = service.create(request);
@@ -49,12 +51,14 @@ class ProductController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @Operation(summary = "Replace a product")
     ProductResponse update(@PathVariable UUID id, @Valid @RequestBody ProductRequest request) {
         return service.update(id, request);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @Operation(summary = "Delete a product")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
     void delete(@PathVariable UUID id) {

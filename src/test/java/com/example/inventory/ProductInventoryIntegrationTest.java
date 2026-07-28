@@ -1,11 +1,14 @@
 package com.example.inventory;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.http.MediaType;
 
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -17,40 +20,50 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
 
+    private static final String PASSWORD = "regression-password-123";
+    private String adminToken;
+
+    @BeforeEach
+    void authenticateAdmin() throws Exception {
+        createUser("regression-admin", PASSWORD, true, false,
+                com.example.inventory.users.RoleName.ADMIN);
+        adminToken = login("regression-admin", PASSWORD);
+    }
+
     @Test
     void productCrudWorksAgainstPostgres() throws Exception {
         String location = createProduct("kbd-001", "Keyboard");
 
-        mockMvc.perform(get(location))
+        performAuthenticated(get(location))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sku").value("KBD-001"))
                 .andExpect(jsonPath("$.price").value(99.90));
 
-        mockMvc.perform(get("/api/products"))
+        performAuthenticated(get("/api/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)));
 
-        mockMvc.perform(put(location)
+        performAuthenticated(put(location)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson("KBD-001", "Updated keyboard", "149.90")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Updated keyboard"));
 
-        mockMvc.perform(delete(location)).andExpect(status().isNoContent());
-        mockMvc.perform(get(location)).andExpect(status().isNotFound());
+        performAuthenticated(delete(location)).andExpect(status().isNoContent());
+        performAuthenticated(get(location)).andExpect(status().isNotFound());
     }
 
     @Test
     void duplicateSkuAndInvalidProductReturnUsefulErrors() throws Exception {
         createProduct("SKU-1", "First");
 
-        mockMvc.perform(post("/api/products")
+        performAuthenticated(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson("sku-1", "Duplicate", "10.00")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("SKU SKU-1 already exists"));
 
-        mockMvc.perform(post("/api/products")
+        performAuthenticated(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"sku":"", "name":"", "price":-1, "active":true}
@@ -64,7 +77,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     void stockCanBeReceivedAndConsumedButNeverBecomesNegative() throws Exception {
         UUID productId = idFromLocation(createProduct("STOCK-1", "Stocked product"));
 
-        mockMvc.perform(get("/api/inventory/{id}", productId))
+        performAuthenticated(get("/api/inventory/{id}", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quantity").value(0));
 
@@ -79,7 +92,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void inventoryRequiresAnExistingProduct() throws Exception {
         UUID missingId = UUID.randomUUID();
-        mockMvc.perform(get("/api/inventory/{id}", missingId))
+        performAuthenticated(get("/api/inventory/{id}", missingId))
                 .andExpect(status().isNotFound());
         adjust(missingId, 1).andExpect(status().isNotFound());
     }
@@ -90,8 +103,8 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
         UUID productId = idFromLocation(location);
         adjust(productId, 5).andExpect(status().isOk());
 
-        mockMvc.perform(delete(location)).andExpect(status().isNoContent());
-        mockMvc.perform(get(location)).andExpect(status().isNotFound());
+        performAuthenticated(delete(location)).andExpect(status().isNoContent());
+        performAuthenticated(get(location)).andExpect(status().isNotFound());
 
         Integer movements = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM stock_movements WHERE product_id = ?",
@@ -107,7 +120,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String createProduct(String sku, String name) throws Exception {
-        return mockMvc.perform(post("/api/products")
+        return performAuthenticated(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson(sku, name, "99.90")))
                 .andExpect(status().isCreated())
@@ -117,9 +130,14 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
 
     private org.springframework.test.web.servlet.ResultActions adjust(UUID productId, int delta)
             throws Exception {
-        return mockMvc.perform(patch("/api/inventory/{id}/adjustments", productId)
+        return performAuthenticated(patch("/api/inventory/{id}/adjustments", productId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"quantityDelta\":%d}".formatted(delta)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions performAuthenticated(
+            MockHttpServletRequestBuilder request) throws Exception {
+        return mockMvc.perform(request.header(AUTHORIZATION, "Bearer " + adminToken));
     }
 
     private UUID idFromLocation(String location) {
