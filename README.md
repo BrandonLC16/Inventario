@@ -4,6 +4,7 @@ API REST de productos e inventario con autenticación JWT y autorización por ro
 
 ## Funcionalidades actuales
 
+<<<<<<< HEAD
 - CRUD de productos con SKU único y borrado lógico.
 - Consulta y ajustes de inventario con bloqueo pesimista, saldo no negativo y movimientos internos.
 - Login por usuario o correo.
@@ -12,6 +13,22 @@ API REST de productos e inventario con autenticación JWT y autorización por ro
 - Roles `ADMIN`, `INVENTORY_MANAGER` y `SALES`.
 - Administración de usuarios por `ADMIN`.
 - Flyway y pruebas PostgreSQL con Testcontainers.
+=======
+- Crear, consultar, actualizar y eliminar lógicamente productos.
+- Consultar las existencias de un producto.
+- Registrar entradas y salidas de inventario de forma atómica.
+- Mantener un kardex con el tipo de movimiento, cambio de cantidad, saldo anterior,
+  saldo resultante, referencia de negocio, fecha y usuario responsable.
+- Conservar el inventario y sus movimientos cuando un producto se elimina.
+- Proveer operaciones internas para descontar y restaurar existencias al confirmar o
+  cancelar pedidos.
+- Impedir que las existencias queden en números negativos.
+- Serializar los ajustes concurrentes mediante bloqueo pesimista del inventario.
+- Validar solicitudes y devolver errores HTTP estructurados.
+- Crear y validar el esquema de PostgreSQL mediante Flyway.
+- Documentar y probar la API desde Swagger UI.
+- Ejecutar pruebas de integración contra PostgreSQL mediante Testcontainers.
+>>>>>>> f6ffd9e28770e21fec4f6ee147d34c407d2ccc45
 
 No existe API de pedidos: sus tablas y operaciones internas son infraestructura parcial, no un módulo terminado. Tampoco existe endpoint para consultar movimientos de inventario.
 
@@ -27,7 +44,25 @@ docker version
 docker compose version
 ```
 
+<<<<<<< HEAD
 ## Inicio local
+=======
+El motor de Docker debe estar iniciado antes de levantar PostgreSQL o ejecutar las pruebas.
+
+## Obtener el proyecto
+Git:
+
+```bash
+git clone <URL_DEL_REPOSITORIO>
+cd Inventario
+```
+
+## Ejecución rápida
+
+### 1. Iniciar PostgreSQL
+
+Desde la raíz del proyecto:
+>>>>>>> f6ffd9e28770e21fec4f6ee147d34c407d2ccc45
 
 ```bash
 docker compose up -d
@@ -84,6 +119,7 @@ curl -X POST http://localhost:8080/api/v1/auth/logout \
 
 ## Matriz de roles
 
+<<<<<<< HEAD
 | Operación implementada | `ADMIN` | `INVENTORY_MANAGER` | `SALES` |
 |---|---:|---:|---:|
 | Administrar usuarios y roles | Sí | No | No |
@@ -91,6 +127,9 @@ curl -X POST http://localhost:8080/api/v1/auth/logout \
 | Ajustar inventario | Sí | Sí | No |
 | Consultar productos e inventario | Sí | Sí | Sí |
 | Swagger habilitado | Sí | No | No |
+=======
+Al iniciar la aplicación, Flyway aplicará automáticamente las migraciones pendientes e Hibernate validará el esquema.
+>>>>>>> f6ffd9e28770e21fec4f6ee147d34c407d2ccc45
 
 Clientes y pedidos no aparecen porque no tienen endpoints.
 
@@ -114,6 +153,36 @@ curl -X POST http://localhost:8080/api/products \
   -H "Content-Type: application/json" \
   -d '{"sku":"KBD-001","name":"Teclado","description":null,"price":1299.90,"active":true}'
 
+<<<<<<< HEAD
+=======
+La respuesta incluye el identificador `id` del producto. Sustituye `<PRODUCT_ID>` en los siguientes ejemplos.
+
+Los SKU se normalizan automáticamente: se eliminan los espacios exteriores y se
+guardan en mayúsculas. No se permiten SKU repetidos, sin distinguir entre
+mayúsculas y minúsculas.
+
+### Listar productos
+
+```bash
+curl http://localhost:8080/api/products
+```
+
+### Consultar un producto
+
+```bash
+curl http://localhost:8080/api/products/<PRODUCT_ID>
+```
+
+### Consultar sus existencias
+
+```bash
+curl http://localhost:8080/api/inventory/<PRODUCT_ID>
+```
+
+### Agregar existencias
+
+```bash
+>>>>>>> f6ffd9e28770e21fec4f6ee147d34c407d2ccc45
 curl -X PATCH http://localhost:8080/api/inventory/<PRODUCT_ID>/adjustments \
   -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -H "Content-Type: application/json" \
@@ -124,7 +193,96 @@ curl -X PATCH http://localhost:8080/api/inventory/<PRODUCT_ID>/adjustments \
 
 Todos requieren `ADMIN`.
 
+<<<<<<< HEAD
 | Método | Ruta | Acción |
+=======
+La operación será rechazada con HTTP `400` si el descuento intenta dejar el inventario en negativo.
+
+Cada ajuste exitoso se registra también en `stock_movements`. El primer ingreso de
+un producto se clasifica como `INITIAL_STOCK`; los ingresos posteriores como
+`MANUAL_IN`, y las salidas como `MANUAL_OUT`. El historial se conserva aunque el
+producto sea eliminado.
+
+### Eliminar un producto
+
+```bash
+curl -X DELETE http://localhost:8080/api/products/<PRODUCT_ID>
+```
+
+La respuesta es HTTP `204`. La eliminación es lógica: el producto deja de aparecer
+en listados y consultas, y sus operaciones de inventario pasan a responder HTTP
+`404`, pero sus datos y movimientos históricos permanecen en PostgreSQL. El SKU
+del producto eliminado continúa reservado.
+
+## Endpoints disponibles
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/products` | Lista productos no eliminados, ordenados por nombre |
+| `GET` | `/api/products/{id}` | Consulta un producto no eliminado |
+| `POST` | `/api/products` | Crea un producto |
+| `PUT` | `/api/products/{id}` | Reemplaza los campos editables de un producto |
+| `DELETE` | `/api/products/{id}` | Elimina lógicamente un producto |
+| `GET` | `/api/inventory/{productId}` | Consulta existencias; devuelve cero si aún no hay registro |
+| `PATCH` | `/api/inventory/{productId}/adjustments` | Aplica una entrada o salida y registra el movimiento |
+
+Actualmente no hay un endpoint público para consultar el kardex. Los movimientos
+se almacenan como trazabilidad interna y quedan disponibles para futuros casos de
+uso o endpoints.
+
+## Preparación para pedidos
+
+La migración `V2` crea las tablas `orders`, `order_items` y `stock_movements`. El
+módulo de inventario publica además el contrato interno `InventoryOperations` para:
+
+- `consumeForOrder`: descontar existencias y registrar `ORDER_CONFIRMED`.
+- `restoreForOrder`: devolver existencias y registrar `ORDER_CANCELLED`.
+
+Ambas operaciones validan cantidades positivas, bloquean el inventario durante la
+escritura y guardan la referencia del pedido y el usuario responsable. La
+orquestación del ciclo de vida del pedido y sus endpoints REST todavía no están
+implementados.
+
+## Ejecutar las pruebas
+
+Las pruebas utilizan Testcontainers para crear una instancia temporal y aislada de PostgreSQL. Docker debe estar iniciado; no es necesario ejecutar `docker compose up` previamente.
+
+Windows:
+
+```powershell
+.\mvnw.cmd test
+```
+
+macOS o Linux:
+
+```bash
+./mvnw test
+```
+
+## Construir el ejecutable
+
+Windows:
+
+```powershell
+.\mvnw.cmd clean package
+java -jar target\inventory-api-0.0.1-SNAPSHOT.jar
+```
+
+macOS o Linux:
+
+```bash
+./mvnw clean package
+java -jar target/inventory-api-0.0.1-SNAPSHOT.jar
+```
+
+PostgreSQL debe continuar disponible mientras se ejecuta el archivo JAR.
+
+## Configuración
+
+La aplicación acepta estas variables de entorno:
+
+| Variable | Valor predeterminado | Descripción |
+>>>>>>> f6ffd9e28770e21fec4f6ee147d34c407d2ccc45
 |---|---|---|
 | `POST`, `GET` | `/api/v1/users` | Crear o listar |
 | `GET` | `/api/v1/users/{id}` | Consultar |
@@ -171,6 +329,7 @@ La suite contiene 75 pruebas: 62 unitarias y 13 de integración. `verify` genera
 
 ## Afirmación → evidencia → estado
 
+<<<<<<< HEAD
 | Afirmación | Evidencia | Prueba | Estado |
 |---|---|---|---|
 | CRUD y borrado lógico | `ProductController`, `ProductService`, V1/V3 | Productos e integración | Cubierto |
@@ -194,3 +353,66 @@ La suite contiene 75 pruebas: 62 unitarias y 13 de integración. `verify` genera
 - Swagger habilitado y autenticado como `ADMIN`.
 - Revocación inmediata de access tokens e invalidación instantánea de roles emitidos.
 - Operación productiva de rotación, monitoreo y respaldo de claves.
+=======
+## Detener el entorno local
+
+Para detener PostgreSQL sin eliminar la información almacenada:
+
+```bash
+docker compose down
+```
+
+Para detenerlo y eliminar también el volumen local de datos:
+
+```bash
+docker compose down -v
+```
+
+> El segundo comando elimina permanentemente la base de datos local creada por Docker Compose.
+
+## Estructura principal
+
+```text
+src/main/java/com/example/inventory/
+├── config/       Configuración de OpenAPI
+├── inventory/    Existencias, ajustes, kardex y contrato para pedidos
+├── products/     Catálogo y eliminación lógica de productos
+└── shared/       Excepciones y respuestas de error compartidas
+
+src/main/resources/
+├── application.yml
+└── db/migration/ Migraciones de Flyway
+```
+
+## Solución de problemas
+
+### Testcontainers no encuentra Docker
+
+Si aparece `Could not find a valid Docker environment`, inicia Docker Desktop o el servicio Docker y verifica nuevamente:
+
+```bash
+docker version
+```
+
+La salida debe mostrar información tanto de `Client` como de `Server`.
+
+### El puerto 5432 está ocupado
+
+Detén la instancia local de PostgreSQL que utiliza ese puerto o cambia el puerto publicado en `compose.yaml`. Si se publica, por ejemplo, `5433:5432`, inicia la aplicación con:
+
+```text
+DB_URL=jdbc:postgresql://localhost:5433/inventory
+```
+
+### La aplicación no encuentra Java
+
+Comprueba que el JDK 24 esté instalado, que `JAVA_HOME` apunte al JDK y que su carpeta `bin` esté incluida en `PATH`.
+
+## Estado del proyecto
+
+El catálogo de productos, la eliminación lógica, el control concurrente de
+existencias y el registro del kardex están implementados. La base de datos y el
+contrato interno de inventario ya preparan la confirmación y cancelación de pedidos,
+pero aún falta el módulo que orqueste y exponga ese flujo. La seguridad con JWT y la
+autorización por roles también permanecen como siguientes incrementos funcionales.
+>>>>>>> f6ffd9e28770e21fec4f6ee147d34c407d2ccc45
