@@ -274,7 +274,7 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 90 pruebas: 65 unitarias y 25 de integración. Cubren productos, inventario, kardex, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP. Las pruebas PostgreSQL del kardex verifican movimientos manuales y de pedidos, orden, paginación, filtros combinables, productos eliminados y permisos.
+Actualmente hay 92 pruebas: 65 unitarias y 27 de integración. Cubren productos, inventario, kardex, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP. Las pruebas PostgreSQL verifican también los ajustes concurrentes: no pierden entradas simultáneas al inicializar inventario y evitan que dos salidas sobre stock limitado produzcan existencias negativas.
 
 ## Construcción
 
@@ -311,7 +311,6 @@ src/test/java/com/example/inventory/
 ## Alcance pendiente
 
 - Revocación inmediata de access tokens y cambios de rol instantáneos.
-- Prueba dedicada de ajustes concurrentes.
 - Operación de rotación, respaldo y monitoreo de claves.
 
 ## Detener el entorno local
