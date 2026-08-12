@@ -6,4 +6,7 @@ import java.util.UUID;
 public interface ProductCatalog {
 
     void requireProduct(UUID productId);
+
+    /** Requires the database record even when it was soft-deleted. */
+    void requireStoredProduct(UUID productId);
 }

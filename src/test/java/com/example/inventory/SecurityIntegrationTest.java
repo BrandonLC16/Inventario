@@ -104,6 +104,18 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quantityDelta\":1}"))
                 .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/orders")
+                        .header(AUTHORIZATION, "Bearer " + salesToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":"%s","quantity":1}]}
+                                """.formatted(productId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+        mockMvc.perform(get("/api/orders")
+                        .header(AUTHORIZATION, "Bearer " + managerToken))
+                .andExpect(status().isForbidden());
     }
 
     @Test

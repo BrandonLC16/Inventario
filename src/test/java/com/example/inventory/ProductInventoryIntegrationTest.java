@@ -22,11 +22,12 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
 
     private static final String PASSWORD = "regression-password-123";
     private String adminToken;
+    private UUID adminId;
 
     @BeforeEach
     void authenticateAdmin() throws Exception {
-        createUser("regression-admin", PASSWORD, true, false,
-                com.example.inventory.users.RoleName.ADMIN);
+        adminId = createUser("regression-admin", PASSWORD, true, false,
+                com.example.inventory.users.RoleName.ADMIN).getId();
         adminToken = login("regression-admin", PASSWORD);
     }
 
@@ -87,6 +88,19 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.quantity").value(7));
         adjust(productId, -8).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Inventory quantity cannot be negative"));
+    }
+
+    @Test
+    void manualAdjustmentRecordsAuthenticatedUser() throws Exception {
+        UUID productId = idFromLocation(createProduct("AUDIT-1", "Audited product"));
+
+        adjust(productId, 4).andExpect(status().isOk());
+
+        String responsibleUser = jdbcTemplate.queryForObject("""
+                SELECT responsible_user FROM stock_movements
+                WHERE product_id = ? AND movement_type = 'INITIAL_STOCK'
+                """, String.class, productId);
+        org.junit.jupiter.api.Assertions.assertEquals(adminId.toString(), responsibleUser);
     }
 
     @Test

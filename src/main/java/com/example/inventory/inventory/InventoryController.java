@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,7 +36,8 @@ class InventoryController {
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @Operation(summary = "Adjust stock", description = "Applies an increment or decrement atomically")
     InventoryResponse adjust(@PathVariable UUID productId,
-                             @Valid @RequestBody StockAdjustmentRequest request) {
-        return service.adjust(productId, request.quantityDelta());
+                             @Valid @RequestBody StockAdjustmentRequest request,
+                             @AuthenticationPrincipal Jwt jwt) {
+        return service.adjust(productId, request.quantityDelta(), jwt.getSubject());
     }
 }

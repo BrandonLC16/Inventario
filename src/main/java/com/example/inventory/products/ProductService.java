@@ -60,6 +60,13 @@ class ProductService implements ProductCatalog {
         }
     }
 
+    @Override
+    public void requireStoredProduct(UUID productId) {
+        if (!repository.existsById(productId)) {
+            throw new NotFoundException("Product %s was not found".formatted(productId));
+        }
+    }
+
     private Product findEntity(UUID id) {
         return repository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Product %s was not found".formatted(id)));

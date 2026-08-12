@@ -31,7 +31,8 @@ class InventoryService implements InventoryOperations {
     }
 
     @Transactional
-    InventoryResponse adjust(UUID productId, int delta) {
+    InventoryResponse adjust(UUID productId, int delta, String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
         productCatalog.requireProduct(productId);
         if (delta == 0) {
             throw new BadRequestException("Inventory adjustment must not be zero");
@@ -50,7 +51,7 @@ class InventoryService implements InventoryOperations {
         StockMovementType type = initialStock && delta > 0
                 ? StockMovementType.INITIAL_STOCK
                 : delta > 0 ? StockMovementType.MANUAL_IN : StockMovementType.MANUAL_OUT;
-        recordMovement(item, type, delta, balanceBefore, "MANUAL:" + UUID.randomUUID(), null);
+        recordMovement(item, type, delta, balanceBefore, "MANUAL:" + UUID.randomUUID(), actor);
         return InventoryResponse.from(item);
     }
 
@@ -58,6 +59,7 @@ class InventoryService implements InventoryOperations {
     @Transactional
     public void consumeForOrder(UUID productId, int quantity, UUID orderId,
                                 String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
         productCatalog.requireProduct(productId);
         repository.ensureExists(productId);
@@ -69,15 +71,16 @@ class InventoryService implements InventoryOperations {
             throw insufficientStock(productId);
         }
         recordMovement(item, StockMovementType.ORDER_CONFIRMED, -quantity,
-                balanceBefore, orderId.toString(), responsibleUser);
+                balanceBefore, orderId.toString(), actor);
     }
 
     @Override
     @Transactional
     public void restoreForOrder(UUID productId, int quantity, UUID orderId,
                                 String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
-        productCatalog.requireProduct(productId);
+        productCatalog.requireStoredProduct(productId);
         repository.ensureExists(productId);
         InventoryItem item = lockInventory(productId);
         int balanceBefore = item.getQuantity();
@@ -87,7 +90,7 @@ class InventoryService implements InventoryOperations {
             throw new ConflictException(exception.getMessage());
         }
         recordMovement(item, StockMovementType.ORDER_CANCELLED, quantity,
-                balanceBefore, orderId.toString(), responsibleUser);
+                balanceBefore, orderId.toString(), actor);
     }
 
     private InventoryItem lockInventory(UUID productId) {
@@ -111,5 +114,12 @@ class InventoryService implements InventoryOperations {
         if (quantity <= 0) {
             throw new BadRequestException("Quantity must be greater than zero");
         }
+    }
+
+    private String requireResponsibleUser(String responsibleUser) {
+        if (responsibleUser == null || responsibleUser.isBlank()) {
+            throw new IllegalArgumentException("The responsible user is required");
+        }
+        return responsibleUser.trim();
     }
 }

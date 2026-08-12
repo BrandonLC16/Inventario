@@ -221,6 +221,26 @@ class ProductServiceTest {
         assertSame(failure, thrown);
     }
 
+    @Test
+    void requireStoredProductAcceptsSoftDeletedDatabaseRecord() {
+        UUID productId = UUID.randomUUID();
+        when(repository.existsById(productId)).thenReturn(true);
+
+        service().requireStoredProduct(productId);
+
+        verify(repository).existsById(productId);
+    }
+
+    @Test
+    void requireStoredProductRejectsMissingDatabaseRecord() {
+        UUID productId = UUID.randomUUID();
+
+        NotFoundException error = assertThrows(
+                NotFoundException.class, () -> service().requireStoredProduct(productId));
+
+        assertEquals("Product %s was not found".formatted(productId), error.getMessage());
+    }
+
     private ProductService service() {
         return new ProductService(repository);
     }

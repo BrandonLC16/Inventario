@@ -104,6 +104,8 @@ public class SecurityConfiguration {
                             .authenticated();
                     authorize.requestMatchers(HttpMethod.PATCH, "/api/inventory/*/adjustments")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
+                    authorize.requestMatchers("/api/orders", "/api/orders/**")
+                            .hasAnyRole(RoleName.ADMIN.name(), RoleName.SALES.name());
                     authorize.anyRequest().authenticated();
                 });
         return http.build();
