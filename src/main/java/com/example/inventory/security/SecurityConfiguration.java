@@ -100,6 +100,8 @@ public class SecurityConfiguration {
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
                     authorize.requestMatchers(HttpMethod.DELETE, "/api/products/*")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
+                    authorize.requestMatchers(HttpMethod.GET, "/api/inventory/*/movements")
+                            .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
                     authorize.requestMatchers(HttpMethod.GET, "/api/inventory/*")
                             .authenticated();
                     authorize.requestMatchers(HttpMethod.PATCH, "/api/inventory/*/adjustments")

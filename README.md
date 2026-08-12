@@ -9,7 +9,7 @@ El proyecto implementa:
 - CRUD de productos con SKU único, normalización a mayúsculas y borrado lógico.
 - Consulta y ajustes atómicos de inventario, sin permitir existencias negativas.
 - Bloqueo pesimista durante las modificaciones de stock.
-- Registro interno de movimientos de inventario (kardex).
+- Consulta operativa paginada del kardex, con filtros y trazabilidad histórica.
 - Creación y consulta de pedidos, con confirmación y cancelación idempotentes.
 - Confirmación transaccional: descuenta todos los artículos o revierte el pedido completo.
 - Cancelación transaccional: restaura existencias exactamente una vez.
@@ -21,7 +21,6 @@ El proyecto implementa:
 - Migraciones de base de datos con Flyway.
 - Pruebas unitarias y de integración con PostgreSQL mediante Testcontainers.
 
-Todavía no existe un endpoint para consultar los movimientos de inventario.
 
 ## Tecnologías
 
@@ -123,6 +122,7 @@ Los access tokens son stateless y siguen válidos hasta expirar. No existe una d
 | Consultar productos e inventario | Sí | Sí | Sí |
 | Crear, modificar o eliminar productos | Sí | Sí | No |
 | Ajustar inventario | Sí | Sí | No |
+| Consultar el kardex | Sí | Sí | No |
 | Crear, consultar, confirmar o cancelar pedidos | Sí | No | Sí |
 | Administrar usuarios y roles | Sí | No | No |
 | Acceder a OpenAPI/Swagger habilitado | Sí | No | No |
@@ -139,6 +139,7 @@ Todos estos endpoints requieren un access token.
 | `PUT` | `/api/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Reemplaza los campos editables |
 | `DELETE` | `/api/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Elimina lógicamente; responde `204` |
 | `GET` | `/api/inventory/{productId}` | Autenticado | Consulta las existencias |
+| `GET` | `/api/inventory/{productId}/movements` | `ADMIN`, `INVENTORY_MANAGER` | Consulta el kardex |
 | `PATCH` | `/api/inventory/{productId}/adjustments` | `ADMIN`, `INVENTORY_MANAGER` | Suma o resta existencias |
 
 Producto de ejemplo:
@@ -151,7 +152,24 @@ El SKU se recorta y guarda en mayúsculas. Su unicidad no distingue mayúsculas 
 
 Para ajustar inventario envía `{"quantityDelta":10}`. El valor debe ser distinto de cero: uno positivo registra una entrada y uno negativo una salida. La operación responde `400` si deja el saldo en negativo. Si aún no hay registro de inventario, la consulta devuelve cantidad `0` y `updatedAt: null`.
 
-Cada ajuste exitoso genera un movimiento interno con saldo anterior y posterior, tipo, referencia y el UUID del usuario autenticado en `responsible_user`. La primera entrada usa `INITIAL_STOCK`; las siguientes, `MANUAL_IN` o `MANUAL_OUT`. El historial permanece tras eliminar el producto, pero aún no se expone por HTTP.
+Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, referencia y el UUID del usuario autenticado en `responsible_user`. La primera entrada usa `INITIAL_STOCK`; las siguientes, `MANUAL_IN` o `MANUAL_OUT`.
+
+### Consulta del kardex
+
+`GET /api/inventory/{productId}/movements` devuelve los movimientos en orden descendente por `occurredAt` y usa `id` como desempate para mantener estable la paginación. El historial se puede consultar incluso si el producto fue eliminado lógicamente.
+
+| Parámetro | Predeterminado | Descripción |
+|---|---|---|
+| `page` | `0` | Índice de página, desde cero |
+| `size` | `20` | Elementos por página, entre 1 y 100 |
+| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_CONFIRMED` u `ORDER_CANCELLED` |
+| `from` | Sin filtro | Fecha inicial inclusiva en ISO-8601 |
+| `to` | Sin filtro | Fecha final inclusiva en ISO-8601 |
+| `reference` | Sin filtro | Coincidencia exacta con la referencia de negocio |
+
+Los filtros son opcionales y combinables. `from` no puede ser posterior a `to`. Cada elemento contiene `movementType`, `quantityDelta`, `balanceBefore`, `balanceAfter`, `businessReference`, `occurredAt` y `responsibleUser`, además de los identificadores del movimiento y producto.
+
+La respuesta contiene `content`, `page`, `size`, `totalElements`, `totalPages`, `first` y `last`.
 
 ## Pedidos
 
@@ -201,7 +219,7 @@ El usuario y correo se normalizan a minúsculas y deben ser únicos. Los roles n
 
 Los errores usan los campos `timestamp`, `status`, `error`, `message`, `path` y `validationErrors`.
 
-- `400`: cuerpo inválido, ajuste cero o inventario insuficiente.
+- `400`: cuerpo inválido, ajuste cero, inventario insuficiente o filtros/paginación inválidos.
 - `401`: autenticación ausente o inválida.
 - `403`: rol insuficiente.
 - `404`: producto o usuario inexistente.
@@ -256,7 +274,7 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 85 pruebas: 65 unitarias y 20 de integración. Cubren productos, inventario, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP. Las pruebas PostgreSQL de pedidos verifican validaciones, transiciones, rollback, idempotencia, confirmación/cancelación concurrentes y ausencia de sobreventa entre pedidos simultáneos.
+Actualmente hay 90 pruebas: 65 unitarias y 25 de integración. Cubren productos, inventario, kardex, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP. Las pruebas PostgreSQL del kardex verifican movimientos manuales y de pedidos, orden, paginación, filtros combinables, productos eliminados y permisos.
 
 ## Construcción
 
@@ -275,7 +293,7 @@ En macOS o Linux usa `./mvnw` y separadores de ruta `/`. PostgreSQL y las variab
 src/main/java/com/example/inventory/
 ├── auth/          Login, refresh, logout y sesión actual
 ├── config/        Configuración de OpenAPI
-├── inventory/     Existencias, movimientos y contrato para pedidos
+├── inventory/     Existencias, ajustes, kardex y contrato para pedidos
 ├── orders/        Creación, consulta, confirmación y cancelación
 ├── products/      Catálogo y borrado lógico
 ├── security/      JWT, CORS y autorización
@@ -292,7 +310,6 @@ src/test/java/com/example/inventory/
 
 ## Alcance pendiente
 
-- Endpoint de consulta del kardex.
 - Revocación inmediata de access tokens y cambios de rol instantáneos.
 - Prueba dedicada de ajustes concurrentes.
 - Operación de rotación, respaldo y monitoreo de claves.

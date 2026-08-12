@@ -58,4 +58,14 @@ class StockMovement {
         this.occurredAt = Instant.now();
         this.responsibleUser = responsibleUser;
     }
+
+    UUID getId() { return id; }
+    UUID getProductId() { return productId; }
+    StockMovementType getMovementType() { return movementType; }
+    int getQuantityDelta() { return quantityDelta; }
+    int getBalanceBefore() { return balanceBefore; }
+    int getBalanceAfter() { return balanceAfter; }
+    String getBusinessReference() { return businessReference; }
+    Instant getOccurredAt() { return occurredAt; }
+    String getResponsibleUser() { return responsibleUser; }
 }
