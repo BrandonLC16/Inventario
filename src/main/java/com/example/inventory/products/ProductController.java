@@ -14,9 +14,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.example.inventory.shared.PageResponse;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -32,8 +33,13 @@ class ProductController {
 
     @GetMapping
     @Operation(summary = "List products")
-    List<ProductResponse> findAll() {
-        return service.findAll();
+    PageResponse<ProductResponse> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sku,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Boolean active) {
+        return service.findAll(page, size, sku, name, active);
     }
 
     @GetMapping("/{id}")

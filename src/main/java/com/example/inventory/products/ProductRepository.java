@@ -1,15 +1,13 @@
 package com.example.inventory.products;
 
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-interface ProductRepository extends JpaRepository<Product, UUID> {
-
-    List<Product> findAllByDeletedFalse(Sort sort);
+interface ProductRepository extends JpaRepository<Product, UUID>,
+        JpaSpecificationExecutor<Product> {
 
     Optional<Product> findByIdAndDeletedFalse(UUID id);
 

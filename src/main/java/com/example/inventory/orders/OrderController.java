@@ -12,9 +12,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.http.HttpStatus;
+import org.springframework.format.annotation.DateTimeFormat;
+import com.example.inventory.shared.PageResponse;
+import java.time.Instant;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -30,8 +37,17 @@ public class OrderController {
 
     @GetMapping
     @Operation(summary = "List orders")
-    public List<OrderResponse> findAll() {
-        return service.findAll();
+    public PageResponse<OrderResponse> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) UUID customerId,
+            @RequestParam(required = false) String folio) {
+        return service.findAll(page, size, status, from, to, customerId, folio);
     }
 
     @GetMapping("/{id}")
@@ -42,8 +58,10 @@ public class OrderController {
 
     @PostMapping
     @Operation(summary = "Create a pending order")
-    public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
-        OrderResponse response = service.create(request);
+    public ResponseEntity<OrderResponse> create(
+            @Valid @RequestBody CreateOrderRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        OrderResponse response = service.create(request, jwt.getSubject());
         return ResponseEntity.created(URI.create("/api/orders/" + response.id())).body(response);
     }
 
@@ -59,5 +77,20 @@ public class OrderController {
     public OrderResponse cancel(@PathVariable UUID id,
                                 @AuthenticationPrincipal Jwt jwt) {
         return service.cancel(id, jwt.getSubject());
+    }
+
+    @PutMapping("/{id}/items")
+    @Operation(summary = "Replace the items of a pending order")
+    public OrderResponse replaceItems(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateOrderItemsRequest request) {
+        return service.replaceItems(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete a pending order")
+    public void deletePending(@PathVariable UUID id) {
+        service.deletePending(id);
     }
 }

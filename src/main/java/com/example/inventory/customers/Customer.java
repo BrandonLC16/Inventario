@@ -1,4 +1,4 @@
-package com.example.inventory.products;
+package com.example.inventory.customers;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -7,37 +7,27 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "products")
-class Product {
+@Table(name = "customers")
+class Customer {
 
     @Id
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 64)
-    private String sku;
-
     @Column(nullable = false, length = 160)
     private String name;
 
-    @Column(length = 1000)
-    private String description;
+    @Column(name = "fiscal_identifier", length = 32)
+    private String fiscalIdentifier;
 
-    @Column(nullable = false, precision = 12, scale = 2)
-    private BigDecimal price;
+    @Column(length = 254)
+    private String email;
 
     @Column(nullable = false)
     private boolean active;
-
-    @Column(nullable = false)
-    private boolean deleted;
-
-    @Column(name = "minimum_stock", nullable = false)
-    private int minimumStock;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -45,27 +35,23 @@ class Product {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected Product() {
+    protected Customer() {
     }
 
-    Product(String sku, String name, String description, BigDecimal price, boolean active,
-            int minimumStock) {
+    Customer(String name, String fiscalIdentifier, String email, boolean active) {
         this.id = UUID.randomUUID();
-        update(sku, name, description, price, active, minimumStock);
+        update(name, fiscalIdentifier, email, active);
     }
 
-    void update(String sku, String name, String description, BigDecimal price, boolean active,
-                int minimumStock) {
-        this.sku = sku;
+    void update(String name, String fiscalIdentifier, String email, boolean active) {
         this.name = name;
-        this.description = description;
-        this.price = price;
+        this.fiscalIdentifier = fiscalIdentifier;
+        this.email = email;
         this.active = active;
-        this.minimumStock = minimumStock;
     }
 
-    void markDeleted() {
-        deleted = true;
+    void deactivate() {
+        active = false;
     }
 
     @PrePersist
@@ -84,12 +70,10 @@ class Product {
     }
 
     UUID getId() { return id; }
-    String getSku() { return sku; }
     String getName() { return name; }
-    String getDescription() { return description; }
-    BigDecimal getPrice() { return price; }
+    String getFiscalIdentifier() { return fiscalIdentifier; }
+    String getEmail() { return email; }
     boolean isActive() { return active; }
-    int getMinimumStock() { return minimumStock; }
     Instant getCreatedAt() { return createdAt; }
     Instant getUpdatedAt() { return updatedAt; }
 }

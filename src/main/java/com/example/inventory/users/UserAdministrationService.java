@@ -2,12 +2,20 @@ package com.example.inventory.users;
 
 import com.example.inventory.shared.ConflictException;
 import com.example.inventory.shared.NotFoundException;
+import com.example.inventory.security.SessionRevoker;
+import com.example.inventory.shared.PageResponse;
+import com.example.inventory.shared.PageSupport;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -20,16 +28,26 @@ public class UserAdministrationService {
     private final UserAccountRepository users;
     private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
+    private final SessionRevoker sessions;
 
     public UserAdministrationService(UserAccountRepository users, RoleRepository roles,
-                                     PasswordEncoder passwordEncoder) {
+                                     PasswordEncoder passwordEncoder,
+                                     SessionRevoker sessions) {
         this.users = users;
         this.roles = roles;
         this.passwordEncoder = passwordEncoder;
+        this.sessions = sessions;
     }
 
-    public List<UserResponse> findAll() {
-        return users.findAllByOrderByUsernameAsc().stream().map(UserResponse::from).toList();
+    public PageResponse<UserResponse> findAll(
+            int page, int size, String username, String email, RoleName role,
+            Boolean enabled, Boolean locked) {
+        var pageable = PageSupport.request(page, size,
+                Sort.by(Sort.Direction.ASC, "username")
+                        .and(Sort.by(Sort.Direction.ASC, "id")));
+        return PageResponse.from(users.findAll(
+                filters(username, email, role, enabled, locked), pageable),
+                UserResponse::from);
     }
 
     public UserResponse findById(UUID id) {
@@ -60,7 +78,7 @@ public class UserAdministrationService {
                 || account.isLocked() != request.locked();
         account.updateStatus(request.enabled(), request.locked());
         if (changed) {
-            account.revokeAccessTokens();
+            sessions.revokeAll(account);
         }
         return UserResponse.from(account);
     }
@@ -79,9 +97,21 @@ public class UserAdministrationService {
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         account.replaceRoles(replacement);
         if (!currentRoles.equals(request.roles())) {
-            account.revokeAccessTokens();
+            sessions.revokeAll(account);
         }
         return UserResponse.from(account);
+    }
+
+    @Transactional
+    public void resetPassword(UUID id, ResetPasswordRequest request) {
+        UserAccount account = requireUser(id);
+        account.replacePasswordHash(passwordEncoder.encode(request.newPassword()));
+        sessions.revokeAll(account);
+    }
+
+    @Transactional
+    public void revokeSessions(UUID id) {
+        sessions.revokeAll(requireUser(id));
     }
 
     private void lockAdministratorChanges() {
@@ -114,5 +144,40 @@ public class UserAdministrationService {
     private boolean isActiveAdmin(UserAccount account) {
         return account.isEnabled() && !account.isLocked()
                 && account.getRoles().stream().anyMatch(role -> role.getName() == RoleName.ADMIN);
+    }
+
+    private Specification<UserAccount> filters(
+            String username, String email, RoleName role,
+            Boolean enabled, Boolean locked) {
+        String normalizedUsername = normalizeFilter(username);
+        String normalizedEmail = normalizeFilter(email);
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (normalizedUsername != null) {
+                predicates.add(builder.like(builder.lower(root.get("username")),
+                        "%" + normalizedUsername + "%"));
+            }
+            if (normalizedEmail != null) {
+                predicates.add(builder.like(builder.lower(root.get("email")),
+                        "%" + normalizedEmail + "%"));
+            }
+            if (role != null) {
+                predicates.add(builder.equal(
+                        root.join("roles", JoinType.INNER).get("name"), role));
+                query.distinct(true);
+            }
+            if (enabled != null) {
+                predicates.add(builder.equal(root.get("enabled"), enabled));
+            }
+            if (locked != null) {
+                predicates.add(builder.equal(root.get("locked"), locked));
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private String normalizeFilter(String value) {
+        return value == null || value.isBlank()
+                ? null : value.trim().toLowerCase(Locale.ROOT);
     }
 }

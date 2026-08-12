@@ -74,7 +74,7 @@ abstract class AbstractIntegrationTest {
     void cleanDatabase() {
         jdbcTemplate.execute(
                 "TRUNCATE TABLE refresh_tokens, user_roles, app_users, stock_movements, " +
-                        "order_items, orders, inventory, products CASCADE");
+                        "order_items, orders, inventory, products, customers CASCADE");
     }
 
     UserAccount createUser(String username, String password, boolean enabled,

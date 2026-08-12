@@ -14,6 +14,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -37,6 +38,7 @@ class AuthServiceTest {
     private RefreshTokenService refreshTokens;
     private JwtService jwtService;
     private UserAccountRepository users;
+    private PasswordEncoder passwordEncoder;
     private AuthService service;
 
     @BeforeEach
@@ -45,8 +47,9 @@ class AuthServiceTest {
         refreshTokens = mock(RefreshTokenService.class);
         jwtService = mock(JwtService.class);
         users = mock(UserAccountRepository.class);
+        passwordEncoder = mock(PasswordEncoder.class);
         service = new AuthService(authenticationManager, refreshTokens, jwtService, users,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                passwordEncoder, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test

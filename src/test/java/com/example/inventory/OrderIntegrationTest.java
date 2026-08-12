@@ -52,7 +52,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.items[0].quantity").value(4));
         performSales(get("/api/orders"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(orderId.toString()));
+                .andExpect(jsonPath("$.content[0].id").value(orderId.toString()));
         performSales(post("/api/orders/{id}/cancel", orderId))
                 .andExpect(status().isConflict());
 

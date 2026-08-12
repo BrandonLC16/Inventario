@@ -2,6 +2,13 @@ package com.example.inventory.orders;
 
 import com.example.inventory.inventory.InventoryOperations;
 import com.example.inventory.products.ProductCatalog;
+import com.example.inventory.products.ProductSnapshot;
+import com.example.inventory.customers.CustomerDirectory;
+import com.example.inventory.shared.PageResponse;
+import com.example.inventory.shared.PageSupport;
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import com.example.inventory.shared.BadRequestException;
 import com.example.inventory.shared.ConflictException;
 import com.example.inventory.shared.NotFoundException;
@@ -14,6 +21,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
+import java.util.ArrayList;
 
 @Service
 @PreAuthorize("hasAnyRole('ADMIN', 'SALES')")
@@ -23,18 +32,26 @@ public class OrderService {
     private final OrderRepository orders;
     private final ProductCatalog products;
     private final InventoryOperations inventory;
+    private final CustomerDirectory customers;
 
     public OrderService(OrderRepository orders, ProductCatalog products,
-                        InventoryOperations inventory) {
+                        InventoryOperations inventory, CustomerDirectory customers) {
         this.orders = orders;
         this.products = products;
         this.inventory = inventory;
+        this.customers = customers;
     }
 
-    public List<OrderResponse> findAll() {
-        return orders.findAllByOrderByCreatedAtDesc().stream()
-                .map(OrderResponse::from)
-                .toList();
+    public PageResponse<OrderResponse> findAll(int page, int size, OrderStatus status,
+                                               Instant from, Instant to, UUID customerId,
+                                               String folio) {
+        PageSupport.validateDateRange(from, to);
+        var pageable = PageSupport.request(page, size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+                        .and(Sort.by(Sort.Direction.DESC, "id")));
+        return PageResponse.from(orders.findAll(
+                filters(status, from, to, customerId, folio), pageable),
+                OrderResponse::from);
     }
 
     public OrderResponse findById(UUID id) {
@@ -43,11 +60,36 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponse create(CreateOrderRequest request) {
+    public OrderResponse create(CreateOrderRequest request, String responsibleUser) {
         List<CreateOrderItemRequest> items = validateItems(request);
-        items.stream().map(CreateOrderItemRequest::productId)
-                .sorted().forEach(products::requireProduct);
-        return OrderResponse.from(orders.saveAndFlush(new SalesOrder(items)));
+        if (request.customerId() != null) {
+            customers.requireActiveCustomer(request.customerId());
+        }
+        List<PricedOrderItem> pricedItems = priceItems(items);
+        String folio = "ORD-%010d".formatted(orders.nextFolioSequence());
+        SalesOrder order = new SalesOrder(
+                folio, request.customerId(), "MXN", requireActor(responsibleUser), pricedItems);
+        return OrderResponse.from(orders.saveAndFlush(order));
+    }
+
+    @Transactional
+    public OrderResponse replaceItems(UUID id, UpdateOrderItemsRequest request) {
+        SalesOrder order = requireForUpdate(id);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new ConflictException("Only a pending order can be updated");
+        }
+        order.replaceItems(priceItems(validateItems(request.items())));
+        orders.flush();
+        return OrderResponse.from(order);
+    }
+
+    @Transactional
+    public void deletePending(UUID id) {
+        SalesOrder order = requireForUpdate(id);
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new ConflictException("Only a pending order can be deleted");
+        }
+        orders.delete(order);
     }
 
     @Transactional
@@ -62,7 +104,7 @@ public class OrderService {
         String actor = requireActor(responsibleUser);
         sortedItems(order).forEach(item -> inventory.consumeForOrder(
                 item.getProductId(), item.getQuantity(), order.getId(), actor));
-        order.confirm();
+        order.confirm(actor);
         orders.flush();
         return OrderResponse.from(order);
     }
@@ -79,7 +121,7 @@ public class OrderService {
         String actor = requireActor(responsibleUser);
         sortedItems(order).forEach(item -> inventory.restoreForOrder(
                 item.getProductId(), item.getQuantity(), order.getId(), actor));
-        order.cancel();
+        order.cancel(actor);
         orders.flush();
         return OrderResponse.from(order);
     }
@@ -101,6 +143,47 @@ public class OrderService {
             }
         }
         return List.copyOf(request.items());
+    }
+
+    private List<CreateOrderItemRequest> validateItems(List<CreateOrderItemRequest> items) {
+        return validateItems(new CreateOrderRequest(items));
+    }
+
+    private List<PricedOrderItem> priceItems(List<CreateOrderItemRequest> items) {
+        return items.stream()
+                .sorted(Comparator.comparing(CreateOrderItemRequest::productId))
+                .map(item -> {
+                    ProductSnapshot product = products.requireProductSnapshot(item.productId());
+                    return new PricedOrderItem(
+                            product.id(), item.quantity(), product.price());
+                })
+                .toList();
+    }
+
+    private Specification<SalesOrder> filters(OrderStatus status, Instant from, Instant to,
+                                               UUID customerId, String folio) {
+        String normalizedFolio = folio == null || folio.isBlank()
+                ? null : folio.trim().toLowerCase(java.util.Locale.ROOT);
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (status != null) {
+                predicates.add(builder.equal(root.get("status"), status));
+            }
+            if (from != null) {
+                predicates.add(builder.greaterThanOrEqualTo(root.get("createdAt"), from));
+            }
+            if (to != null) {
+                predicates.add(builder.lessThanOrEqualTo(root.get("createdAt"), to));
+            }
+            if (customerId != null) {
+                predicates.add(builder.equal(root.get("customerId"), customerId));
+            }
+            if (normalizedFolio != null) {
+                predicates.add(builder.like(builder.lower(root.get("folio")),
+                        "%" + normalizedFolio + "%"));
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
     }
 
     private SalesOrder requireForUpdate(UUID id) {

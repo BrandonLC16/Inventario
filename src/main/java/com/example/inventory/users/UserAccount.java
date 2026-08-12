@@ -10,6 +10,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -49,6 +50,7 @@ public class UserAccount {
     private Instant updatedAt;
 
     @ManyToMany(fetch = FetchType.LAZY)
+    @BatchSize(size = 100)
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
@@ -78,7 +80,7 @@ public class UserAccount {
         roles.addAll(replacementRoles);
     }
 
-    void replacePasswordHash(String passwordHash) {
+    public void replacePasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
     }
 

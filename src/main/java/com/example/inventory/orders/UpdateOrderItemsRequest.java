@@ -5,13 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
-import java.util.UUID;
 
-public record CreateOrderRequest(
-        UUID customerId,
+public record UpdateOrderItemsRequest(
         @NotEmpty @Size(max = 100) List<@Valid CreateOrderItemRequest> items) {
-
-    public CreateOrderRequest(List<CreateOrderItemRequest> items) {
-        this(null, items);
-    }
 }

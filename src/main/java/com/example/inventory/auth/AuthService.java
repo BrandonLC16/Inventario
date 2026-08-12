@@ -4,10 +4,12 @@ import com.example.inventory.security.InventoryUserDetails;
 import com.example.inventory.security.JwtService;
 import com.example.inventory.users.UserAccount;
 import com.example.inventory.users.UserAccountRepository;
+import com.example.inventory.shared.BadRequestException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,17 +24,20 @@ public class AuthService {
     private final RefreshTokenService refreshTokens;
     private final JwtService jwtService;
     private final UserAccountRepository users;
+    private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
     public AuthService(AuthenticationManager authenticationManager,
                        RefreshTokenService refreshTokens,
                        JwtService jwtService,
                        UserAccountRepository users,
+                       PasswordEncoder passwordEncoder,
                        Clock clock) {
         this.authenticationManager = authenticationManager;
         this.refreshTokens = refreshTokens;
         this.jwtService = jwtService;
         this.users = users;
+        this.passwordEncoder = passwordEncoder;
         this.clock = clock;
     }
 
@@ -59,21 +64,38 @@ public class AuthService {
         refreshTokens.logout(request.refreshToken());
     }
 
+    @Transactional
+    public void changePassword(String subject, ChangePasswordRequest request) {
+        UserAccount user = requireActiveUser(subject);
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Current password is invalid");
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("New password must be different from the current password");
+        }
+        user.replacePasswordHash(passwordEncoder.encode(request.newPassword()));
+        refreshTokens.revokeAll(user);
+    }
+
     @Transactional(readOnly = true)
     public CurrentUserResponse me(String subject) {
+        UserAccount user = requireActiveUser(subject);
+        return new CurrentUserResponse(user.getId(), user.getUsername(), user.getEmail(),
+                user.getRoles().stream().map(role -> role.getName())
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+    }
+
+    private UserAccount requireActiveUser(String subject) {
         UUID userId;
         try {
             userId = UUID.fromString(subject);
         } catch (IllegalArgumentException exception) {
             throw new InvalidAuthenticationException();
         }
-        UserAccount user = users.findByIdWithRoles(userId)
+        return users.findByIdWithRoles(userId)
                 .filter(UserAccount::isEnabled)
                 .filter(account -> !account.isLocked())
                 .orElseThrow(InvalidAuthenticationException::new);
-        return new CurrentUserResponse(user.getId(), user.getUsername(), user.getEmail(),
-                user.getRoles().stream().map(role -> role.getName())
-                        .collect(java.util.stream.Collectors.toUnmodifiableSet()));
     }
 
     private TokenResponse issuePair(InventoryUserDetails user,

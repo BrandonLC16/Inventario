@@ -1,0 +1,23 @@
+package com.example.inventory.inventory;
+
+import java.util.UUID;
+
+public record LowStockResponse(
+        UUID productId,
+        String sku,
+        String name,
+        int quantity,
+        int minimumStock,
+        int replenishmentQuantity,
+        StockAlertLevel alert) {
+
+    static LowStockResponse from(LowStockProjection row) {
+        return new LowStockResponse(
+                row.getProductId(), row.getSku(), row.getName(),
+                row.getQuantity(), row.getMinimumStock(),
+                Math.max(0, row.getMinimumStock() - row.getQuantity()),
+                row.getQuantity() == 0
+                        ? StockAlertLevel.OUT_OF_STOCK
+                        : StockAlertLevel.LOW_STOCK);
+    }
+}

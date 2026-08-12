@@ -42,7 +42,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
 
         performAuthenticated(get("/api/products"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)));
+                .andExpect(jsonPath("$.content", hasSize(1)));
 
         performAuthenticated(put(location)
                         .contentType(MediaType.APPLICATION_JSON)

@@ -1,6 +1,7 @@
 package com.example.inventory.auth;
 
 import com.example.inventory.security.SecurityProperties;
+import com.example.inventory.security.SessionRevoker;
 import com.example.inventory.users.UserAccount;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,7 +15,7 @@ import java.util.Base64;
 import java.util.UUID;
 
 @Service
-public class RefreshTokenService {
+public class RefreshTokenService implements SessionRevoker {
 
     private static final int TOKEN_BYTES = 32;
 
@@ -68,6 +69,13 @@ public class RefreshTokenService {
     public void logout(String presentedToken) {
         repository.findByTokenHashForUpdate(hash(presentedToken))
                 .ifPresent(token -> revokeFamilyAndAccessTokens(token, clock.instant()));
+    }
+
+    @Override
+    @Transactional
+    public void revokeAll(UserAccount user) {
+        repository.revokeAllActiveByUserId(user.getId(), clock.instant());
+        user.revokeAccessTokens();
     }
 
     private void revokeFamilyAndAccessTokens(RefreshToken token, Instant revokedAt) {

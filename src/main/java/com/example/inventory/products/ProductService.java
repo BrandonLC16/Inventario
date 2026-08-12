@@ -2,10 +2,15 @@ package com.example.inventory.products;
 
 import com.example.inventory.shared.ConflictException;
 import com.example.inventory.shared.NotFoundException;
+import com.example.inventory.shared.PageResponse;
+import com.example.inventory.shared.PageSupport;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,10 +24,13 @@ class ProductService implements ProductCatalog {
         this.repository = repository;
     }
 
-    List<ProductResponse> findAll() {
-        return repository.findAllByDeletedFalse(Sort.by("name").ascending()).stream()
-                .map(ProductResponse::from)
-                .toList();
+    PageResponse<ProductResponse> findAll(int page, int size, String sku,
+                                          String name, Boolean active) {
+        var pageable = PageSupport.request(page, size,
+                Sort.by(Sort.Direction.ASC, "name")
+                        .and(Sort.by(Sort.Direction.ASC, "id")));
+        return PageResponse.from(repository.findAll(filters(sku, name, active), pageable),
+                ProductResponse::from);
     }
 
     ProductResponse findById(UUID id) {
@@ -34,7 +42,7 @@ class ProductService implements ProductCatalog {
         String sku = normalizeSku(request.sku());
         ensureSkuIsAvailable(sku, null);
         Product product = new Product(sku, request.name().trim(), trimToNull(request.description()),
-                request.price(), request.active());
+                request.price(), request.active(), minimumStock(request.minimumStock()));
         return ProductResponse.from(repository.save(product));
     }
 
@@ -44,7 +52,7 @@ class ProductService implements ProductCatalog {
         String sku = normalizeSku(request.sku());
         ensureSkuIsAvailable(sku, id);
         product.update(sku, request.name().trim(), trimToNull(request.description()),
-                request.price(), request.active());
+                request.price(), request.active(), minimumStock(request.minimumStock()));
         return ProductResponse.from(product);
     }
 
@@ -61,6 +69,12 @@ class ProductService implements ProductCatalog {
     }
 
     @Override
+    public ProductSnapshot requireProductSnapshot(UUID productId) {
+        Product product = findEntity(productId);
+        return new ProductSnapshot(product.getId(), product.getPrice());
+    }
+
+    @Override
     public void requireStoredProduct(UUID productId) {
         if (!repository.existsById(productId)) {
             throw new NotFoundException("Product %s was not found".formatted(productId));
@@ -70,6 +84,31 @@ class ProductService implements ProductCatalog {
     private Product findEntity(UUID id) {
         return repository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new NotFoundException("Product %s was not found".formatted(id)));
+    }
+
+    private Specification<Product> filters(String sku, String name, Boolean active) {
+        String normalizedSku = trimToNull(sku);
+        String normalizedName = trimToNull(name);
+        return (root, query, builder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(builder.isFalse(root.get("deleted")));
+            if (normalizedSku != null) {
+                predicates.add(builder.like(builder.lower(root.get("sku")),
+                        "%" + normalizedSku.toLowerCase(java.util.Locale.ROOT) + "%"));
+            }
+            if (normalizedName != null) {
+                predicates.add(builder.like(builder.lower(root.get("name")),
+                        "%" + normalizedName.toLowerCase(java.util.Locale.ROOT) + "%"));
+            }
+            if (active != null) {
+                predicates.add(builder.equal(root.get("active"), active));
+            }
+            return builder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private int minimumStock(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private void ensureSkuIsAvailable(String sku, UUID currentId) {

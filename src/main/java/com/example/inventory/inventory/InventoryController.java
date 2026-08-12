@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.example.inventory.shared.PageResponse;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -54,12 +55,24 @@ class InventoryController {
                 productId, page, size, type, from, to, reference);
     }
 
+    @GetMapping("/low-stock")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
+    @Operation(summary = "List low-stock and out-of-stock products")
+    PageResponse<LowStockResponse> findLowStock(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "false") boolean outOfStockOnly) {
+        return service.findLowStock(page, size, search, outOfStockOnly);
+    }
+
     @PatchMapping("/{productId}/adjustments")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @Operation(summary = "Adjust stock", description = "Applies an increment or decrement atomically")
     InventoryResponse adjust(@PathVariable UUID productId,
                              @Valid @RequestBody StockAdjustmentRequest request,
                              @AuthenticationPrincipal Jwt jwt) {
-        return service.adjust(productId, request.quantityDelta(), jwt.getSubject());
+        return service.adjust(productId, request.quantityDelta(),
+                request.reference(), jwt.getSubject());
     }
 }

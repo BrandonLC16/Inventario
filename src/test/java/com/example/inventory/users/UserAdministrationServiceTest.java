@@ -4,6 +4,8 @@ import com.example.inventory.shared.ConflictException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import com.example.inventory.security.SessionRevoker;
+import static org.mockito.Mockito.doAnswer;
 
 import java.util.Optional;
 import java.util.Set;
@@ -24,6 +26,7 @@ class UserAdministrationServiceTest {
     private RoleRepository roles;
     private PasswordEncoder encoder;
     private UserAdministrationService service;
+    private SessionRevoker sessions;
 
     @BeforeEach
     void setUp() {
@@ -31,7 +34,12 @@ class UserAdministrationServiceTest {
         roles = mock(RoleRepository.class);
         when(roles.findByNameForUpdate(RoleName.ADMIN)).thenReturn(Optional.of(UserTestFixtures.role(RoleName.ADMIN)));
         encoder = mock(PasswordEncoder.class);
-        service = new UserAdministrationService(users, roles, encoder);
+        sessions = mock(SessionRevoker.class);
+        doAnswer(invocation -> {
+            invocation.<UserAccount>getArgument(0).revokeAccessTokens();
+            return null;
+        }).when(sessions).revokeAll(any(UserAccount.class));
+        service = new UserAdministrationService(users, roles, encoder, sessions);
     }
 
     @Test

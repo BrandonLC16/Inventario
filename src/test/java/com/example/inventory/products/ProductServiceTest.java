@@ -7,7 +7,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -37,15 +39,16 @@ class ProductServiceTest {
     void findAllRequestsProductsSortedByName() {
         Product keyboard = product("KEY-1", "Keyboard");
         Product mouse = product("MOU-1", "Mouse");
-        when(repository.findAllByDeletedFalse(any(Sort.class))).thenReturn(List.of(keyboard, mouse));
+        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(keyboard, mouse)));
 
-        List<ProductResponse> responses = service().findAll();
+        var responses = service().findAll(0, 20, null, null, null);
 
         assertEquals(List.of("Keyboard", "Mouse"),
-                responses.stream().map(ProductResponse::name).toList());
-        ArgumentCaptor<Sort> sort = ArgumentCaptor.forClass(Sort.class);
-        verify(repository).findAllByDeletedFalse(sort.capture());
-        assertEquals(Sort.by("name").ascending(), sort.getValue());
+                responses.content().stream().map(ProductResponse::name).toList());
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(repository).findAll(any(Specification.class), pageable.capture());
+        assertEquals("name: ASC,id: ASC", pageable.getValue().getSort().toString());
     }
 
     @Test
@@ -176,7 +179,7 @@ class ProductServiceTest {
         service().delete(product.getId());
 
         verify(product).markDeleted();
-        verify(repository, never()).delete(any());
+        verify(repository, never()).delete(any(Product.class));
     }
 
     @Test
@@ -186,7 +189,7 @@ class ProductServiceTest {
 
         assertThrows(NotFoundException.class, () -> service().delete(productId));
 
-        verify(repository, never()).delete(any());
+        verify(repository, never()).delete(any(Product.class));
     }
 
     @Test
@@ -246,7 +249,7 @@ class ProductServiceTest {
     }
 
     private Product product(String sku, String name) {
-        return new Product(sku, name, null, new BigDecimal("10.00"), true);
+        return new Product(sku, name, null, new BigDecimal("10.00"), true, 0);
     }
 
     private ProductRequest request(String sku, String name, String description) {

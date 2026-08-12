@@ -7,6 +7,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import com.example.inventory.shared.PageResponse;
+import com.example.inventory.shared.PageSupport;
+import org.springframework.data.domain.Sort;
 
 @Service
 @Transactional(readOnly = true)
@@ -32,6 +35,12 @@ class InventoryService implements InventoryOperations {
 
     @Transactional
     InventoryResponse adjust(UUID productId, int delta, String responsibleUser) {
+        return adjust(productId, delta, null, responsibleUser);
+    }
+
+    @Transactional
+    InventoryResponse adjust(UUID productId, int delta, String reference,
+                             String responsibleUser) {
         String actor = requireResponsibleUser(responsibleUser);
         productCatalog.requireProduct(productId);
         if (delta == 0) {
@@ -51,8 +60,21 @@ class InventoryService implements InventoryOperations {
         StockMovementType type = initialStock && delta > 0
                 ? StockMovementType.INITIAL_STOCK
                 : delta > 0 ? StockMovementType.MANUAL_IN : StockMovementType.MANUAL_OUT;
-        recordMovement(item, type, delta, balanceBefore, "MANUAL:" + UUID.randomUUID(), actor);
+        String businessReference = normalizeReference(reference);
+        recordMovement(item, type, delta, balanceBefore,
+                businessReference == null
+                        ? "MANUAL:" + UUID.randomUUID()
+                        : businessReference,
+                actor);
         return InventoryResponse.from(item);
+    }
+
+    PageResponse<LowStockResponse> findLowStock(
+            int page, int size, String search, boolean outOfStockOnly) {
+        String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
+        var pageable = PageSupport.request(page, size, Sort.unsorted());
+        return PageResponse.from(repository.findLowStock(
+                normalizedSearch, outOfStockOnly, pageable), LowStockResponse::from);
     }
 
     @Override
@@ -121,5 +143,16 @@ class InventoryService implements InventoryOperations {
             throw new IllegalArgumentException("The responsible user is required");
         }
         return responsibleUser.trim();
+    }
+
+    private String normalizeReference(String reference) {
+        if (reference == null || reference.isBlank()) {
+            return null;
+        }
+        String normalized = reference.trim();
+        if (normalized.length() > 128) {
+            throw new BadRequestException("Reference must not exceed 128 characters");
+        }
+        return normalized;
     }
 }

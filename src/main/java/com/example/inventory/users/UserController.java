@@ -12,9 +12,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
+import com.example.inventory.shared.PageResponse;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -37,8 +40,15 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "List users")
-    public List<UserResponse> findAll() {
-        return service.findAll();
+    public PageResponse<UserResponse> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) RoleName role,
+            @RequestParam(required = false) Boolean enabled,
+            @RequestParam(required = false) Boolean locked) {
+        return service.findAll(page, size, username, email, role, enabled, locked);
     }
 
     @GetMapping("/{id}")
@@ -59,5 +69,20 @@ public class UserController {
     public UserResponse replaceRoles(@PathVariable UUID id,
                                      @Valid @RequestBody UpdateUserRolesRequest request) {
         return service.replaceRoles(id, request);
+    }
+
+    @PutMapping("/{id}/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Administratively reset a user's password")
+    public void resetPassword(@PathVariable UUID id,
+                              @Valid @RequestBody ResetPasswordRequest request) {
+        service.resetPassword(id, request);
+    }
+
+    @PostMapping("/{id}/sessions/revoke")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Revoke all sessions for a user")
+    public void revokeSessions(@PathVariable UUID id) {
+        service.revokeSessions(id);
     }
 }
