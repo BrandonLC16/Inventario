@@ -39,6 +39,9 @@ public class UserAccount {
     @Column(nullable = false)
     private boolean locked;
 
+    @Column(name = "access_token_version", nullable = false)
+    private long accessTokenVersion;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -84,6 +87,10 @@ public class UserAccount {
         this.locked = locked;
     }
 
+    public void revokeAccessTokens() {
+        accessTokenVersion = Math.incrementExact(accessTokenVersion);
+    }
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -121,6 +128,10 @@ public class UserAccount {
 
     public boolean isLocked() {
         return locked;
+    }
+
+    public long getAccessTokenVersion() {
+        return accessTokenVersion;
     }
 
     public Instant getCreatedAt() {

@@ -31,6 +31,7 @@ public class JwtService {
                 .subject(user.id().toString())
                 .id(UUID.randomUUID().toString())
                 .claim("roles", user.roles().stream().map(Enum::name).sorted().toList())
+                .claim(AccessTokenValidator.TOKEN_VERSION_CLAIM, user.accessTokenVersion())
                 .build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).type("JWT").build();
         String token = encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

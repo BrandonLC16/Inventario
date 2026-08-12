@@ -113,7 +113,7 @@ Envía el access token como `Authorization: Bearer <ACCESS_TOKEN>`. Para renovar
 
 Los fallos de login, los usuarios inexistentes, deshabilitados o bloqueados y los refresh tokens inválidos al renovar usan la misma respuesta genérica `401`. Un refresh token rotado o revocado no puede reutilizarse. El logout revoca toda su familia y es idempotente: un token desconocido también recibe `204`.
 
-Los access tokens son stateless y siguen válidos hasta expirar. No existe una denylist, por lo que un logout o cambio de roles no invalida de inmediato un access token ya emitido.
+Cada access token incluye una versión de seguridad que se contrasta con PostgreSQL en todas las peticiones autenticadas. El logout revoca la familia del refresh token e invalida inmediatamente todos los access tokens emitidos previamente para ese usuario; repetir el mismo logout no invalida tokens nuevos. Deshabilitar, bloquear o cambiar los roles de una cuenta también invalida sus access tokens anteriores al confirmar la transacción. Un nuevo login o refresh emite el token con la versión y los roles vigentes.
 
 ## Roles y permisos
 
@@ -274,7 +274,7 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 92 pruebas: 65 unitarias y 27 de integración. Cubren productos, inventario, kardex, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP. Las pruebas PostgreSQL verifican también los ajustes concurrentes: no pierden entradas simultáneas al inicializar inventario y evitan que dos salidas sobre stock limitado produzcan existencias negativas.
+Actualmente hay 95 pruebas: 65 unitarias y 30 de integración. Cubren productos, inventario, kardex, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP. Las pruebas PostgreSQL verifican también los ajustes concurrentes y la revocación inmediata de access tokens por logout, cambios de estado y cambios de roles.
 
 ## Construcción
 
@@ -310,7 +310,6 @@ src/test/java/com/example/inventory/
 
 ## Alcance pendiente
 
-- Revocación inmediata de access tokens y cambios de rol instantáneos.
 - Operación de rotación, respaldo y monitoreo de claves.
 
 ## Detener el entorno local

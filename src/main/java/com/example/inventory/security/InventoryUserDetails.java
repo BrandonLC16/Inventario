@@ -19,6 +19,7 @@ public final class InventoryUserDetails implements UserDetails {
     private final String passwordHash;
     private final boolean enabled;
     private final boolean accountNonLocked;
+    private final long accessTokenVersion;
     private final Set<RoleName> roles;
     private final List<GrantedAuthority> authorities;
 
@@ -29,6 +30,7 @@ public final class InventoryUserDetails implements UserDetails {
         this.passwordHash = account.getPasswordHash();
         this.enabled = account.isEnabled();
         this.accountNonLocked = !account.isLocked();
+        this.accessTokenVersion = account.getAccessTokenVersion();
         this.roles = account.getRoles().stream()
                 .map(role -> role.getName())
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -51,6 +53,10 @@ public final class InventoryUserDetails implements UserDetails {
 
     public Set<RoleName> roles() {
         return roles;
+    }
+
+    public long accessTokenVersion() {
+        return accessTokenVersion;
     }
 
     @Override

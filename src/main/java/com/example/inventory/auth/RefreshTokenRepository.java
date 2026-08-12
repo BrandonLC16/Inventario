@@ -21,7 +21,7 @@ interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
             """)
     Optional<RefreshToken> findByTokenHashForUpdate(@Param("tokenHash") byte[] tokenHash);
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query("""
             update RefreshToken token
                set token.revokedAt = :revokedAt

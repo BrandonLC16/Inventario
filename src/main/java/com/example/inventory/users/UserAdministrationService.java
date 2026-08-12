@@ -56,7 +56,12 @@ public class UserAdministrationService {
                 && users.countActiveWithRole(RoleName.ADMIN) <= 1) {
             throw new ConflictException("The last active administrator cannot be disabled or locked");
         }
+        boolean changed = account.isEnabled() != request.enabled()
+                || account.isLocked() != request.locked();
         account.updateStatus(request.enabled(), request.locked());
+        if (changed) {
+            account.revokeAccessTokens();
+        }
         return UserResponse.from(account);
     }
 
@@ -69,7 +74,13 @@ public class UserAdministrationService {
                 && users.countActiveWithRole(RoleName.ADMIN) <= 1) {
             throw new ConflictException("The ADMIN role cannot be removed from the last active administrator");
         }
+        Set<RoleName> currentRoles = account.getRoles().stream()
+                .map(Role::getName)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         account.replaceRoles(replacement);
+        if (!currentRoles.equals(request.roles())) {
+            account.revokeAccessTokens();
+        }
         return UserResponse.from(account);
     }
 

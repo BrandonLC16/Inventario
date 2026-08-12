@@ -180,6 +180,12 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                 WHERE schemaname='public' AND tablename IN ('app_users','user_roles','refresh_tokens')
                 """, Integer.class);
         assertTrue(indexes >= 7);
+        org.junit.jupiter.api.Assertions.assertEquals("bigint", jdbcTemplate.queryForObject("""
+                SELECT data_type FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'app_users'
+                  AND column_name = 'access_token_version'
+                """, String.class));
     }
 
     @Test

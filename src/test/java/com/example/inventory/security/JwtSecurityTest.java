@@ -56,6 +56,8 @@ class JwtSecurityTest {
         assertEquals(NOW.plusSeconds(300), jwt.getExpiresAt());
         assertEquals(36, jwt.getId().length());
         assertEquals(List.of("INVENTORY_MANAGER", "SALES"), jwt.getClaimAsStringList("roles"));
+        assertEquals(0L, ((Number) jwt.getClaim(
+                AccessTokenValidator.TOKEN_VERSION_CLAIM)).longValue());
         assertEquals(issued.expiresAt(), jwt.getExpiresAt());
         assertTrue(principal.getAuthorities().stream()
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_INVENTORY_MANAGER")));
@@ -134,7 +136,8 @@ class JwtSecurityTest {
                                 List<String> roles, SignatureAlgorithm algorithm) {
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer).audience(audience).issuedAt(issuedAt).expiresAt(expiresAt)
-                .subject(subject).id(jti).claim("roles", roles).build();
+                .subject(subject).id(jti).claim("roles", roles)
+                .claim(AccessTokenValidator.TOKEN_VERSION_CLAIM, 0L).build();
         JwsHeader header = JwsHeader.with(algorithm).type("JWT").build();
         return signingKeys.encoder(algorithm)
                 .encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

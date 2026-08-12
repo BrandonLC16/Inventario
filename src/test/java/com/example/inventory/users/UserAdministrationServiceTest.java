@@ -91,5 +91,6 @@ class UserAdministrationServiceTest {
                 new UpdateUserStatusRequest(false, false));
 
         assertFalse(response.enabled());
+        assertEquals(1L, admin.getAccessTokenVersion());
     }
 }

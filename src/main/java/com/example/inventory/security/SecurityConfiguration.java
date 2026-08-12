@@ -141,7 +141,19 @@ public class SecurityConfiguration {
     }
 
     @Bean
+    JwtDecoder jwtDecoder(SecurityProperties properties, ResourceLoader resourceLoader, Clock clock,
+                          AccessTokenValidator accessTokenValidator) {
+        return buildJwtDecoder(properties, resourceLoader, clock, accessTokenValidator);
+    }
+
     JwtDecoder jwtDecoder(SecurityProperties properties, ResourceLoader resourceLoader, Clock clock) {
+        return buildJwtDecoder(properties, resourceLoader, clock,
+                token -> OAuth2TokenValidatorResult.success());
+    }
+
+    private JwtDecoder buildJwtDecoder(SecurityProperties properties,
+                                       ResourceLoader resourceLoader, Clock clock,
+                                       OAuth2TokenValidator<Jwt> accessTokenValidator) {
         RSAPublicKey publicKey = readPublicKey(properties.jwt().publicKeyLocation(), resourceLoader);
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(publicKey)
                 .signatureAlgorithm(SignatureAlgorithm.RS256)
@@ -149,7 +161,8 @@ public class SecurityConfiguration {
         OAuth2TokenValidator<Jwt> defaults = JwtValidators.createDefaultWithIssuer(properties.jwt().issuer());
         OAuth2TokenValidator<Jwt> applicationClaims = token ->
                 validateApplicationClaims(token, properties, clock.instant());
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(defaults, applicationClaims));
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                defaults, applicationClaims, accessTokenValidator));
         return decoder;
     }
 
@@ -200,7 +213,9 @@ public class SecurityConfiguration {
         boolean validRoles = rolesClaim instanceof Collection<?> roles
                 && !roles.isEmpty()
                 && roles.stream().allMatch(role -> role instanceof String value && ALLOWED_ROLES.contains(value));
-        if (validAudience && validSubject && validJti && validIssuedAt && validLifetime && validRoles) {
+        boolean validTokenVersion = AccessTokenValidator.tokenVersion(token).isPresent();
+        if (validAudience && validSubject && validJti && validIssuedAt && validLifetime
+                && validRoles && validTokenVersion) {
             return OAuth2TokenValidatorResult.success();
         }
         return OAuth2TokenValidatorResult.failure(

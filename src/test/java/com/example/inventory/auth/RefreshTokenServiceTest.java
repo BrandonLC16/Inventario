@@ -138,11 +138,13 @@ class RefreshTokenServiceTest {
                 RefreshTokenService.hash("logout-token"), NOW.plusSeconds(600));
         when(repository.findByTokenHashForUpdate(any(byte[].class)))
                 .thenReturn(Optional.of(token), Optional.empty());
+        when(repository.revokeActiveFamily(familyId, NOW)).thenReturn(1);
 
         service.logout("logout-token");
         service.logout("unknown-token");
 
         verify(repository).revokeActiveFamily(familyId, NOW);
+        assertEquals(1L, user.getAccessTokenVersion());
         ArgumentCaptor<byte[]> hash = ArgumentCaptor.forClass(byte[].class);
         verify(repository, org.mockito.Mockito.times(2)).findByTokenHashForUpdate(hash.capture());
         assertArrayEquals(RefreshTokenService.hash("logout-token"), hash.getAllValues().get(0));

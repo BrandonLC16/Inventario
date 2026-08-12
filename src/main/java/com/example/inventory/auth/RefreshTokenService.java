@@ -44,7 +44,7 @@ public class RefreshTokenService {
                 .orElseThrow(InvalidAuthenticationException::new);
 
         if (current.isRevoked()) {
-            repository.revokeActiveFamily(current.getFamilyId(), now);
+            revokeFamilyAndAccessTokens(current, now);
             throw new InvalidAuthenticationException();
         }
         if (current.isExpiredAt(now)) {
@@ -53,7 +53,7 @@ public class RefreshTokenService {
         }
         UserAccount user = current.getUser();
         if (!user.isEnabled() || user.isLocked()) {
-            repository.revokeActiveFamily(current.getFamilyId(), now);
+            revokeFamilyAndAccessTokens(current, now);
             throw new InvalidAuthenticationException();
         }
 
@@ -67,7 +67,13 @@ public class RefreshTokenService {
     @Transactional
     public void logout(String presentedToken) {
         repository.findByTokenHashForUpdate(hash(presentedToken))
-                .ifPresent(token -> repository.revokeActiveFamily(token.getFamilyId(), clock.instant()));
+                .ifPresent(token -> revokeFamilyAndAccessTokens(token, clock.instant()));
+    }
+
+    private void revokeFamilyAndAccessTokens(RefreshToken token, Instant revokedAt) {
+        if (repository.revokeActiveFamily(token.getFamilyId(), revokedAt) > 0) {
+            token.getUser().revokeAccessTokens();
+        }
     }
 
     private IssuedRefreshToken create(UserAccount user, UUID familyId, Instant now) {

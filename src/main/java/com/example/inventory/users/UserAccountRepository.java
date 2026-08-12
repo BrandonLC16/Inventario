@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,4 +43,13 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             where role.name = :role and account.enabled = true and account.locked = false
             """)
     long countActiveWithRole(@Param("role") RoleName role);
+
+    @Query("""
+            select count(account) > 0 from UserAccount account
+            where account.id = :id
+              and account.enabled = true
+              and account.locked = false
+              and account.accessTokenVersion = :version
+            """)
+    boolean isAccessTokenActive(@Param("id") UUID id, @Param("version") long version);
 }
