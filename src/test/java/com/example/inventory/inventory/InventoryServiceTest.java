@@ -4,6 +4,7 @@ import com.example.inventory.products.ProductCatalog;
 import com.example.inventory.shared.BadRequestException;
 import com.example.inventory.shared.ConflictException;
 import com.example.inventory.shared.NotFoundException;
+import com.example.inventory.warehouses.WarehouseDirectory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,6 +32,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class InventoryServiceTest {
 
+    private static final UUID WAREHOUSE_ID = WarehouseDirectory.MAIN_WAREHOUSE_ID;
+
     @Mock
     private InventoryRepository repository;
 
@@ -43,13 +46,16 @@ class InventoryServiceTest {
     @Mock
     private ProductCatalog productCatalog;
 
+    @Mock
+    private WarehouseDirectory warehouses;
+
     @Test
     void findByProductIdReturnsExistingInventory() {
         UUID productId = UUID.randomUUID();
-        when(repository.findBalance(productId))
+        when(repository.findBalance(WAREHOUSE_ID, productId))
                 .thenReturn(Optional.of(balance(productId, 7, 2)));
 
-        InventoryResponse response = service().findByProductId(productId);
+        InventoryResponse response = service().findByProductId(WAREHOUSE_ID, productId);
 
         assertEquals(productId, response.productId());
         assertEquals(7, response.quantity());
@@ -61,9 +67,9 @@ class InventoryServiceTest {
     @Test
     void findByProductIdReturnsZeroWhenInventoryDoesNotExist() {
         UUID productId = UUID.randomUUID();
-        when(repository.findBalance(productId)).thenReturn(Optional.empty());
+        when(repository.findBalance(WAREHOUSE_ID, productId)).thenReturn(Optional.empty());
 
-        InventoryResponse response = service().findByProductId(productId);
+        InventoryResponse response = service().findByProductId(WAREHOUSE_ID, productId);
 
         assertEquals(productId, response.productId());
         assertEquals(0, response.quantity());
@@ -74,7 +80,7 @@ class InventoryServiceTest {
         UUID productId = UUID.randomUUID();
         doThrow(new NotFoundException("missing")).when(productCatalog).requireProduct(productId);
 
-        assertThrows(NotFoundException.class, () -> service().findByProductId(productId));
+        assertThrows(NotFoundException.class, () -> service().findByProductId(WAREHOUSE_ID, productId));
 
         verifyNoInteractions(repository, movementRepository);
     }
@@ -83,10 +89,10 @@ class InventoryServiceTest {
     void firstPositiveAdjustmentRecordsInitialStock() {
         UUID productId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 0);
-        when(repository.ensureExists(productId)).thenReturn(1);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(repository.ensureExists(WAREHOUSE_ID, productId)).thenReturn(1);
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
 
-        InventoryResponse response = service().adjust(productId, 8, "operator");
+        InventoryResponse response = service().adjust(WAREHOUSE_ID, productId, 8, null, "operator");
 
         assertEquals(8, response.quantity());
         assertMovement(StockMovementType.INITIAL_STOCK, 8, 0, 8, null, "operator");
@@ -96,10 +102,10 @@ class InventoryServiceTest {
     void laterPositiveAdjustmentRecordsManualInput() {
         UUID productId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 4);
-        when(repository.ensureExists(productId)).thenReturn(0);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(repository.ensureExists(WAREHOUSE_ID, productId)).thenReturn(0);
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
 
-        InventoryResponse response = service().adjust(productId, 3, "operator");
+        InventoryResponse response = service().adjust(WAREHOUSE_ID, productId, 3, null, "operator");
 
         assertEquals(7, response.quantity());
         assertMovement(StockMovementType.MANUAL_IN, 3, 4, 7, null, "operator");
@@ -109,10 +115,10 @@ class InventoryServiceTest {
     void validNegativeAdjustmentRecordsManualOutput() {
         UUID productId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 9);
-        when(repository.ensureExists(productId)).thenReturn(0);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(repository.ensureExists(WAREHOUSE_ID, productId)).thenReturn(0);
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
 
-        InventoryResponse response = service().adjust(productId, -5, "operator");
+        InventoryResponse response = service().adjust(WAREHOUSE_ID, productId, -5, null, "operator");
 
         assertEquals(4, response.quantity());
         assertMovement(StockMovementType.MANUAL_OUT, -5, 9, 4, null, "operator");
@@ -123,17 +129,17 @@ class InventoryServiceTest {
         UUID productId = UUID.randomUUID();
 
         BadRequestException error = assertThrows(
-                BadRequestException.class, () -> service().adjust(productId, 0, "operator"));
+                BadRequestException.class, () -> service().adjust(WAREHOUSE_ID, productId, 0, null, "operator"));
 
         assertEquals("Inventory adjustment must not be zero", error.getMessage());
-        verify(repository, never()).ensureExists(any());
+        verify(repository, never()).ensureExists(any(), any());
         verifyNoInteractions(movementRepository);
     }
 
     @Test
     void adjustmentRequiresResponsibleUserBeforeTouchingInventory() {
         assertThrows(IllegalArgumentException.class,
-                () -> service().adjust(UUID.randomUUID(), 1, " "));
+                () -> service().adjust(WAREHOUSE_ID, UUID.randomUUID(), 1, null, " "));
 
         verifyNoInteractions(productCatalog, repository, movementRepository);
     }
@@ -142,11 +148,11 @@ class InventoryServiceTest {
     void insufficientStockIsRejectedWithoutChangingBalanceOrRecordingMovement() {
         UUID productId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 2);
-        when(repository.ensureExists(productId)).thenReturn(0);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(repository.ensureExists(WAREHOUSE_ID, productId)).thenReturn(0);
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
 
         BadRequestException error = assertThrows(
-                BadRequestException.class, () -> service().adjust(productId, -3, "operator"));
+                BadRequestException.class, () -> service().adjust(WAREHOUSE_ID, productId, -3, null, "operator"));
 
         assertEquals("Inventory quantity cannot be negative", error.getMessage());
         assertEquals(2, item.getQuantity());
@@ -157,11 +163,11 @@ class InventoryServiceTest {
     void adjustmentOverflowIsRejectedWithoutChangingBalanceOrRecordingMovement() {
         UUID productId = UUID.randomUUID();
         InventoryItem item = inventory(productId, Integer.MAX_VALUE);
-        when(repository.ensureExists(productId)).thenReturn(0);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(repository.ensureExists(WAREHOUSE_ID, productId)).thenReturn(0);
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
 
         BadRequestException error = assertThrows(
-                BadRequestException.class, () -> service().adjust(productId, 1, "operator"));
+                BadRequestException.class, () -> service().adjust(WAREHOUSE_ID, productId, 1, null, "operator"));
 
         assertEquals("Inventory quantity is outside the supported range", error.getMessage());
         assertEquals(Integer.MAX_VALUE, item.getQuantity());
@@ -173,7 +179,7 @@ class InventoryServiceTest {
         UUID productId = UUID.randomUUID();
         doThrow(new NotFoundException("missing")).when(productCatalog).requireProduct(productId);
 
-        assertThrows(NotFoundException.class, () -> service().adjust(productId, 1, "operator"));
+        assertThrows(NotFoundException.class, () -> service().adjust(WAREHOUSE_ID, productId, 1, null, "operator"));
 
         verifyNoInteractions(repository, movementRepository);
     }
@@ -181,10 +187,10 @@ class InventoryServiceTest {
     @Test
     void adjustmentFailsWithoutMovementWhenInventoryCannotBeLocked() {
         UUID productId = UUID.randomUUID();
-        when(repository.ensureExists(productId)).thenReturn(1);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.empty());
+        when(repository.ensureExists(WAREHOUSE_ID, productId)).thenReturn(1);
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.empty());
 
-        assertThrows(ConflictException.class, () -> service().adjust(productId, 1, "operator"));
+        assertThrows(ConflictException.class, () -> service().adjust(WAREHOUSE_ID, productId, 1, null, "operator"));
 
         verifyNoInteractions(movementRepository);
     }
@@ -193,10 +199,10 @@ class InventoryServiceTest {
     void adjustmentPropagatesInitializationPersistenceErrorWithoutMovement() {
         UUID productId = UUID.randomUUID();
         RuntimeException failure = new RuntimeException("database unavailable");
-        when(repository.ensureExists(productId)).thenThrow(failure);
+        when(repository.ensureExists(WAREHOUSE_ID, productId)).thenThrow(failure);
 
         RuntimeException thrown = assertThrows(
-                RuntimeException.class, () -> service().adjust(productId, 1, "operator"));
+                RuntimeException.class, () -> service().adjust(WAREHOUSE_ID, productId, 1, null, "operator"));
 
         assertSame(failure, thrown);
         verifyNoInteractions(movementRepository);
@@ -207,13 +213,13 @@ class InventoryServiceTest {
         UUID productId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 10);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
-        when(reservations.findForUpdate(orderId, productId))
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
+        when(reservations.findForUpdate(orderId, WAREHOUSE_ID, productId))
                 .thenReturn(Optional.of(new InventoryReservation(
-                        orderId, productId, 4, "operator@example.com")));
-        when(reservations.reservedQuantity(productId)).thenReturn(4L);
+                        orderId, WAREHOUSE_ID, productId, 4, "operator@example.com")));
+        when(reservations.reservedQuantity(WAREHOUSE_ID, productId)).thenReturn(4L);
 
-        service().consumeReservation(productId, 4, orderId, "operator@example.com");
+        service().consumeReservation(WAREHOUSE_ID, productId, 4, orderId, "operator@example.com");
 
         assertEquals(6, item.getQuantity());
         assertMovement(StockMovementType.ORDER_CONFIRMED, -4, 10, 6,
@@ -224,7 +230,7 @@ class InventoryServiceTest {
     @ValueSource(ints = {0, -1})
     void consumeReservationRejectsNonPositiveQuantityWithoutInteractions(int quantity) {
         assertThrows(BadRequestException.class, () -> service().consumeReservation(
-                UUID.randomUUID(), quantity, UUID.randomUUID(), "operator"));
+                WAREHOUSE_ID, UUID.randomUUID(), quantity, UUID.randomUUID(), "operator"));
 
         verifyNoInteractions(productCatalog, repository, movementRepository);
     }
@@ -236,7 +242,7 @@ class InventoryServiceTest {
                 .when(productCatalog).requireStoredProduct(productId);
 
         assertThrows(NotFoundException.class, () -> service().consumeReservation(
-                productId, 1, UUID.randomUUID(), "operator"));
+                WAREHOUSE_ID, productId, 1, UUID.randomUUID(), "operator"));
 
         verifyNoInteractions(repository, movementRepository);
     }
@@ -246,14 +252,14 @@ class InventoryServiceTest {
         UUID productId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 3);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
-        when(reservations.findForUpdate(orderId, productId))
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
+        when(reservations.findForUpdate(orderId, WAREHOUSE_ID, productId))
                 .thenReturn(Optional.of(new InventoryReservation(
-                        orderId, productId, 4, "operator")));
-        when(reservations.reservedQuantity(productId)).thenReturn(4L);
+                        orderId, WAREHOUSE_ID, productId, 4, "operator")));
+        when(reservations.reservedQuantity(WAREHOUSE_ID, productId)).thenReturn(4L);
 
         assertThrows(BadRequestException.class, () -> service().consumeReservation(
-                productId, 4, orderId, "operator"));
+                WAREHOUSE_ID, productId, 4, orderId, "operator"));
 
         assertEquals(3, item.getQuantity());
         verifyNoInteractions(movementRepository);
@@ -264,9 +270,9 @@ class InventoryServiceTest {
         UUID productId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 6);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
 
-        service().restoreForOrder(productId, 4, orderId, "operator@example.com");
+        service().restoreForOrder(WAREHOUSE_ID, productId, 4, orderId, "operator@example.com");
 
         assertEquals(10, item.getQuantity());
         assertMovement(StockMovementType.ORDER_CANCELLED, 4, 6, 10,
@@ -278,7 +284,7 @@ class InventoryServiceTest {
     @ValueSource(ints = {0, -1})
     void restoreForOrderRejectsNonPositiveQuantityWithoutInteractions(int quantity) {
         assertThrows(BadRequestException.class, () -> service().restoreForOrder(
-                UUID.randomUUID(), quantity, UUID.randomUUID(), "operator"));
+                WAREHOUSE_ID, UUID.randomUUID(), quantity, UUID.randomUUID(), "operator"));
 
         verifyNoInteractions(productCatalog, repository, movementRepository);
     }
@@ -287,10 +293,10 @@ class InventoryServiceTest {
     void restoreForOrderRejectsOverflowWithoutMovement() {
         UUID productId = UUID.randomUUID();
         InventoryItem item = inventory(productId, Integer.MAX_VALUE);
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
 
         assertThrows(ConflictException.class, () -> service().restoreForOrder(
-                productId, 1, UUID.randomUUID(), "operator"));
+                WAREHOUSE_ID, productId, 1, UUID.randomUUID(), "operator"));
 
         assertEquals(Integer.MAX_VALUE, item.getQuantity());
         verifyNoInteractions(movementRepository);
@@ -300,10 +306,10 @@ class InventoryServiceTest {
     void orderOperationPropagatesLockPersistenceErrorWithoutMovement() {
         UUID productId = UUID.randomUUID();
         RuntimeException failure = new RuntimeException("lock failed");
-        when(repository.findByProductIdForUpdate(productId)).thenThrow(failure);
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenThrow(failure);
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> service().consumeReservation(
-                productId, 1, UUID.randomUUID(), "operator"));
+                WAREHOUSE_ID, productId, 1, UUID.randomUUID(), "operator"));
 
         assertSame(failure, thrown);
         verifyNoInteractions(movementRepository);
@@ -315,15 +321,15 @@ class InventoryServiceTest {
         UUID orderId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 5);
         RuntimeException failure = new RuntimeException("movement insert failed");
-        when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
-        when(reservations.findForUpdate(orderId, productId))
+        when(repository.findForUpdate(WAREHOUSE_ID, productId)).thenReturn(Optional.of(item));
+        when(reservations.findForUpdate(orderId, WAREHOUSE_ID, productId))
                 .thenReturn(Optional.of(new InventoryReservation(
-                        orderId, productId, 2, "operator")));
-        when(reservations.reservedQuantity(productId)).thenReturn(2L);
+                        orderId, WAREHOUSE_ID, productId, 2, "operator")));
+        when(reservations.reservedQuantity(WAREHOUSE_ID, productId)).thenReturn(2L);
         when(movementRepository.save(any(StockMovement.class))).thenThrow(failure);
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> service().consumeReservation(
-                productId, 2, orderId, "operator"));
+                WAREHOUSE_ID, productId, 2, orderId, "operator"));
 
         assertSame(failure, thrown);
         verify(movementRepository).save(any(StockMovement.class));
@@ -331,11 +337,11 @@ class InventoryServiceTest {
 
     private InventoryService service() {
         return new InventoryService(
-                repository, reservations, movementRepository, productCatalog);
+                repository, reservations, movementRepository, productCatalog, warehouses);
     }
 
     private InventoryItem inventory(UUID productId, int quantity) {
-        InventoryItem item = new InventoryItem(productId);
+        InventoryItem item = new InventoryItem(WAREHOUSE_ID, productId);
         item.changeQuantity(quantity);
         return item;
     }
@@ -343,6 +349,9 @@ class InventoryServiceTest {
     private InventoryBalanceProjection balance(
             UUID productId, int quantity, int reservedQuantity) {
         return new InventoryBalanceProjection() {
+            @Override
+            public UUID getWarehouseId() { return WAREHOUSE_ID; }
+
             @Override
             public UUID getProductId() { return productId; }
 

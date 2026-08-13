@@ -10,6 +10,7 @@ public record OrderResponse(
         UUID id,
         String folio,
         UUID customerId,
+        UUID fulfillmentWarehouseId,
         OrderStatus status,
         String currency,
         BigDecimal total,
@@ -30,7 +31,7 @@ public record OrderResponse(
                 .map(OrderItemResponse::from)
                 .toList();
         return new OrderResponse(order.getId(), order.getFolio(), order.getCustomerId(),
-                order.getStatus(), order.getCurrency(), order.getTotal(), items,
+                order.getFulfillmentWarehouseId(), order.getStatus(), order.getCurrency(), order.getTotal(), items,
                 order.getCreatedBy(), order.getReservedBy(),
                 order.getConfirmedBy(), order.getCancelledBy(),
                 order.getCreatedAt(), order.getUpdatedAt(),

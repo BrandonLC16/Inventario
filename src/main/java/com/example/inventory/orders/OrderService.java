@@ -6,6 +6,7 @@ import com.example.inventory.products.ProductSnapshot;
 import com.example.inventory.customers.CustomerDirectory;
 import com.example.inventory.shared.PageResponse;
 import com.example.inventory.shared.PageSupport;
+import com.example.inventory.warehouses.WarehouseDirectory;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -33,13 +34,16 @@ public class OrderService {
     private final ProductCatalog products;
     private final InventoryOperations inventory;
     private final CustomerDirectory customers;
+    private final WarehouseDirectory warehouses;
 
     public OrderService(OrderRepository orders, ProductCatalog products,
-                        InventoryOperations inventory, CustomerDirectory customers) {
+                        InventoryOperations inventory, CustomerDirectory customers,
+                        WarehouseDirectory warehouses) {
         this.orders = orders;
         this.products = products;
         this.inventory = inventory;
         this.customers = customers;
+        this.warehouses = warehouses;
     }
 
     public PageResponse<OrderResponse> findAll(int page, int size, OrderStatus status,
@@ -65,10 +69,15 @@ public class OrderService {
         if (request.customerId() != null) {
             customers.requireActiveCustomer(request.customerId());
         }
+        UUID warehouseId = request.fulfillmentWarehouseId() == null
+                ? WarehouseDirectory.MAIN_WAREHOUSE_ID
+                : request.fulfillmentWarehouseId();
+        warehouses.lockActiveWarehouse(warehouseId);
         List<PricedOrderItem> pricedItems = priceItems(items);
         String folio = "ORD-%010d".formatted(orders.nextFolioSequence());
         SalesOrder order = new SalesOrder(
-                folio, request.customerId(), "MXN", requireActor(responsibleUser), pricedItems);
+                folio, request.customerId(), warehouseId, "MXN",
+                requireActor(responsibleUser), pricedItems);
         return OrderResponse.from(orders.saveAndFlush(order));
     }
 
@@ -80,6 +89,16 @@ public class OrderService {
                 && order.getStatus() != OrderStatus.RESERVED) {
             throw new ConflictException(
                     "Only a pending or reserved order can be updated");
+        }
+        UUID requestedWarehouseId = request.fulfillmentWarehouseId();
+        if (requestedWarehouseId != null
+                && !requestedWarehouseId.equals(order.getFulfillmentWarehouseId())) {
+            if (order.getStatus() == OrderStatus.RESERVED) {
+                throw new ConflictException(
+                        "A reserved order must be released before changing warehouse");
+            }
+            warehouses.lockActiveWarehouse(requestedWarehouseId);
+            order.changeFulfillmentWarehouse(requestedWarehouseId);
         }
         if (order.getStatus() == OrderStatus.RESERVED) {
             releaseReservations(order, requireActor(responsibleUser));
@@ -103,7 +122,6 @@ public class OrderService {
         }
         orders.delete(order);
     }
-
     @Transactional
     public OrderResponse reserve(UUID id, String responsibleUser) {
         SalesOrder order = requireForUpdate(id);
@@ -115,7 +133,7 @@ public class OrderService {
         }
         String actor = requireActor(responsibleUser);
         sortedItems(order).forEach(item -> inventory.reserveForOrder(
-                item.getProductId(), item.getQuantity(), order.getId(), actor));
+                order.getFulfillmentWarehouseId(), item.getProductId(), item.getQuantity(), order.getId(), actor));
         order.reserve(actor);
         orders.flush();
         return OrderResponse.from(order);
@@ -151,7 +169,7 @@ public class OrderService {
         }
         String actor = requireActor(responsibleUser);
         sortedItems(order).forEach(item -> inventory.consumeReservation(
-                item.getProductId(), item.getQuantity(), order.getId(), actor));
+                order.getFulfillmentWarehouseId(), item.getProductId(), item.getQuantity(), order.getId(), actor));
         order.confirm(actor);
         orders.flush();
         return OrderResponse.from(order);
@@ -170,7 +188,7 @@ public class OrderService {
         }
         String actor = requireActor(responsibleUser);
         sortedItems(order).forEach(item -> inventory.restoreForOrder(
-                item.getProductId(), item.getQuantity(), order.getId(), actor));
+                order.getFulfillmentWarehouseId(), item.getProductId(), item.getQuantity(), order.getId(), actor));
         order.cancel(actor);
         orders.flush();
         return OrderResponse.from(order);
@@ -248,7 +266,7 @@ public class OrderService {
 
     private void releaseReservations(SalesOrder order, String actor) {
         sortedItems(order).forEach(item -> inventory.releaseForOrder(
-                item.getProductId(), order.getId(), actor));
+                order.getFulfillmentWarehouseId(), item.getProductId(), order.getId(), actor));
     }
 
     private String requireActor(String responsibleUser) {

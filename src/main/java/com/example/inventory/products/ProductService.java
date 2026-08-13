@@ -4,6 +4,7 @@ import com.example.inventory.shared.ConflictException;
 import com.example.inventory.shared.NotFoundException;
 import com.example.inventory.shared.PageResponse;
 import com.example.inventory.shared.PageSupport;
+import com.example.inventory.warehouses.WarehouseDirectory;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -19,9 +20,11 @@ import java.util.UUID;
 class ProductService implements ProductCatalog {
 
     private final ProductRepository repository;
+    private final WarehouseDirectory warehouses;
 
-    ProductService(ProductRepository repository) {
+    ProductService(ProductRepository repository, WarehouseDirectory warehouses) {
         this.repository = repository;
+        this.warehouses = warehouses;
     }
 
     PageResponse<ProductResponse> findAll(int page, int size, String sku,
@@ -41,9 +44,12 @@ class ProductService implements ProductCatalog {
     ProductResponse create(ProductRequest request) {
         String sku = normalizeSku(request.sku());
         ensureSkuIsAvailable(sku, null);
-        Product product = new Product(sku, request.name().trim(), trimToNull(request.description()),
-                request.price(), request.active(), minimumStock(request.minimumStock()));
-        return ProductResponse.from(repository.save(product));
+        Product product = repository.saveAndFlush(new Product(sku, request.name().trim(),
+                trimToNull(request.description()), request.price(), request.active()));
+        warehouses.registerProduct(product.getId());
+        warehouses.configureProduct(WarehouseDirectory.MAIN_WAREHOUSE_ID,
+                product.getId(), minimumStock(request.minimumStock()), true);
+        return ProductResponse.from(product);
     }
 
     @Transactional
@@ -52,7 +58,9 @@ class ProductService implements ProductCatalog {
         String sku = normalizeSku(request.sku());
         ensureSkuIsAvailable(sku, id);
         product.update(sku, request.name().trim(), trimToNull(request.description()),
-                request.price(), request.active(), minimumStock(request.minimumStock()));
+                request.price(), request.active());
+        warehouses.configureProduct(WarehouseDirectory.MAIN_WAREHOUSE_ID,
+                product.getId(), minimumStock(request.minimumStock()), true);
         return ProductResponse.from(product);
     }
 

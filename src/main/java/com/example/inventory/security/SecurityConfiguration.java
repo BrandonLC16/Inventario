@@ -115,6 +115,17 @@ public class SecurityConfiguration {
                     authorize.requestMatchers(HttpMethod.PATCH,
                             "/api/v1/inventory/*/adjustments")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
+                    authorize.requestMatchers(HttpMethod.GET,
+                            "/api/v1/warehouses", "/api/v1/warehouses/**")
+                            .authenticated();
+                    authorize.requestMatchers(HttpMethod.POST, "/api/v1/warehouses")
+                            .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
+                    authorize.requestMatchers(HttpMethod.PUT, "/api/v1/warehouses/**")
+                            .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
+                    authorize.requestMatchers(HttpMethod.PATCH, "/api/v1/warehouses/**")
+                            .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
+                    authorize.requestMatchers(HttpMethod.DELETE, "/api/v1/warehouses/*")
+                            .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
                     authorize.requestMatchers("/api/v1/orders", "/api/v1/orders/**")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.SALES.name());
                     authorize.anyRequest().authenticated();

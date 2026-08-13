@@ -2,6 +2,7 @@ package com.example.inventory.inventory;
 
 import com.example.inventory.products.ProductCatalog;
 import com.example.inventory.shared.BadRequestException;
+import com.example.inventory.warehouses.WarehouseDirectory;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,18 +23,22 @@ class StockMovementQueryService {
 
     private final StockMovementRepository movements;
     private final ProductCatalog products;
+    private final WarehouseDirectory warehouses;
 
-    StockMovementQueryService(StockMovementRepository movements, ProductCatalog products) {
+    StockMovementQueryService(StockMovementRepository movements, ProductCatalog products,
+                              WarehouseDirectory warehouses) {
         this.movements = movements;
         this.products = products;
+        this.warehouses = warehouses;
     }
 
-    StockMovementPageResponse findMovements(UUID productId, int page, int size,
+    StockMovementPageResponse findMovements(UUID warehouseId, UUID productId, int page, int size,
                                             StockMovementType type, Instant from,
                                             Instant to, String reference) {
         validatePage(page, size);
         validateDateRange(from, to);
         String normalizedReference = normalizeReference(reference);
+        warehouses.requireWarehouse(warehouseId);
         if (productId != null) {
             products.requireStoredProduct(productId);
         }
@@ -42,14 +47,15 @@ class StockMovementQueryService {
                 Sort.by(Sort.Direction.DESC, "occurredAt")
                         .and(Sort.by(Sort.Direction.DESC, "id")));
         return StockMovementPageResponse.from(movements.findAll(
-                filters(productId, type, from, to, normalizedReference), pageable));
+                filters(warehouseId, productId, type, from, to, normalizedReference), pageable));
     }
 
-    private Specification<StockMovement> filters(UUID productId, StockMovementType type,
+    private Specification<StockMovement> filters(UUID warehouseId, UUID productId, StockMovementType type,
                                                   Instant from, Instant to,
                                                   String reference) {
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(builder.equal(root.get("warehouseId"), warehouseId));
             if (productId != null) {
                 predicates.add(builder.equal(root.get("productId"), productId));
             }

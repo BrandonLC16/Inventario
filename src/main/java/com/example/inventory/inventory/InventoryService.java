@@ -3,71 +3,68 @@ package com.example.inventory.inventory;
 import com.example.inventory.products.ProductCatalog;
 import com.example.inventory.shared.BadRequestException;
 import com.example.inventory.shared.ConflictException;
+import com.example.inventory.shared.PageResponse;
+import com.example.inventory.shared.PageSupport;
+import com.example.inventory.warehouses.WarehouseDirectory;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
-import com.example.inventory.shared.PageResponse;
-import com.example.inventory.shared.PageSupport;
-import org.springframework.data.domain.Sort;
 
 @Service
 @Transactional(readOnly = true)
 class InventoryService implements InventoryOperations {
-
     private final InventoryRepository repository;
     private final InventoryReservationRepository reservations;
     private final StockMovementRepository movementRepository;
     private final ProductCatalog productCatalog;
+    private final WarehouseDirectory warehouses;
 
     InventoryService(InventoryRepository repository,
                      InventoryReservationRepository reservations,
                      StockMovementRepository movementRepository,
-                     ProductCatalog productCatalog) {
+                     ProductCatalog productCatalog,
+                     WarehouseDirectory warehouses) {
         this.repository = repository;
         this.reservations = reservations;
         this.movementRepository = movementRepository;
         this.productCatalog = productCatalog;
+        this.warehouses = warehouses;
     }
 
-    InventoryResponse findByProductId(UUID productId) {
+    InventoryResponse findByProductId(UUID warehouseId, UUID productId) {
+        warehouses.requireWarehouse(warehouseId);
         productCatalog.requireProduct(productId);
-        return repository.findBalance(productId)
+        return repository.findBalance(warehouseId, productId)
                 .map(InventoryResponse::from)
-                .orElseGet(() -> InventoryResponse.empty(productId));
+                .orElseGet(() -> InventoryResponse.empty(warehouseId, productId));
     }
 
-    PageResponse<InventoryResponse> findAll(int page, int size) {
+    PageResponse<InventoryResponse> findAll(UUID warehouseId, int page, int size) {
+        warehouses.requireWarehouse(warehouseId);
         var pageable = PageSupport.request(page, size, Sort.unsorted());
-        return PageResponse.from(repository.findBalances(pageable), InventoryResponse::from);
+        return PageResponse.from(repository.findBalances(warehouseId, pageable),
+                InventoryResponse::from);
     }
 
     @Transactional
-    InventoryResponse adjust(UUID productId, int delta, String responsibleUser) {
-        return adjust(productId, delta, null, responsibleUser);
-    }
-
-    @Transactional
-    InventoryResponse adjust(UUID productId, int delta, String reference,
-                             String responsibleUser) {
+    InventoryResponse adjust(UUID warehouseId, UUID productId, int delta,
+                             String reference, String responsibleUser) {
         String actor = requireResponsibleUser(responsibleUser);
-        productCatalog.requireProduct(productId);
-        if (delta == 0) {
-            throw new BadRequestException("Inventory adjustment must not be zero");
-        }
-        boolean initialStock = repository.ensureExists(productId) == 1;
-        InventoryItem item = lockInventory(productId);
+        if (delta == 0) throw new BadRequestException("Inventory adjustment must not be zero");
+        lockActiveWarehouseProduct(warehouseId, productId);
+        boolean initialStock = repository.ensureExists(warehouseId, productId) == 1;
+        InventoryItem item = lockInventory(warehouseId, productId);
         int balanceBefore = item.getQuantity();
-        int reserved = reservedQuantity(productId);
+        int reserved = reservedQuantity(warehouseId, productId);
         if (delta < 0 && -((long) delta) > item.getQuantity() - (long) reserved) {
             throw insufficientStock(productId);
         }
         try {
             item.changeQuantity(delta);
         } catch (IllegalArgumentException exception) {
-            if (delta < 0) {
-                throw insufficientStock(productId);
-            }
+            if (delta < 0) throw insufficientStock(productId);
             throw new BadRequestException(exception.getMessage());
         }
         StockMovementType type = initialStock && delta > 0
@@ -75,58 +72,60 @@ class InventoryService implements InventoryOperations {
                 : delta > 0 ? StockMovementType.MANUAL_IN : StockMovementType.MANUAL_OUT;
         String businessReference = normalizeReference(reference);
         recordMovement(item, type, delta, balanceBefore, 0, reserved, reserved,
-                businessReference == null
-                        ? "MANUAL:" + UUID.randomUUID()
-                        : businessReference,
+                businessReference == null ? "MANUAL:" + UUID.randomUUID() : businessReference,
                 actor);
         return InventoryResponse.from(item, reserved);
     }
 
-    PageResponse<LowStockResponse> findLowStock(
-            int page, int size, String search, boolean outOfStockOnly) {
+    PageResponse<LowStockResponse> findLowStock(UUID warehouseId, int page, int size,
+                                                String search, boolean outOfStockOnly) {
+        warehouses.requireWarehouse(warehouseId);
         String normalizedSearch = search == null || search.isBlank() ? null : search.trim();
         var pageable = PageSupport.request(page, size, Sort.unsorted());
         return PageResponse.from(repository.findLowStock(
-                normalizedSearch, outOfStockOnly, pageable), LowStockResponse::from);
+                warehouseId, normalizedSearch, outOfStockOnly, pageable),
+                LowStockResponse::from);
+    }
+
+    @Transactional
+    void configureProduct(UUID warehouseId, UUID productId, int minimumStock, boolean active) {
+        productCatalog.requireProduct(productId);
+        warehouses.configureProduct(warehouseId, productId, minimumStock, active);
     }
 
     @Override
     @Transactional
-    public void reserveForOrder(UUID productId, int quantity, UUID orderId,
-                                String responsibleUser) {
+    public void reserveForOrder(UUID warehouseId, UUID productId, int quantity,
+                                UUID orderId, String responsibleUser) {
         String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
-        productCatalog.requireProduct(productId);
-        repository.ensureExists(productId);
-        InventoryItem item = lockInventory(productId);
-        int reservedBefore = reservedQuantity(productId);
-        int available = item.getQuantity() - reservedBefore;
-        if (quantity > available) {
-            throw insufficientStock(productId);
-        }
-        if (reservations.findForUpdate(orderId, productId).isPresent()) {
-            throw new ConflictException(
-                    "Inventory is already reserved for this order and product");
+        lockActiveWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
+        int reservedBefore = reservedQuantity(warehouseId, productId);
+        if (quantity > item.getQuantity() - reservedBefore) throw insufficientStock(productId);
+        if (reservations.findForUpdate(orderId, warehouseId, productId).isPresent()) {
+            throw new ConflictException("Inventory is already reserved for this order and product");
         }
         reservations.save(new InventoryReservation(
-                orderId, productId, quantity, actor));
-        recordMovement(item, StockMovementType.ORDER_RESERVED, 0,
-                item.getQuantity(), quantity, reservedBefore,
-                Math.addExact(reservedBefore, quantity), orderId.toString(), actor);
+                orderId, warehouseId, productId, quantity, actor));
+        recordMovement(item, StockMovementType.ORDER_RESERVED, 0, item.getQuantity(),
+                quantity, reservedBefore, Math.addExact(reservedBefore, quantity),
+                orderId.toString(), actor);
     }
 
     @Override
     @Transactional
-    public void releaseForOrder(UUID productId, UUID orderId,
+    public void releaseForOrder(UUID warehouseId, UUID productId, UUID orderId,
                                 String responsibleUser) {
         String actor = requireResponsibleUser(responsibleUser);
-        productCatalog.requireStoredProduct(productId);
-        repository.ensureExists(productId);
-        InventoryItem item = lockInventory(productId);
-        InventoryReservation reservation = reservations.findForUpdate(orderId, productId)
-                .orElseThrow(() -> new ConflictException(
-                        "Inventory reservation was not found"));
-        int reservedBefore = reservedQuantity(productId);
+        lockStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
+        InventoryReservation reservation = reservations
+                .findForUpdate(orderId, warehouseId, productId)
+                .orElseThrow(() -> new ConflictException("Inventory reservation was not found"));
+        int reservedBefore = reservedQuantity(warehouseId, productId);
         reservations.delete(reservation);
         recordMovement(item, StockMovementType.ORDER_RESERVATION_RELEASED, 0,
                 item.getQuantity(), -reservation.getQuantity(), reservedBefore,
@@ -135,22 +134,21 @@ class InventoryService implements InventoryOperations {
 
     @Override
     @Transactional
-    public void consumeReservation(UUID productId, int quantity, UUID orderId,
-                                   String responsibleUser) {
+    public void consumeReservation(UUID warehouseId, UUID productId, int quantity,
+                                   UUID orderId, String responsibleUser) {
         String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
-        productCatalog.requireStoredProduct(productId);
-        repository.ensureExists(productId);
-        InventoryItem item = lockInventory(productId);
-        InventoryReservation reservation = reservations.findForUpdate(orderId, productId)
-                .orElseThrow(() -> new ConflictException(
-                        "Inventory reservation was not found"));
+        lockStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
+        InventoryReservation reservation = reservations
+                .findForUpdate(orderId, warehouseId, productId)
+                .orElseThrow(() -> new ConflictException("Inventory reservation was not found"));
         if (reservation.getQuantity() != quantity) {
-            throw new ConflictException(
-                    "Inventory reservation does not match the order item");
+            throw new ConflictException("Inventory reservation does not match the order item");
         }
         int balanceBefore = item.getQuantity();
-        int reservedBefore = reservedQuantity(productId);
+        int reservedBefore = reservedQuantity(warehouseId, productId);
         try {
             item.changeQuantity(-quantity);
         } catch (IllegalArgumentException exception) {
@@ -164,15 +162,15 @@ class InventoryService implements InventoryOperations {
 
     @Override
     @Transactional
-    public void restoreForOrder(UUID productId, int quantity, UUID orderId,
-                                String responsibleUser) {
+    public void restoreForOrder(UUID warehouseId, UUID productId, int quantity,
+                                UUID orderId, String responsibleUser) {
         String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
-        productCatalog.requireStoredProduct(productId);
-        repository.ensureExists(productId);
-        InventoryItem item = lockInventory(productId);
+        lockStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
         int balanceBefore = item.getQuantity();
-        int reserved = reservedQuantity(productId);
+        int reserved = reservedQuantity(warehouseId, productId);
         try {
             item.changeQuantity(quantity);
         } catch (IllegalArgumentException exception) {
@@ -182,22 +180,33 @@ class InventoryService implements InventoryOperations {
                 balanceBefore, 0, reserved, reserved, orderId.toString(), actor);
     }
 
-    private InventoryItem lockInventory(UUID productId) {
-        return repository.findByProductIdForUpdate(productId)
+    private void lockActiveWarehouseProduct(UUID warehouseId, UUID productId) {
+        warehouses.lockActiveWarehouse(warehouseId);
+        productCatalog.requireProduct(productId);
+        warehouses.requireActiveProduct(warehouseId, productId);
+    }
+
+    private void lockStoredWarehouseProduct(UUID warehouseId, UUID productId) {
+        warehouses.lockWarehouse(warehouseId);
+        productCatalog.requireStoredProduct(productId);
+    }
+
+    private InventoryItem lockInventory(UUID warehouseId, UUID productId) {
+        return repository.findForUpdate(warehouseId, productId)
                 .orElseThrow(() -> new ConflictException(
-                        "Inventory for product %s could not be initialized".formatted(productId)));
+                        "Inventory for warehouse %s and product %s could not be initialized"
+                                .formatted(warehouseId, productId)));
     }
 
     private BadRequestException insufficientStock(UUID productId) {
         return new BadRequestException("Inventory quantity cannot be negative");
     }
 
-    private int reservedQuantity(UUID productId) {
+    private int reservedQuantity(UUID warehouseId, UUID productId) {
         try {
-            return Math.toIntExact(reservations.reservedQuantity(productId));
+            return Math.toIntExact(reservations.reservedQuantity(warehouseId, productId));
         } catch (ArithmeticException exception) {
-            throw new IllegalStateException(
-                    "Reserved inventory is outside the supported range", exception);
+            throw new IllegalStateException("Reserved inventory is outside the supported range", exception);
         }
     }
 
@@ -206,17 +215,14 @@ class InventoryService implements InventoryOperations {
                                 int reservationDelta, int reservedBefore,
                                 int reservedAfter, String businessReference,
                                 String responsibleUser) {
-        movementRepository.save(new StockMovement(
-                item.getProductId(), type, quantityDelta,
-                balanceBefore, item.getQuantity(),
+        movementRepository.save(new StockMovement(item.getWarehouseId(), item.getProductId(),
+                type, quantityDelta, balanceBefore, item.getQuantity(),
                 reservationDelta, reservedBefore, reservedAfter,
                 businessReference, responsibleUser));
     }
 
     private void requirePositive(int quantity) {
-        if (quantity <= 0) {
-            throw new BadRequestException("Quantity must be greater than zero");
-        }
+        if (quantity <= 0) throw new BadRequestException("Quantity must be greater than zero");
     }
 
     private String requireResponsibleUser(String responsibleUser) {
@@ -227,9 +233,7 @@ class InventoryService implements InventoryOperations {
     }
 
     private String normalizeReference(String reference) {
-        if (reference == null || reference.isBlank()) {
-            return null;
-        }
+        if (reference == null || reference.isBlank()) return null;
         String normalized = reference.trim();
         if (normalized.length() > 128) {
             throw new BadRequestException("Reference must not exceed 128 characters");

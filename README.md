@@ -159,6 +159,25 @@ Todos estos endpoints requieren un access token.
 | `GET` | `/api/v1/inventory/low-stock` | `ADMIN`, `INVENTORY_MANAGER` | Lista alertas de stock bajo o agotado |
 | `PATCH` | `/api/v1/inventory/{productId}/adjustments` | `ADMIN`, `INVENTORY_MANAGER` | Suma o resta existencias |
 
+### Almacenes e inventario por almacén
+
+V10 crea el almacén determinista `MAIN` (`00000000-0000-0000-0000-000000000001`) y le asigna las existencias, reservas, movimientos, pedidos y mínimos preexistentes. Las rutas históricas `/api/v1/inventory/**` permanecen como alias compatibles hacia `MAIN`.
+
+| Método | Ruta | Permiso | Descripción |
+|---|---|---|---|
+| `GET` | `/api/v1/warehouses` | Autenticado | Lista almacenes |
+| `POST` | `/api/v1/warehouses` | `ADMIN`, `INVENTORY_MANAGER` | Crea un almacén |
+| `GET` | `/api/v1/warehouses/{id}` | Autenticado | Consulta un almacén |
+| `PUT` | `/api/v1/warehouses/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Actualiza un almacén |
+| `DELETE` | `/api/v1/warehouses/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Desactiva un almacén vacío y sin documentos abiertos |
+| `GET` | `/api/v1/warehouses/{id}/inventory` | Autenticado | Lista balances del almacén |
+| `GET` | `/api/v1/warehouses/{id}/inventory/{productId}` | Autenticado | Consulta un balance físico, reservado y disponible |
+| `PATCH` | `/api/v1/warehouses/{id}/inventory/{productId}/adjustments` | `ADMIN`, `INVENTORY_MANAGER` | Ajusta existencias del almacén |
+| `GET` | `/api/v1/warehouses/{id}/inventory/movements` | `ADMIN`, `INVENTORY_MANAGER` | Consulta el kardex del almacén |
+| `GET` | `/api/v1/warehouses/{id}/inventory/low-stock` | `ADMIN`, `INVENTORY_MANAGER` | Consulta alertas configuradas por almacén |
+| `PUT` | `/api/v1/warehouses/{id}/inventory/{productId}/settings` | `ADMIN`, `INVENTORY_MANAGER` | Configura `minimumStock` y activación por almacén |
+
+Cada balance, movimiento y alerta incluye `warehouseId`. Un almacén inactivo no admite ajustes ni reservas. La disponibilidad se calcula siempre como `quantity - reservedQuantity` y ninguna operación permite existencia o disponibilidad negativa.
 Producto de ejemplo:
 
 ```json
@@ -350,9 +369,9 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 113 pruebas: 65 unitarias y 48 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 119 pruebas: 65 unitarias y 54 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
 
-Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V8→V9 con datos históricos; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
+Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 
 El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta `./mvnw --batch-mode verify` en cada `push` y `pull_request`.
 

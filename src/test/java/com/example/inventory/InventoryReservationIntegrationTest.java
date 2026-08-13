@@ -222,8 +222,8 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void v9BackfillsHistoricalConfirmedOrdersAndMovements() {
-        String schema = "reservation_v9_upgrade";
+    void v10AssignsAllV9HistoricalDataToDeterministicMainWarehouse() {
+        String schema = "warehouse_v10_upgrade";
         jdbcTemplate.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
         jdbcTemplate.execute("CREATE SCHEMA " + schema);
         Flyway.configure()
@@ -231,35 +231,48 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
                 .locations("classpath:db/migration")
                 .schemas(schema)
                 .defaultSchema(schema)
-                .target("8")
+                .target("9")
                 .load()
                 .migrate();
 
         UUID productId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
+        UUID movementId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
         jdbcTemplate.update("""
-                INSERT INTO reservation_v9_upgrade.products (
+                INSERT INTO warehouse_v10_upgrade.products (
                     id, sku, name, price, active, created_at, updated_at,
                     deleted, minimum_stock
-                ) VALUES (?, 'LEGACY-RESERVATION', 'Legacy', 10, true,
-                          current_timestamp, current_timestamp, false, 0)
+                ) VALUES (?, 'LEGACY-WAREHOUSE', 'Legacy', 10, true,
+                          current_timestamp, current_timestamp, false, 7)
                 """, productId);
         jdbcTemplate.update("""
-                INSERT INTO reservation_v9_upgrade.orders (
+                INSERT INTO warehouse_v10_upgrade.inventory (
+                    product_id, quantity, updated_at
+                ) VALUES (?, 5, current_timestamp)
+                """, productId);
+        jdbcTemplate.update("""
+                INSERT INTO warehouse_v10_upgrade.orders (
                     id, status, created_at, updated_at, folio, currency,
-                    total, created_by, confirmed_at, confirmed_by
-                ) VALUES (?, 'CONFIRMED', current_timestamp, current_timestamp,
-                          'ORD-LEGACY-RESERVATION', 'MXN', 20, 'legacy-user',
+                    total, created_by, reserved_at, reserved_by
+                ) VALUES (?, 'RESERVED', current_timestamp, current_timestamp,
+                          'ORD-LEGACY-WAREHOUSE', 'MXN', 20, 'legacy-user',
                           current_timestamp, 'legacy-user')
                 """, orderId);
         jdbcTemplate.update("""
-                INSERT INTO reservation_v9_upgrade.stock_movements (
+                INSERT INTO warehouse_v10_upgrade.inventory_reservations (
+                    id, order_id, product_id, quantity, reserved_at, reserved_by
+                ) VALUES (?, ?, ?, 2, current_timestamp, 'legacy-user')
+                """, reservationId, orderId, productId);
+        jdbcTemplate.update("""
+                INSERT INTO warehouse_v10_upgrade.stock_movements (
                     id, product_id, movement_type, quantity_delta,
                     balance_before, balance_after, business_reference,
-                    occurred_at, responsible_user
-                ) VALUES (?, ?, 'ORDER_CONFIRMED', -2, 5, 3, ?,
-                          current_timestamp, 'legacy-user')
-                """, UUID.randomUUID(), productId, orderId.toString());
+                    occurred_at, responsible_user, reservation_delta,
+                    reserved_before, reserved_after
+                ) VALUES (?, ?, 'INITIAL_STOCK', 5, 0, 5, 'LEGACY-STOCK',
+                          current_timestamp, 'legacy-user', 0, 0, 0)
+                """, movementId, productId);
 
         Flyway.configure()
                 .dataSource(jdbcTemplate.getDataSource())
@@ -269,20 +282,36 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
                 .load()
                 .migrate();
 
-        var movement = jdbcTemplate.queryForMap("""
-                SELECT reservation_delta, reserved_before, reserved_after
-                FROM reservation_v9_upgrade.stock_movements
+        UUID main = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        assertEquals(main, jdbcTemplate.queryForObject("""
+                SELECT id FROM warehouse_v10_upgrade.warehouses WHERE code = 'MAIN'
+                """, UUID.class));
+        assertEquals(main, jdbcTemplate.queryForObject("""
+                SELECT warehouse_id FROM warehouse_v10_upgrade.inventory
                 WHERE product_id = ?
-                """, productId);
-        assertEquals(-2, number(movement.get("reservation_delta")));
-        assertEquals(2, number(movement.get("reserved_before")));
-        assertEquals(0, number(movement.get("reserved_after")));
-        assertEquals("legacy-user", jdbcTemplate.queryForObject("""
-                SELECT reserved_by FROM reservation_v9_upgrade.orders
+                """, UUID.class, productId));
+        assertEquals(main, jdbcTemplate.queryForObject("""
+                SELECT warehouse_id FROM warehouse_v10_upgrade.inventory_reservations
                 WHERE id = ?
-                """, String.class, orderId));
+                """, UUID.class, reservationId));
+        assertEquals(main, jdbcTemplate.queryForObject("""
+                SELECT warehouse_id FROM warehouse_v10_upgrade.stock_movements
+                WHERE id = ?
+                """, UUID.class, movementId));
+        assertEquals(main, jdbcTemplate.queryForObject("""
+                SELECT fulfillment_warehouse_id FROM warehouse_v10_upgrade.orders
+                WHERE id = ?
+                """, UUID.class, orderId));
+        assertEquals(7, jdbcTemplate.queryForObject("""
+                SELECT minimum_stock FROM warehouse_v10_upgrade.warehouse_product_settings
+                WHERE warehouse_id = ? AND product_id = ?
+                """, Integer.class, main, productId));
+        assertEquals(0, jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM information_schema.columns
+                WHERE table_schema = 'warehouse_v10_upgrade'
+                  AND table_name = 'products' AND column_name = 'minimum_stock'
+                """, Integer.class));
     }
-
     private UUID createProduct(String sku, int stock) throws Exception {
         return createProduct(sku, stock, 0);
     }

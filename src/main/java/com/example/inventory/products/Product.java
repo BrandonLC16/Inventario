@@ -36,8 +36,6 @@ class Product {
     @Column(nullable = false)
     private boolean deleted;
 
-    @Column(name = "minimum_stock", nullable = false)
-    private int minimumStock;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -48,20 +46,17 @@ class Product {
     protected Product() {
     }
 
-    Product(String sku, String name, String description, BigDecimal price, boolean active,
-            int minimumStock) {
+    Product(String sku, String name, String description, BigDecimal price, boolean active) {
         this.id = UUID.randomUUID();
-        update(sku, name, description, price, active, minimumStock);
+        update(sku, name, description, price, active);
     }
 
-    void update(String sku, String name, String description, BigDecimal price, boolean active,
-                int minimumStock) {
+    void update(String sku, String name, String description, BigDecimal price, boolean active) {
         this.sku = sku;
         this.name = name;
         this.description = description;
         this.price = price;
         this.active = active;
-        this.minimumStock = minimumStock;
     }
 
     void markDeleted() {
@@ -89,7 +84,6 @@ class Product {
     String getDescription() { return description; }
     BigDecimal getPrice() { return price; }
     boolean isActive() { return active; }
-    int getMinimumStock() { return minimumStock; }
     Instant getCreatedAt() { return createdAt; }
     Instant getUpdatedAt() { return updatedAt; }
 }

@@ -2,6 +2,7 @@ package com.example.inventory.products;
 
 import com.example.inventory.shared.ConflictException;
 import com.example.inventory.shared.NotFoundException;
+import com.example.inventory.warehouses.WarehouseDirectory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,6 +35,9 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository repository;
+
+    @Mock
+    private WarehouseDirectory warehouses;
 
     @Test
     void findAllRequestsProductsSortedByName() {
@@ -77,20 +81,20 @@ class ProductServiceTest {
     void createNormalizesProductFieldsBeforeSaving() {
         ProductRequest request = request("  sku-1  ", "  Keyboard  ", "  Compact  ");
         when(repository.existsBySkuIgnoreCase("SKU-1")).thenReturn(false);
-        when(repository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductResponse response = service().create(request);
 
         assertEquals("SKU-1", response.sku());
         assertEquals("Keyboard", response.name());
         assertEquals("Compact", response.description());
-        verify(repository).save(any(Product.class));
+        verify(repository).saveAndFlush(any(Product.class));
     }
 
     @Test
     void createConvertsBlankDescriptionToNull() {
         ProductRequest request = request("SKU-1", "Keyboard", "   ");
-        when(repository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProductResponse response = service().create(request);
 
@@ -124,7 +128,7 @@ class ProductServiceTest {
     void createPropagatesSavePersistenceError() {
         ProductRequest request = request("SKU-1", "Keyboard", null);
         RuntimeException failure = new RuntimeException("insert failed");
-        when(repository.save(any(Product.class))).thenThrow(failure);
+        when(repository.saveAndFlush(any(Product.class))).thenThrow(failure);
 
         RuntimeException thrown = assertThrows(RuntimeException.class, () -> service().create(request));
 
@@ -245,11 +249,11 @@ class ProductServiceTest {
     }
 
     private ProductService service() {
-        return new ProductService(repository);
+        return new ProductService(repository, warehouses);
     }
 
     private Product product(String sku, String name) {
-        return new Product(sku, name, null, new BigDecimal("10.00"), true, 0);
+        return new Product(sku, name, null, new BigDecimal("10.00"), true);
     }
 
     private ProductRequest request(String sku, String name, String description) {

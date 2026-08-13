@@ -36,6 +36,9 @@ class SalesOrder {
     @Column(name = "customer_id")
     private UUID customerId;
 
+    @Column(name = "fulfillment_warehouse_id", nullable = false)
+    private UUID fulfillmentWarehouseId;
+
     @Column(nullable = false, length = 3)
     private String currency;
 
@@ -77,21 +80,35 @@ class SalesOrder {
     protected SalesOrder() {
     }
 
-    SalesOrder(String folio, UUID customerId, String currency, String createdBy,
+    SalesOrder(String folio, UUID customerId, UUID fulfillmentWarehouseId,
+               String currency, String createdBy,
                List<PricedOrderItem> requestedItems) {
         this.id = UUID.randomUUID();
         this.status = OrderStatus.PENDING;
         this.folio = folio;
         this.customerId = customerId;
+        this.fulfillmentWarehouseId = fulfillmentWarehouseId;
         this.currency = currency;
         this.createdBy = createdBy;
         replaceItems(requestedItems);
     }
 
+    void changeFulfillmentWarehouse(UUID warehouseId) {
+        fulfillmentWarehouseId = warehouseId;
+    }
+
     void replaceItems(List<PricedOrderItem> requestedItems) {
-        items.clear();
-        requestedItems.forEach(item -> items.add(
-                new OrderItem(this, item.productId(), item.quantity(), item.unitPrice())));
+        var requestedProductIds = requestedItems.stream()
+                .map(PricedOrderItem::productId)
+                .collect(java.util.stream.Collectors.toSet());
+        items.removeIf(item -> !requestedProductIds.contains(item.getProductId()));
+        requestedItems.forEach(requested -> items.stream()
+                .filter(item -> item.getProductId().equals(requested.productId()))
+                .findFirst()
+                .ifPresentOrElse(
+                        item -> item.update(requested.quantity(), requested.unitPrice()),
+                        () -> items.add(new OrderItem(this, requested.productId(),
+                                requested.quantity(), requested.unitPrice()))));
         total = items.stream().map(OrderItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -138,6 +155,7 @@ class SalesOrder {
     UUID getId() { return id; }
     String getFolio() { return folio; }
     UUID getCustomerId() { return customerId; }
+    UUID getFulfillmentWarehouseId() { return fulfillmentWarehouseId; }
     OrderStatus getStatus() { return status; }
     String getCurrency() { return currency; }
     BigDecimal getTotal() { return total; }

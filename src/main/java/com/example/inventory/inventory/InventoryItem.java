@@ -1,8 +1,8 @@
 package com.example.inventory.inventory;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -13,22 +13,14 @@ import java.util.UUID;
 @Entity
 @Table(name = "inventory")
 class InventoryItem {
+    @EmbeddedId private InventoryId id;
+    @Column(nullable = false) private int quantity;
+    @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
-    @Id
-    @Column(name = "product_id")
-    private UUID productId;
+    protected InventoryItem() { }
 
-    @Column(nullable = false)
-    private int quantity;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
-    protected InventoryItem() {
-    }
-
-    InventoryItem(UUID productId) {
-        this.productId = productId;
+    InventoryItem(UUID warehouseId, UUID productId) {
+        this.id = new InventoryId(warehouseId, productId);
         this.quantity = 0;
     }
 
@@ -37,7 +29,8 @@ class InventoryItem {
         try {
             newQuantity = Math.addExact(quantity, delta);
         } catch (ArithmeticException exception) {
-            throw new IllegalArgumentException("Inventory quantity is outside the supported range", exception);
+            throw new IllegalArgumentException(
+                    "Inventory quantity is outside the supported range", exception);
         }
         if (newQuantity < 0) {
             throw new IllegalArgumentException("Inventory quantity cannot be negative");
@@ -47,11 +40,10 @@ class InventoryItem {
 
     @PrePersist
     @PreUpdate
-    void touch() {
-        updatedAt = Instant.now();
-    }
+    void touch() { updatedAt = Instant.now(); }
 
-    UUID getProductId() { return productId; }
+    UUID getWarehouseId() { return id.getWarehouseId(); }
+    UUID getProductId() { return id.getProductId(); }
     int getQuantity() { return quantity; }
     Instant getUpdatedAt() { return updatedAt; }
 }

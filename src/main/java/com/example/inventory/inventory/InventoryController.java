@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.UUID;
 import com.example.inventory.shared.PageResponse;
+import com.example.inventory.warehouses.WarehouseDirectory;
 
 @RestController
 @RequestMapping("/api/v1/inventory")
@@ -37,7 +38,7 @@ class InventoryController {
     PageResponse<InventoryResponse> findAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return service.findAll(page, size);
+        return service.findAll(WarehouseDirectory.MAIN_WAREHOUSE_ID, page, size);
     }
 
     @GetMapping("/movements")
@@ -54,13 +55,14 @@ class InventoryController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(required = false) String reference) {
         return movementQueries.findMovements(
-                productId, page, size, type, from, to, reference);
+                WarehouseDirectory.MAIN_WAREHOUSE_ID, productId, page, size,
+                type, from, to, reference);
     }
 
     @GetMapping("/{productId}")
     @Operation(summary = "Get stock for a product")
     InventoryResponse findByProductId(@PathVariable UUID productId) {
-        return service.findByProductId(productId);
+        return service.findByProductId(WarehouseDirectory.MAIN_WAREHOUSE_ID, productId);
     }
 
     @GetMapping("/{productId}/movements")
@@ -77,7 +79,8 @@ class InventoryController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(required = false) String reference) {
         return movementQueries.findMovements(
-                productId, page, size, type, from, to, reference);
+                WarehouseDirectory.MAIN_WAREHOUSE_ID, productId, page, size,
+                type, from, to, reference);
     }
 
     @GetMapping("/low-stock")
@@ -88,7 +91,8 @@ class InventoryController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "false") boolean outOfStockOnly) {
-        return service.findLowStock(page, size, search, outOfStockOnly);
+        return service.findLowStock(WarehouseDirectory.MAIN_WAREHOUSE_ID,
+                page, size, search, outOfStockOnly);
     }
 
     @PatchMapping("/{productId}/adjustments")
@@ -97,7 +101,7 @@ class InventoryController {
     InventoryResponse adjust(@PathVariable UUID productId,
                              @Valid @RequestBody StockAdjustmentRequest request,
                              @AuthenticationPrincipal Jwt jwt) {
-        return service.adjust(productId, request.quantityDelta(),
-                request.reference(), jwt.getSubject());
+        return service.adjust(WarehouseDirectory.MAIN_WAREHOUSE_ID, productId,
+                request.quantityDelta(), request.reference(), jwt.getSubject());
     }
 }

@@ -4,14 +4,12 @@ import java.util.UUID;
 
 /** Public write contract exposed by inventory to business modules. */
 public interface InventoryOperations {
-
-    void reserveForOrder(UUID productId, int quantity, UUID orderId,
-                         String responsibleUser);
-
-    void releaseForOrder(UUID productId, UUID orderId, String responsibleUser);
-
-    void consumeReservation(UUID productId, int quantity, UUID orderId,
-                            String responsibleUser);
-
-    void restoreForOrder(UUID productId, int quantity, UUID orderId, String responsibleUser);
+    void reserveForOrder(UUID warehouseId, UUID productId, int quantity,
+                         UUID orderId, String responsibleUser);
+    void releaseForOrder(UUID warehouseId, UUID productId,
+                         UUID orderId, String responsibleUser);
+    void consumeReservation(UUID warehouseId, UUID productId, int quantity,
+                            UUID orderId, String responsibleUser);
+    void restoreForOrder(UUID warehouseId, UUID productId, int quantity,
+                         UUID orderId, String responsibleUser);
 }

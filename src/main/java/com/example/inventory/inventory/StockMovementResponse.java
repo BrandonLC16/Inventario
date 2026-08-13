@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record StockMovementResponse(
         UUID id,
+        UUID warehouseId,
         UUID productId,
         StockMovementType movementType,
         int quantityDelta,
@@ -18,12 +19,12 @@ public record StockMovementResponse(
         String responsibleUser) {
 
     static StockMovementResponse from(StockMovement movement) {
-        return new StockMovementResponse(
-                movement.getId(), movement.getProductId(), movement.getMovementType(),
+        return new StockMovementResponse(movement.getId(), movement.getWarehouseId(),
+                movement.getProductId(), movement.getMovementType(),
                 movement.getQuantityDelta(), movement.getBalanceBefore(),
                 movement.getBalanceAfter(), movement.getReservationDelta(),
                 movement.getReservedBefore(), movement.getReservedAfter(),
-                movement.getBusinessReference(),
-                movement.getOccurredAt(), movement.getResponsibleUser());
+                movement.getBusinessReference(), movement.getOccurredAt(),
+                movement.getResponsibleUser());
     }
 }

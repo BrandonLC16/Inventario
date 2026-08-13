@@ -46,6 +46,12 @@ class OrderItem {
         this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
     }
 
+    void update(int quantity, BigDecimal unitPrice) {
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.subtotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+    }
+
     UUID getId() { return id; }
     UUID getProductId() { return productId; }
     int getQuantity() { return quantity; }

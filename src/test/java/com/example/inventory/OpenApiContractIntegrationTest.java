@@ -49,6 +49,14 @@ class OpenApiContractIntegrationTest extends AbstractIntegrationTest {
         assertTrue(paths.stream().allMatch(path -> path.startsWith("/api/v1/")));
         assertTrue(paths.contains("/api/v1/inventory"));
         assertTrue(paths.contains("/api/v1/inventory/movements"));
+        assertTrue(paths.contains("/api/v1/warehouses"));
+        assertTrue(paths.contains("/api/v1/warehouses/{warehouseId}/inventory"));
+        assertTrue(paths.contains(
+                "/api/v1/warehouses/{warehouseId}/inventory/{productId}/adjustments"));
+        assertTrue(paths.contains(
+                "/api/v1/warehouses/{warehouseId}/inventory/movements"));
+        assertTrue(paths.contains(
+                "/api/v1/warehouses/{warehouseId}/inventory/low-stock"));
 
         Path output = Path.of("target", "openapi", "inventory-api-v1.json");
         Files.createDirectories(output.getParent());
