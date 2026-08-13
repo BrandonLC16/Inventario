@@ -73,10 +73,17 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponse replaceItems(UUID id, UpdateOrderItemsRequest request) {
+    public OrderResponse replaceItems(UUID id, UpdateOrderItemsRequest request,
+                                      String responsibleUser) {
         SalesOrder order = requireForUpdate(id);
-        if (order.getStatus() != OrderStatus.PENDING) {
-            throw new ConflictException("Only a pending order can be updated");
+        if (order.getStatus() != OrderStatus.PENDING
+                && order.getStatus() != OrderStatus.RESERVED) {
+            throw new ConflictException(
+                    "Only a pending or reserved order can be updated");
+        }
+        if (order.getStatus() == OrderStatus.RESERVED) {
+            releaseReservations(order, requireActor(responsibleUser));
+            order.release();
         }
         order.replaceItems(priceItems(validateItems(request.items())));
         orders.flush();
@@ -84,12 +91,49 @@ public class OrderService {
     }
 
     @Transactional
-    public void deletePending(UUID id) {
+    public void deletePending(UUID id, String responsibleUser) {
         SalesOrder order = requireForUpdate(id);
-        if (order.getStatus() != OrderStatus.PENDING) {
-            throw new ConflictException("Only a pending order can be deleted");
+        if (order.getStatus() != OrderStatus.PENDING
+                && order.getStatus() != OrderStatus.RESERVED) {
+            throw new ConflictException(
+                    "Only a pending or reserved order can be deleted");
+        }
+        if (order.getStatus() == OrderStatus.RESERVED) {
+            releaseReservations(order, requireActor(responsibleUser));
         }
         orders.delete(order);
+    }
+
+    @Transactional
+    public OrderResponse reserve(UUID id, String responsibleUser) {
+        SalesOrder order = requireForUpdate(id);
+        if (order.getStatus() == OrderStatus.RESERVED) {
+            return OrderResponse.from(order);
+        }
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new ConflictException("Only a pending order can be reserved");
+        }
+        String actor = requireActor(responsibleUser);
+        sortedItems(order).forEach(item -> inventory.reserveForOrder(
+                item.getProductId(), item.getQuantity(), order.getId(), actor));
+        order.reserve(actor);
+        orders.flush();
+        return OrderResponse.from(order);
+    }
+
+    @Transactional
+    public OrderResponse release(UUID id, String responsibleUser) {
+        SalesOrder order = requireForUpdate(id);
+        if (order.getStatus() == OrderStatus.PENDING) {
+            return OrderResponse.from(order);
+        }
+        if (order.getStatus() != OrderStatus.RESERVED) {
+            throw new ConflictException("Only a reserved order can be released");
+        }
+        releaseReservations(order, requireActor(responsibleUser));
+        order.release();
+        orders.flush();
+        return OrderResponse.from(order);
     }
 
     @Transactional
@@ -101,8 +145,12 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new ConflictException("A cancelled order cannot be confirmed");
         }
+        if (order.getStatus() == OrderStatus.PENDING) {
+            throw new ConflictException(
+                    "A pending order must be reserved before confirmation");
+        }
         String actor = requireActor(responsibleUser);
-        sortedItems(order).forEach(item -> inventory.consumeForOrder(
+        sortedItems(order).forEach(item -> inventory.consumeReservation(
                 item.getProductId(), item.getQuantity(), order.getId(), actor));
         order.confirm(actor);
         orders.flush();
@@ -115,8 +163,10 @@ public class OrderService {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             return OrderResponse.from(order);
         }
-        if (order.getStatus() == OrderStatus.PENDING) {
-            throw new ConflictException("A pending order cannot be cancelled");
+        if (order.getStatus() == OrderStatus.PENDING
+                || order.getStatus() == OrderStatus.RESERVED) {
+            throw new ConflictException(
+                    "Only a confirmed order can be cancelled");
         }
         String actor = requireActor(responsibleUser);
         sortedItems(order).forEach(item -> inventory.restoreForOrder(
@@ -194,6 +244,11 @@ public class OrderService {
         return order.getItems().stream()
                 .sorted(Comparator.comparing(OrderItem::getProductId))
                 .toList();
+    }
+
+    private void releaseReservations(SalesOrder order, String actor) {
+        sortedItems(order).forEach(item -> inventory.releaseForOrder(
+                item.getProductId(), order.getId(), actor));
     }
 
     private String requireActor(String responsibleUser) {

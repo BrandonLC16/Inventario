@@ -57,6 +57,19 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict());
 
         performSales(post("/api/orders/{id}/confirm", orderId))
+                .andExpect(status().isConflict());
+        performSales(post("/api/orders/{id}/reserve", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESERVED"))
+                .andExpect(jsonPath("$.reservedBy").value(salesUserId.toString()))
+                .andExpect(jsonPath("$.reservedAt").isNotEmpty());
+        performSales(post("/api/orders/{id}/reserve", orderId))
+                .andExpect(status().isOk());
+        assertEquals(10, stock(productId));
+        assertEquals(4, reserved(productId));
+        assertEquals(1, movementCount(orderId, "ORDER_RESERVED"));
+
+        performSales(post("/api/orders/{id}/confirm", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
         performSales(post("/api/orders/{id}/confirm", orderId))
@@ -82,25 +95,27 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
                 SELECT responsible_user FROM stock_movements
                 WHERE business_reference = ? ORDER BY movement_type
                 """, String.class, orderId.toString());
-        assertEquals(List.of(salesUserId.toString(), salesUserId.toString()), actors);
+        assertEquals(List.of(
+                salesUserId.toString(), salesUserId.toString(),
+                salesUserId.toString()), actors);
     }
 
     @Test
-    void confirmationRollsBackEveryProductWhenOneHasInsufficientStock() throws Exception {
+    void reservationRollsBackEveryProductWhenOneHasInsufficientStock() throws Exception {
         UUID firstProduct = createProduct("ROLLBACK-1", 5);
         UUID secondProduct = createProduct("ROLLBACK-2", 1);
         UUID orderId = createOrder(
                 new RequestedItem(firstProduct, 3),
                 new RequestedItem(secondProduct, 2));
 
-        performSales(post("/api/orders/{id}/confirm", orderId))
+        performSales(post("/api/orders/{id}/reserve", orderId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
                         .value("Inventory quantity cannot be negative"));
 
         assertEquals(5, stock(firstProduct));
         assertEquals(1, stock(secondProduct));
-        assertEquals(0, movementCount(orderId, "ORDER_CONFIRMED"));
+        assertEquals(0, movementCount(orderId, "ORDER_RESERVED"));
         assertEquals("PENDING", orderStatus(orderId));
     }
 
@@ -135,6 +150,8 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         UUID orderId = createOrder(
                 new RequestedItem(firstProduct, 2),
                 new RequestedItem(secondProduct, 2));
+        performSales(post("/api/orders/{id}/reserve", orderId))
+                .andExpect(status().isOk());
         performSales(post("/api/orders/{id}/confirm", orderId))
                 .andExpect(status().isOk());
 
@@ -156,6 +173,8 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
     void concurrentConfirmationAndCancellationApplyInventoryExactlyOnce() throws Exception {
         UUID productId = createProduct("CONCURRENT-1", 10);
         UUID orderId = createOrder(new RequestedItem(productId, 4));
+        performSales(post("/api/orders/{id}/reserve", orderId))
+                .andExpect(status().isOk());
 
         assertEquals(List.of(200, 200), concurrently(
                 "/api/orders/" + orderId + "/confirm"));
@@ -177,18 +196,19 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         UUID secondOrder = createOrder(new RequestedItem(productId, 4));
 
         List<Integer> statuses = concurrentlyDifferent(
-                "/api/orders/" + firstOrder + "/confirm",
-                "/api/orders/" + secondOrder + "/confirm");
+                "/api/orders/" + firstOrder + "/reserve",
+                "/api/orders/" + secondOrder + "/reserve");
 
         assertEquals(List.of(200, 400), statuses);
-        assertEquals(1, stock(productId));
+        assertEquals(5, stock(productId));
+        assertEquals(4, reserved(productId));
         assertEquals(1, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM stock_movements
-                WHERE movement_type = 'ORDER_CONFIRMED'
+                WHERE movement_type = 'ORDER_RESERVED'
                 """, Integer.class));
         List<String> orderStatuses = jdbcTemplate.queryForList(
                 "SELECT status FROM orders ORDER BY status", String.class);
-        assertEquals(List.of("CONFIRMED", "PENDING"), orderStatuses);
+        assertEquals(List.of("PENDING", "RESERVED"), orderStatuses);
     }
 
     private List<Integer> concurrently(String path) throws Exception {
@@ -270,6 +290,13 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         return jdbcTemplate.queryForObject(
                 "SELECT quantity FROM inventory WHERE product_id = ?",
                 Integer.class, productId);
+    }
+
+    private int reserved(UUID productId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT COALESCE(SUM(quantity), 0)
+                FROM inventory_reservations WHERE product_id = ?
+                """, Integer.class, productId);
     }
 
     private int movementCount(UUID orderId, String movementType) {

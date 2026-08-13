@@ -170,6 +170,10 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.total").value(51.0))
                 .andExpect(jsonPath("$.items[0].unitPrice").value(25.5));
 
+        performSales(post("/api/orders/{id}/reserve", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reservedBy").value(salesUserId.toString()))
+                .andExpect(jsonPath("$.reservedAt").isNotEmpty());
         performSales(post("/api/orders/{id}/confirm", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.confirmedBy").value(salesUserId.toString()))

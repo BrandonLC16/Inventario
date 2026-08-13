@@ -14,6 +14,24 @@ import java.util.UUID;
 
 interface InventoryRepository extends JpaRepository<InventoryItem, UUID> {
 
+    @Query(value = """
+            SELECT product.id AS "productId",
+                   COALESCE(item.quantity, 0) AS quantity,
+                   COALESCE(reservation.reserved_quantity, 0)
+                       AS "reservedQuantity",
+                   item.updated_at AS "updatedAt"
+            FROM products product
+            LEFT JOIN inventory item ON item.product_id = product.id
+            LEFT JOIN (
+                SELECT product_id, SUM(quantity)::integer AS reserved_quantity
+                FROM inventory_reservations
+                GROUP BY product_id
+            ) reservation ON reservation.product_id = product.id
+            WHERE product.id = :productId
+            """, nativeQuery = true)
+    Optional<InventoryBalanceProjection> findBalance(
+            @Param("productId") UUID productId);
+
     @Modifying
     @Query(value = "insert into inventory (product_id, quantity, updated_at) values (:productId, 0, current_timestamp) on conflict (product_id) do nothing", nativeQuery = true)
     int ensureExists(@Param("productId") UUID productId);
@@ -27,29 +45,51 @@ interface InventoryRepository extends JpaRepository<InventoryItem, UUID> {
                    product.sku AS sku,
                    product.name AS name,
                    COALESCE(item.quantity, 0) AS quantity,
+                   COALESCE(reservation.reserved_quantity, 0) AS "reservedQuantity",
+                   COALESCE(item.quantity, 0)
+                       - COALESCE(reservation.reserved_quantity, 0)
+                       AS "availableQuantity",
                    product.minimum_stock AS "minimumStock"
             FROM products product
             LEFT JOIN inventory item ON item.product_id = product.id
+            LEFT JOIN (
+                SELECT product_id, SUM(quantity)::integer AS reserved_quantity
+                FROM inventory_reservations
+                GROUP BY product_id
+            ) reservation ON reservation.product_id = product.id
             WHERE product.deleted = false
               AND product.active = true
-              AND COALESCE(item.quantity, 0) <= product.minimum_stock
+              AND COALESCE(item.quantity, 0)
+                    - COALESCE(reservation.reserved_quantity, 0)
+                    <= product.minimum_stock
               AND (:search IS NULL
                    OR lower(product.sku) LIKE lower(concat('%', :search, '%'))
                    OR lower(product.name) LIKE lower(concat('%', :search, '%')))
-              AND (:outOfStockOnly = false OR COALESCE(item.quantity, 0) = 0)
+              AND (:outOfStockOnly = false
+                   OR COALESCE(item.quantity, 0)
+                        - COALESCE(reservation.reserved_quantity, 0) = 0)
             ORDER BY product.name, product.id
             """,
             countQuery = """
             SELECT count(*)
             FROM products product
             LEFT JOIN inventory item ON item.product_id = product.id
+            LEFT JOIN (
+                SELECT product_id, SUM(quantity)::integer AS reserved_quantity
+                FROM inventory_reservations
+                GROUP BY product_id
+            ) reservation ON reservation.product_id = product.id
             WHERE product.deleted = false
               AND product.active = true
-              AND COALESCE(item.quantity, 0) <= product.minimum_stock
+              AND COALESCE(item.quantity, 0)
+                    - COALESCE(reservation.reserved_quantity, 0)
+                    <= product.minimum_stock
               AND (:search IS NULL
                    OR lower(product.sku) LIKE lower(concat('%', :search, '%'))
                    OR lower(product.name) LIKE lower(concat('%', :search, '%')))
-              AND (:outOfStockOnly = false OR COALESCE(item.quantity, 0) = 0)
+              AND (:outOfStockOnly = false
+                   OR COALESCE(item.quantity, 0)
+                        - COALESCE(reservation.reserved_quantity, 0) = 0)
             """,
             nativeQuery = true)
     Page<LowStockProjection> findLowStock(

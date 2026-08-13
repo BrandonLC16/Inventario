@@ -72,6 +72,20 @@ public class OrderController {
         return service.confirm(id, jwt.getSubject());
     }
 
+    @PostMapping("/{id}/reserve")
+    @Operation(summary = "Reserve inventory for a pending order")
+    public OrderResponse reserve(@PathVariable UUID id,
+                                 @AuthenticationPrincipal Jwt jwt) {
+        return service.reserve(id, jwt.getSubject());
+    }
+
+    @PostMapping("/{id}/release")
+    @Operation(summary = "Release inventory for a reserved order")
+    public OrderResponse release(@PathVariable UUID id,
+                                 @AuthenticationPrincipal Jwt jwt) {
+        return service.release(id, jwt.getSubject());
+    }
+
     @PostMapping("/{id}/cancel")
     @Operation(summary = "Cancel a confirmed order")
     public OrderResponse cancel(@PathVariable UUID id,
@@ -80,17 +94,19 @@ public class OrderController {
     }
 
     @PutMapping("/{id}/items")
-    @Operation(summary = "Replace the items of a pending order")
+    @Operation(summary = "Replace items, releasing a reservation when present")
     public OrderResponse replaceItems(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateOrderItemsRequest request) {
-        return service.replaceItems(id, request);
+            @Valid @RequestBody UpdateOrderItemsRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        return service.replaceItems(id, request, jwt.getSubject());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Delete a pending order")
-    public void deletePending(@PathVariable UUID id) {
-        service.deletePending(id);
+    @Operation(summary = "Delete a pending or reserved order")
+    public void deletePending(@PathVariable UUID id,
+                              @AuthenticationPrincipal Jwt jwt) {
+        service.deletePending(id, jwt.getSubject());
     }
 }

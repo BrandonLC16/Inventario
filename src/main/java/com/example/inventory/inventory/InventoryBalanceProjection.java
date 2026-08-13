@@ -1,20 +1,15 @@
 package com.example.inventory.inventory;
 
+import java.time.Instant;
 import java.util.UUID;
 
-interface LowStockProjection {
+interface InventoryBalanceProjection {
 
     UUID getProductId();
-
-    String getSku();
-
-    String getName();
 
     int getQuantity();
 
     int getReservedQuantity();
 
-    int getAvailableQuantity();
-
-    int getMinimumStock();
+    Instant getUpdatedAt();
 }

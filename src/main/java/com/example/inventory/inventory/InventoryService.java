@@ -16,19 +16,23 @@ import org.springframework.data.domain.Sort;
 class InventoryService implements InventoryOperations {
 
     private final InventoryRepository repository;
+    private final InventoryReservationRepository reservations;
     private final StockMovementRepository movementRepository;
     private final ProductCatalog productCatalog;
 
-    InventoryService(InventoryRepository repository, StockMovementRepository movementRepository,
+    InventoryService(InventoryRepository repository,
+                     InventoryReservationRepository reservations,
+                     StockMovementRepository movementRepository,
                      ProductCatalog productCatalog) {
         this.repository = repository;
+        this.reservations = reservations;
         this.movementRepository = movementRepository;
         this.productCatalog = productCatalog;
     }
 
     InventoryResponse findByProductId(UUID productId) {
         productCatalog.requireProduct(productId);
-        return repository.findById(productId)
+        return repository.findBalance(productId)
                 .map(InventoryResponse::from)
                 .orElseGet(() -> InventoryResponse.empty(productId));
     }
@@ -49,6 +53,10 @@ class InventoryService implements InventoryOperations {
         boolean initialStock = repository.ensureExists(productId) == 1;
         InventoryItem item = lockInventory(productId);
         int balanceBefore = item.getQuantity();
+        int reserved = reservedQuantity(productId);
+        if (delta < 0 && -((long) delta) > item.getQuantity() - (long) reserved) {
+            throw insufficientStock(productId);
+        }
         try {
             item.changeQuantity(delta);
         } catch (IllegalArgumentException exception) {
@@ -61,12 +69,12 @@ class InventoryService implements InventoryOperations {
                 ? StockMovementType.INITIAL_STOCK
                 : delta > 0 ? StockMovementType.MANUAL_IN : StockMovementType.MANUAL_OUT;
         String businessReference = normalizeReference(reference);
-        recordMovement(item, type, delta, balanceBefore,
+        recordMovement(item, type, delta, balanceBefore, 0, reserved, reserved,
                 businessReference == null
                         ? "MANUAL:" + UUID.randomUUID()
                         : businessReference,
                 actor);
-        return InventoryResponse.from(item);
+        return InventoryResponse.from(item, reserved);
     }
 
     PageResponse<LowStockResponse> findLowStock(
@@ -79,21 +87,74 @@ class InventoryService implements InventoryOperations {
 
     @Override
     @Transactional
-    public void consumeForOrder(UUID productId, int quantity, UUID orderId,
+    public void reserveForOrder(UUID productId, int quantity, UUID orderId,
                                 String responsibleUser) {
         String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
         productCatalog.requireProduct(productId);
         repository.ensureExists(productId);
         InventoryItem item = lockInventory(productId);
+        int reservedBefore = reservedQuantity(productId);
+        int available = item.getQuantity() - reservedBefore;
+        if (quantity > available) {
+            throw insufficientStock(productId);
+        }
+        if (reservations.findForUpdate(orderId, productId).isPresent()) {
+            throw new ConflictException(
+                    "Inventory is already reserved for this order and product");
+        }
+        reservations.save(new InventoryReservation(
+                orderId, productId, quantity, actor));
+        recordMovement(item, StockMovementType.ORDER_RESERVED, 0,
+                item.getQuantity(), quantity, reservedBefore,
+                Math.addExact(reservedBefore, quantity), orderId.toString(), actor);
+    }
+
+    @Override
+    @Transactional
+    public void releaseForOrder(UUID productId, UUID orderId,
+                                String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
+        productCatalog.requireStoredProduct(productId);
+        repository.ensureExists(productId);
+        InventoryItem item = lockInventory(productId);
+        InventoryReservation reservation = reservations.findForUpdate(orderId, productId)
+                .orElseThrow(() -> new ConflictException(
+                        "Inventory reservation was not found"));
+        int reservedBefore = reservedQuantity(productId);
+        reservations.delete(reservation);
+        recordMovement(item, StockMovementType.ORDER_RESERVATION_RELEASED, 0,
+                item.getQuantity(), -reservation.getQuantity(), reservedBefore,
+                reservedBefore - reservation.getQuantity(), orderId.toString(), actor);
+    }
+
+    @Override
+    @Transactional
+    public void consumeReservation(UUID productId, int quantity, UUID orderId,
+                                   String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
+        requirePositive(quantity);
+        productCatalog.requireStoredProduct(productId);
+        repository.ensureExists(productId);
+        InventoryItem item = lockInventory(productId);
+        InventoryReservation reservation = reservations.findForUpdate(orderId, productId)
+                .orElseThrow(() -> new ConflictException(
+                        "Inventory reservation was not found"));
+        if (reservation.getQuantity() != quantity) {
+            throw new ConflictException(
+                    "Inventory reservation does not match the order item");
+        }
         int balanceBefore = item.getQuantity();
+        int reservedBefore = reservedQuantity(productId);
         try {
             item.changeQuantity(-quantity);
         } catch (IllegalArgumentException exception) {
             throw insufficientStock(productId);
         }
+        reservations.delete(reservation);
         recordMovement(item, StockMovementType.ORDER_CONFIRMED, -quantity,
-                balanceBefore, orderId.toString(), actor);
+                balanceBefore, -quantity, reservedBefore,
+                reservedBefore - quantity, orderId.toString(), actor);
     }
 
     @Override
@@ -106,13 +167,14 @@ class InventoryService implements InventoryOperations {
         repository.ensureExists(productId);
         InventoryItem item = lockInventory(productId);
         int balanceBefore = item.getQuantity();
+        int reserved = reservedQuantity(productId);
         try {
             item.changeQuantity(quantity);
         } catch (IllegalArgumentException exception) {
             throw new ConflictException(exception.getMessage());
         }
         recordMovement(item, StockMovementType.ORDER_CANCELLED, quantity,
-                balanceBefore, orderId.toString(), actor);
+                balanceBefore, 0, reserved, reserved, orderId.toString(), actor);
     }
 
     private InventoryItem lockInventory(UUID productId) {
@@ -125,11 +187,25 @@ class InventoryService implements InventoryOperations {
         return new BadRequestException("Inventory quantity cannot be negative");
     }
 
-    private void recordMovement(InventoryItem item, StockMovementType type, int delta,
-                                int balanceBefore, String businessReference,
+    private int reservedQuantity(UUID productId) {
+        try {
+            return Math.toIntExact(reservations.reservedQuantity(productId));
+        } catch (ArithmeticException exception) {
+            throw new IllegalStateException(
+                    "Reserved inventory is outside the supported range", exception);
+        }
+    }
+
+    private void recordMovement(InventoryItem item, StockMovementType type,
+                                int quantityDelta, int balanceBefore,
+                                int reservationDelta, int reservedBefore,
+                                int reservedAfter, String businessReference,
                                 String responsibleUser) {
-        movementRepository.save(new StockMovement(item.getProductId(), type, delta,
-                balanceBefore, item.getQuantity(), businessReference, responsibleUser));
+        movementRepository.save(new StockMovement(
+                item.getProductId(), type, quantityDelta,
+                balanceBefore, item.getQuantity(),
+                reservationDelta, reservedBefore, reservedAfter,
+                businessReference, responsibleUser));
     }
 
     private void requirePositive(int quantity) {

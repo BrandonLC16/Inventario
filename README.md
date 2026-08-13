@@ -13,8 +13,10 @@ El proyecto implementa:
 - Alertas paginadas de stock bajo o agotado y referencias explícitas de recepción.
 - Módulo de clientes con unicidad condicional, búsqueda y desactivación lógica.
 - Pedidos paginados con cliente, folio, precios históricos, subtotales, total y auditoría.
-- Edición y eliminación de pedidos pendientes sin afectar inventario.
-- Confirmación transaccional: descuenta todos los artículos o revierte el pedido completo.
+- Reservas transaccionales por pedido y producto, sin sobreventa.
+- Cálculo de existencia física, reservada y disponible.
+- Edición o eliminación de pedidos reservados con liberación atómica.
+- Confirmación transaccional: consume la reserva y descuenta físicamente una sola vez.
 - Cancelación transaccional: restaura existencias exactamente una vez.
 - Autenticación por nombre de usuario o correo electrónico.
 - Access tokens JWT firmados con RS256.
@@ -133,7 +135,7 @@ Para cambiar la contraseña propia envía `{"currentPassword":"<ACTUAL>","newPas
 | Consultar el kardex | Sí | Sí | No |
 | Consultar alertas de stock bajo | Sí | Sí | No |
 | Crear, consultar, actualizar o desactivar clientes | Sí | No | Sí |
-| Crear, consultar, confirmar o cancelar pedidos | Sí | No | Sí |
+| Crear, consultar, reservar, liberar, confirmar o cancelar pedidos | Sí | No | Sí |
 | Administrar usuarios y roles | Sí | No | No |
 | Acceder a OpenAPI/Swagger habilitado | Sí | No | No |
 
@@ -161,7 +163,9 @@ Producto de ejemplo:
 
 El SKU se recorta y guarda en mayúsculas. Su unicidad no distingue mayúsculas y el SKU de un producto eliminado continúa reservado.
 
-Para ajustar inventario envía `{"quantityDelta":10,"reference":"PURCHASE-RECEIPT-42"}`. El valor debe ser distinto de cero: uno positivo registra una entrada y uno negativo una salida. `reference` es opcional, admite hasta 128 caracteres y permite identificar una compra, recepción u otra operación. La operación responde `400` si deja el saldo en negativo. Si aún no hay registro de inventario, la consulta devuelve cantidad `0` y `updatedAt: null`.
+Para ajustar inventario envía `{"quantityDelta":10,"reference":"PURCHASE-RECEIPT-42"}`. El valor debe ser distinto de cero: uno positivo registra una entrada y uno negativo una salida. `reference` es opcional, admite hasta 128 caracteres y permite identificar una compra, recepción u otra operación. Una salida responde `400` si consume unidades reservadas o deja el saldo físico negativo.
+
+`GET /api/inventory/{productId}` devuelve `quantity` como existencia física, `reservedQuantity`, `availableQuantity` y `updatedAt`. Se cumple `availableQuantity = quantity - reservedQuantity`. Si todavía no hay inventario, los tres saldos son cero y `updatedAt` es `null`.
 
 Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, referencia y el UUID del usuario autenticado en `responsible_user`. La primera entrada usa `INITIAL_STOCK`; las siguientes, `MANUAL_IN` o `MANUAL_OUT`.
 
@@ -169,7 +173,7 @@ Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, r
 
 ### Alertas y reposición
 
-`GET /api/inventory/low-stock` incluye productos activos no eliminados cuyo saldo es menor o igual a `minimumStock`, aunque todavía no tengan fila de inventario. Admite `page`, `size`, búsqueda parcial por SKU o nombre mediante `search`, y `outOfStockOnly=true`. Cada resultado contiene el saldo, mínimo, cantidad sugerida de reposición y una alerta `LOW_STOCK` u `OUT_OF_STOCK`.
+`GET /api/inventory/low-stock` incluye productos activos no eliminados cuya existencia disponible es menor o igual a `minimumStock`, aunque todavía no tengan fila de inventario. Admite `page`, `size`, búsqueda parcial por SKU o nombre mediante `search`, y `outOfStockOnly=true`. Cada resultado contiene existencia física, reservada y disponible, mínimo, cantidad sugerida de reposición y una alerta `LOW_STOCK` u `OUT_OF_STOCK`.
 
 ### Consulta del kardex
 
@@ -179,12 +183,12 @@ Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, r
 |---|---|---|
 | `page` | `0` | Índice de página, desde cero |
 | `size` | `20` | Elementos por página, entre 1 y 100 |
-| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_CONFIRMED` u `ORDER_CANCELLED` |
+| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_RESERVED`, `ORDER_RESERVATION_RELEASED`, `ORDER_CONFIRMED` u `ORDER_CANCELLED` |
 | `from` | Sin filtro | Fecha inicial inclusiva en ISO-8601 |
 | `to` | Sin filtro | Fecha final inclusiva en ISO-8601 |
 | `reference` | Sin filtro | Coincidencia exacta con la referencia de negocio |
 
-Los filtros son opcionales y combinables. `from` no puede ser posterior a `to`. Cada elemento contiene `movementType`, `quantityDelta`, `balanceBefore`, `balanceAfter`, `businessReference`, `occurredAt` y `responsibleUser`, además de los identificadores del movimiento y producto.
+Los filtros son opcionales y combinables. `from` no puede ser posterior a `to`. Cada elemento contiene `movementType`, el efecto físico mediante `quantityDelta`, `balanceBefore` y `balanceAfter`, y el efecto comprometido mediante `reservationDelta`, `reservedBefore` y `reservedAfter`. También incluye `businessReference`, `occurredAt`, `responsibleUser` y los identificadores.
 
 La respuesta contiene `content`, `page`, `size`, `totalElements`, `totalPages`, `first` y `last`.
 
@@ -217,9 +221,11 @@ Estas rutas requieren `ADMIN` o `SALES`.
 | `POST` | `/api/orders` | Crea un pedido `PENDING` |
 | `GET` | `/api/orders` | Lista pedidos paginados por fecha descendente |
 | `GET` | `/api/orders/{id}` | Consulta un pedido y sus artículos |
-| `PUT` | `/api/orders/{id}/items` | Reemplaza artículos de un pedido pendiente |
-| `DELETE` | `/api/orders/{id}` | Elimina un pedido pendiente sin tocar inventario |
-| `POST` | `/api/orders/{id}/confirm` | Confirma y descuenta existencias |
+| `PUT` | `/api/orders/{id}/items` | Reemplaza artículos; libera antes si estaba reservado |
+| `DELETE` | `/api/orders/{id}` | Elimina un pendiente o reservado; libera si aplica |
+| `POST` | `/api/orders/{id}/reserve` | Reserva atómicamente todos los artículos |
+| `POST` | `/api/orders/{id}/release` | Libera la reserva y vuelve a `PENDING` |
+| `POST` | `/api/orders/{id}/confirm` | Convierte la reserva en salida física |
 | `POST` | `/api/orders/{id}/cancel` | Cancela un confirmado y restaura existencias |
 
 Ejemplo de creación:
@@ -234,11 +240,13 @@ Al crear el pedido se captura el precio unitario vigente y se calculan el subtot
 
 `GET /api/orders` admite `page`, `size`, `status`, `customerId`, coincidencia parcial de `folio`, y rango inclusivo `from`/`to` en ISO-8601 sobre `createdAt`. Todos los filtros son combinables.
 
-El ciclo permitido es `PENDING → CONFIRMED → CANCELLED`. Un pendiente no se puede cancelar y un cancelado no se puede confirmar; ambas transiciones responden `409`. Repetir la confirmación de un confirmado o la cancelación de un cancelado devuelve el estado actual sin volver a modificar inventario.
+El ciclo es `PENDING → RESERVED → CONFIRMED → CANCELLED`. Un `RESERVED` puede volver a `PENDING` mediante `release`. Confirmar exige reserva previa; cancelar exige `CONFIRMED`. Reservar, liberar, confirmar y cancelar son idempotentes cuando se repiten sobre el estado que ya representan.
 
-Mientras permanezca `PENDING`, sus artículos pueden reemplazarse y sus precios se vuelven a capturar. También puede eliminarse con `DELETE`. Un pendiente no reserva ni consume existencias: el stock sólo se descuenta al confirmar. Una estrategia de reservas queda deliberadamente fuera de este incremento porque requiere reglas de inventario independientes.
+La reserva crea una fila por pedido y producto, conserva intacta la existencia física y reduce la disponible. El servicio bloquea el pedido y después cada inventario en orden estable por UUID. Si algún artículo carece de disponibilidad, toda la reserva, sus eventos y el cambio de estado se revierten. Dos pedidos simultáneos no pueden reservar las mismas unidades ni provocar sobreventa.
 
-La confirmación bloquea el pedido y los inventarios en un orden estable. El cambio de estado, todos los descuentos y sus movimientos `ORDER_CONFIRMED` se guardan en una sola transacción; la falta de stock de cualquier artículo revierte todo. La cancelación aplica la misma garantía al restaurar y registrar `ORDER_CANCELLED`. Los movimientos guardan el UUID del usuario que ejecutó la transición. También se puede cancelar un pedido confirmado aunque después se haya eliminado lógicamente uno de sus productos.
+Editar un `RESERVED` libera todos sus artículos y lo devuelve a `PENDING` antes de reemplazarlos y recapturar precios; cualquier fallo posterior revierte también la liberación. Eliminar un reservado aplica la misma liberación transaccional.
+
+La confirmación elimina cada reserva y registra en un único `ORDER_CONFIRMED` tanto el descenso físico como el descenso reservado, por lo que no descuenta dos veces. La cancelación restaura existencia física una sola vez mediante `ORDER_CANCELLED`. `ORDER_RESERVED` y `ORDER_RESERVATION_RELEASED` auditan reservas/liberaciones con referencia al pedido y UUID del actor. La cancelación sigue funcionando aunque un producto haya sido eliminado lógicamente.
 
 ## Administración de usuarios
 
@@ -323,9 +331,9 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 103 pruebas: 65 unitarias y 38 de integración. Cubren productos, inventario, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 110 pruebas: 65 unitarias y 45 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
 
-Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; kardex consecutivo; transiciones, rollback, idempotencia y concurrencia de pedidos; precios históricos y auditoría; filtros paginados; alertas; permisos; y revocación inmediata de access/refresh tokens por logout, bloqueo, cambio de roles, cambio o restablecimiento de contraseña y revocación administrativa.
+Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V8→V9 con datos históricos; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 
 El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta `./mvnw --batch-mode verify` en cada `push` y `pull_request`.
 
@@ -347,7 +355,7 @@ src/main/java/com/example/inventory/
 ├── auth/          Login, refresh, logout, sesión y cambio de contraseña
 ├── config/        Configuración de OpenAPI
 ├── customers/     Clientes, búsqueda y desactivación lógica
-├── inventory/     Existencias, ajustes, kardex y alertas
+├── inventory/     Existencias, reservas, ajustes, kardex y alertas
 ├── orders/        Pedidos, precios históricos y ciclo transaccional
 ├── products/      Catálogo, stock mínimo y borrado lógico
 ├── security/      JWT, CORS y autorización
@@ -364,7 +372,6 @@ src/test/java/com/example/inventory/
 
 ## Alcance pendiente
 
-- Reservas de stock para pedidos pendientes.
 - Proveedores y órdenes de compra.
 - Estrategia concreta de métricas, salud y observabilidad operativa.
 - Operación de rotación, respaldo y monitoreo de claves.

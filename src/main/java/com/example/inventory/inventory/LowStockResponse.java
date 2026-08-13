@@ -7,6 +7,8 @@ public record LowStockResponse(
         String sku,
         String name,
         int quantity,
+        int reservedQuantity,
+        int availableQuantity,
         int minimumStock,
         int replenishmentQuantity,
         StockAlertLevel alert) {
@@ -14,9 +16,10 @@ public record LowStockResponse(
     static LowStockResponse from(LowStockProjection row) {
         return new LowStockResponse(
                 row.getProductId(), row.getSku(), row.getName(),
-                row.getQuantity(), row.getMinimumStock(),
-                Math.max(0, row.getMinimumStock() - row.getQuantity()),
-                row.getQuantity() == 0
+                row.getQuantity(), row.getReservedQuantity(),
+                row.getAvailableQuantity(), row.getMinimumStock(),
+                Math.max(0, row.getMinimumStock() - row.getAvailableQuantity()),
+                row.getAvailableQuantity() == 0
                         ? StockAlertLevel.OUT_OF_STOCK
                         : StockAlertLevel.LOW_STOCK);
     }

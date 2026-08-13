@@ -45,6 +45,12 @@ class SalesOrder {
     @Column(name = "created_by", nullable = false, length = 255)
     private String createdBy;
 
+    @Column(name = "reserved_at")
+    private Instant reservedAt;
+
+    @Column(name = "reserved_by", length = 255)
+    private String reservedBy;
+
     @Column(name = "confirmed_at")
     private Instant confirmedAt;
 
@@ -90,6 +96,18 @@ class SalesOrder {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    void reserve(String actor) {
+        status = OrderStatus.RESERVED;
+        reservedAt = Instant.now();
+        reservedBy = actor;
+    }
+
+    void release() {
+        status = OrderStatus.PENDING;
+        reservedAt = null;
+        reservedBy = null;
+    }
+
     void confirm(String actor) {
         status = OrderStatus.CONFIRMED;
         confirmedAt = Instant.now();
@@ -124,6 +142,8 @@ class SalesOrder {
     String getCurrency() { return currency; }
     BigDecimal getTotal() { return total; }
     String getCreatedBy() { return createdBy; }
+    Instant getReservedAt() { return reservedAt; }
+    String getReservedBy() { return reservedBy; }
     Instant getConfirmedAt() { return confirmedAt; }
     String getConfirmedBy() { return confirmedBy; }
     Instant getCancelledAt() { return cancelledAt; }

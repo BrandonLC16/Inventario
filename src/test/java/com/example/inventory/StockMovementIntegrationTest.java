@@ -54,12 +54,13 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
         cancelOrder(orderId);
         setTime(productId, "INITIAL_STOCK", "2026-01-01T00:00:00Z");
         setTime(productId, "MANUAL_OUT", "2026-01-02T00:00:00Z");
+        setTime(productId, "ORDER_RESERVED", "2026-01-02T12:00:00Z");
         setTime(productId, "ORDER_CONFIRMED", "2026-01-03T00:00:00Z");
         setTime(productId, "ORDER_CANCELLED", "2026-01-04T00:00:00Z");
 
         mockMvc.perform(movements(productId, managerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.totalElements").value(5))
                 .andExpect(jsonPath("$.content[0].movementType")
                         .value("ORDER_CANCELLED"))
                 .andExpect(jsonPath("$.content[0].quantityDelta").value(3))
@@ -74,12 +75,23 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[1].movementType")
                         .value("ORDER_CONFIRMED"))
                 .andExpect(jsonPath("$.content[1].quantityDelta").value(-3))
-                .andExpect(jsonPath("$.content[2].movementType").value("MANUAL_OUT"))
-                .andExpect(jsonPath("$.content[2].businessReference")
+                .andExpect(jsonPath("$.content[1].reservationDelta").value(-3))
+                .andExpect(jsonPath("$.content[1].reservedBefore").value(3))
+                .andExpect(jsonPath("$.content[1].reservedAfter").value(0))
+                .andExpect(jsonPath("$.content[2].movementType")
+                        .value("ORDER_RESERVED"))
+                .andExpect(jsonPath("$.content[2].quantityDelta").value(0))
+                .andExpect(jsonPath("$.content[2].balanceBefore").value(8))
+                .andExpect(jsonPath("$.content[2].balanceAfter").value(8))
+                .andExpect(jsonPath("$.content[2].reservationDelta").value(3))
+                .andExpect(jsonPath("$.content[2].reservedBefore").value(0))
+                .andExpect(jsonPath("$.content[2].reservedAfter").value(3))
+                .andExpect(jsonPath("$.content[3].movementType").value("MANUAL_OUT"))
+                .andExpect(jsonPath("$.content[3].businessReference")
                         .value(startsWith("MANUAL:")))
-                .andExpect(jsonPath("$.content[2].responsibleUser")
-                        .value(managerId.toString()))
                 .andExpect(jsonPath("$.content[3].responsibleUser")
+                        .value(managerId.toString()))
+                .andExpect(jsonPath("$.content[4].responsibleUser")
                         .value(adminId.toString()));
     }
 
@@ -126,6 +138,7 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
         cancelOrder(orderId);
         setTime(productId, "INITIAL_STOCK", "2026-03-01T00:00:00Z");
         setTime(productId, "MANUAL_OUT", "2026-03-02T00:00:00Z");
+        setTime(productId, "ORDER_RESERVED", "2026-03-02T12:00:00Z");
         setTime(productId, "ORDER_CONFIRMED", "2026-03-03T00:00:00Z");
         setTime(productId, "ORDER_CANCELLED", "2026-03-04T00:00:00Z");
 
@@ -137,19 +150,23 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(movements(productId, managerToken)
                         .param("reference", orderId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
                 .andExpect(jsonPath("$.content[0].businessReference")
                         .value(orderId.toString()))
                 .andExpect(jsonPath("$.content[1].businessReference")
+                        .value(orderId.toString()))
+                .andExpect(jsonPath("$.content[2].businessReference")
                         .value(orderId.toString()));
         mockMvc.perform(movements(productId, managerToken)
                         .param("from", "2026-03-02T00:00:00Z")
                         .param("to", "2026-03-03T00:00:00Z"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
                 .andExpect(jsonPath("$.content[0].movementType")
                         .value("ORDER_CONFIRMED"))
-                .andExpect(jsonPath("$.content[1].movementType").value("MANUAL_OUT"));
+                .andExpect(jsonPath("$.content[1].movementType")
+                        .value("ORDER_RESERVED"))
+                .andExpect(jsonPath("$.content[2].movementType").value("MANUAL_OUT"));
 
         mockMvc.perform(movements(productId, managerToken)
                         .param("type", "ORDER_CANCELLED")
@@ -229,6 +246,9 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getHeader("Location");
         UUID orderId = UUID.fromString(location.substring(location.lastIndexOf('/') + 1));
+        mockMvc.perform(post("/api/orders/{id}/reserve", orderId)
+                        .header(AUTHORIZATION, "Bearer " + salesToken))
+                .andExpect(status().isOk());
         mockMvc.perform(post("/api/orders/{id}/confirm", orderId)
                         .header(AUTHORIZATION, "Bearer " + salesToken))
                 .andExpect(status().isOk());

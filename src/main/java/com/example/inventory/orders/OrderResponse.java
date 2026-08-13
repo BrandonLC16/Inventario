@@ -15,10 +15,12 @@ public record OrderResponse(
         BigDecimal total,
         List<OrderItemResponse> items,
         String createdBy,
+        String reservedBy,
         String confirmedBy,
         String cancelledBy,
         Instant createdAt,
         Instant updatedAt,
+        Instant reservedAt,
         Instant confirmedAt,
         Instant cancelledAt) {
 
@@ -29,8 +31,9 @@ public record OrderResponse(
                 .toList();
         return new OrderResponse(order.getId(), order.getFolio(), order.getCustomerId(),
                 order.getStatus(), order.getCurrency(), order.getTotal(), items,
-                order.getCreatedBy(), order.getConfirmedBy(), order.getCancelledBy(),
+                order.getCreatedBy(), order.getReservedBy(),
+                order.getConfirmedBy(), order.getCancelledBy(),
                 order.getCreatedAt(), order.getUpdatedAt(),
-                order.getConfirmedAt(), order.getCancelledAt());
+                order.getReservedAt(), order.getConfirmedAt(), order.getCancelledAt());
     }
 }

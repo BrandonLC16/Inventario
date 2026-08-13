@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,6 +35,9 @@ class InventoryServiceTest {
     private InventoryRepository repository;
 
     @Mock
+    private InventoryReservationRepository reservations;
+
+    @Mock
     private StockMovementRepository movementRepository;
 
     @Mock
@@ -42,20 +46,22 @@ class InventoryServiceTest {
     @Test
     void findByProductIdReturnsExistingInventory() {
         UUID productId = UUID.randomUUID();
-        InventoryItem item = inventory(productId, 7);
-        when(repository.findById(productId)).thenReturn(Optional.of(item));
+        when(repository.findBalance(productId))
+                .thenReturn(Optional.of(balance(productId, 7, 2)));
 
         InventoryResponse response = service().findByProductId(productId);
 
         assertEquals(productId, response.productId());
         assertEquals(7, response.quantity());
+        assertEquals(2, response.reservedQuantity());
+        assertEquals(5, response.availableQuantity());
         verify(productCatalog).requireProduct(productId);
     }
 
     @Test
     void findByProductIdReturnsZeroWhenInventoryDoesNotExist() {
         UUID productId = UUID.randomUUID();
-        when(repository.findById(productId)).thenReturn(Optional.empty());
+        when(repository.findBalance(productId)).thenReturn(Optional.empty());
 
         InventoryResponse response = service().findByProductId(productId);
 
@@ -197,13 +203,17 @@ class InventoryServiceTest {
     }
 
     @Test
-    void consumeForOrderRecordsConfirmedOrderMovement() {
+    void consumeReservationRecordsConfirmedOrderMovement() {
         UUID productId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 10);
         when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(reservations.findForUpdate(orderId, productId))
+                .thenReturn(Optional.of(new InventoryReservation(
+                        orderId, productId, 4, "operator@example.com")));
+        when(reservations.reservedQuantity(productId)).thenReturn(4L);
 
-        service().consumeForOrder(productId, 4, orderId, "operator@example.com");
+        service().consumeReservation(productId, 4, orderId, "operator@example.com");
 
         assertEquals(6, item.getQuantity());
         assertMovement(StockMovementType.ORDER_CONFIRMED, -4, 10, 6,
@@ -212,32 +222,38 @@ class InventoryServiceTest {
 
     @ParameterizedTest
     @ValueSource(ints = {0, -1})
-    void consumeForOrderRejectsNonPositiveQuantityWithoutInteractions(int quantity) {
-        assertThrows(BadRequestException.class, () -> service().consumeForOrder(
+    void consumeReservationRejectsNonPositiveQuantityWithoutInteractions(int quantity) {
+        assertThrows(BadRequestException.class, () -> service().consumeReservation(
                 UUID.randomUUID(), quantity, UUID.randomUUID(), "operator"));
 
         verifyNoInteractions(productCatalog, repository, movementRepository);
     }
 
     @Test
-    void consumeForOrderRejectsMissingProductWithoutMovement() {
+    void consumeReservationRejectsMissingProductWithoutMovement() {
         UUID productId = UUID.randomUUID();
-        doThrow(new NotFoundException("missing")).when(productCatalog).requireProduct(productId);
+        doThrow(new NotFoundException("missing"))
+                .when(productCatalog).requireStoredProduct(productId);
 
-        assertThrows(NotFoundException.class, () -> service().consumeForOrder(
+        assertThrows(NotFoundException.class, () -> service().consumeReservation(
                 productId, 1, UUID.randomUUID(), "operator"));
 
         verifyNoInteractions(repository, movementRepository);
     }
 
     @Test
-    void consumeForOrderRejectsInsufficientStockWithoutMovement() {
+    void consumeReservationRejectsInsufficientStockWithoutMovement() {
         UUID productId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 3);
         when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(reservations.findForUpdate(orderId, productId))
+                .thenReturn(Optional.of(new InventoryReservation(
+                        orderId, productId, 4, "operator")));
+        when(reservations.reservedQuantity(productId)).thenReturn(4L);
 
-        assertThrows(BadRequestException.class, () -> service().consumeForOrder(
-                productId, 4, UUID.randomUUID(), "operator"));
+        assertThrows(BadRequestException.class, () -> service().consumeReservation(
+                productId, 4, orderId, "operator"));
 
         assertEquals(3, item.getQuantity());
         verifyNoInteractions(movementRepository);
@@ -286,7 +302,7 @@ class InventoryServiceTest {
         RuntimeException failure = new RuntimeException("lock failed");
         when(repository.findByProductIdForUpdate(productId)).thenThrow(failure);
 
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service().consumeForOrder(
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service().consumeReservation(
                 productId, 1, UUID.randomUUID(), "operator"));
 
         assertSame(failure, thrown);
@@ -296,26 +312,49 @@ class InventoryServiceTest {
     @Test
     void movementPersistenceErrorIsPropagated() {
         UUID productId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
         InventoryItem item = inventory(productId, 5);
         RuntimeException failure = new RuntimeException("movement insert failed");
         when(repository.findByProductIdForUpdate(productId)).thenReturn(Optional.of(item));
+        when(reservations.findForUpdate(orderId, productId))
+                .thenReturn(Optional.of(new InventoryReservation(
+                        orderId, productId, 2, "operator")));
+        when(reservations.reservedQuantity(productId)).thenReturn(2L);
         when(movementRepository.save(any(StockMovement.class))).thenThrow(failure);
 
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service().consumeForOrder(
-                productId, 2, UUID.randomUUID(), "operator"));
+        RuntimeException thrown = assertThrows(RuntimeException.class, () -> service().consumeReservation(
+                productId, 2, orderId, "operator"));
 
         assertSame(failure, thrown);
         verify(movementRepository).save(any(StockMovement.class));
     }
 
     private InventoryService service() {
-        return new InventoryService(repository, movementRepository, productCatalog);
+        return new InventoryService(
+                repository, reservations, movementRepository, productCatalog);
     }
 
     private InventoryItem inventory(UUID productId, int quantity) {
         InventoryItem item = new InventoryItem(productId);
         item.changeQuantity(quantity);
         return item;
+    }
+
+    private InventoryBalanceProjection balance(
+            UUID productId, int quantity, int reservedQuantity) {
+        return new InventoryBalanceProjection() {
+            @Override
+            public UUID getProductId() { return productId; }
+
+            @Override
+            public int getQuantity() { return quantity; }
+
+            @Override
+            public int getReservedQuantity() { return reservedQuantity; }
+
+            @Override
+            public Instant getUpdatedAt() { return Instant.EPOCH; }
+        };
     }
 
     private void assertMovement(StockMovementType type, int delta, int balanceBefore,
