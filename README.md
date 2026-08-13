@@ -175,6 +175,8 @@ V10 crea el almacén determinista `MAIN` (`00000000-0000-0000-0000-000000000001`
 | `PATCH` | `/api/v1/warehouses/{id}/inventory/{productId}/adjustments` | `ADMIN`, `INVENTORY_MANAGER` | Ajusta existencias del almacén |
 | `GET` | `/api/v1/warehouses/{id}/inventory/movements` | `ADMIN`, `INVENTORY_MANAGER` | Consulta el kardex del almacén |
 | `GET` | `/api/v1/warehouses/{id}/inventory/low-stock` | `ADMIN`, `INVENTORY_MANAGER` | Consulta alertas configuradas por almacén |
+| `GET` | `/api/v1/warehouses/{id}/inventory/settings` | Autenticado | Lista la configuración de productos, incluidos los inactivos |
+| `GET` | `/api/v1/warehouses/{id}/inventory/{productId}/settings` | Autenticado | Consulta `minimumStock` y activación del producto en el almacén |
 | `PUT` | `/api/v1/warehouses/{id}/inventory/{productId}/settings` | `ADMIN`, `INVENTORY_MANAGER` | Configura `minimumStock` y activación por almacén |
 
 Cada balance, movimiento y alerta incluye `warehouseId`. Un almacén inactivo no admite ajustes ni reservas. La disponibilidad se calcula siempre como `quantity - reservedQuantity` y ninguna operación permite existencia o disponibilidad negativa.
@@ -374,7 +376,7 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 120 pruebas: 65 unitarias y 55 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 121 pruebas: 65 unitarias y 56 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
 
 Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 

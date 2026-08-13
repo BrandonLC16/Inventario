@@ -95,6 +95,39 @@ class WarehouseInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void productSettingsCanBeListedAndReadEvenWhenInactive() throws Exception {
+        UUID warehouse = createWarehouse("SETTINGS-READ");
+        UUID activeProduct = createProduct("SETTINGS-ACTIVE", 0);
+        UUID inactiveProduct = createProduct("SETTINGS-INACTIVE", 0);
+        configure(warehouse, activeProduct, 4, true);
+        configure(warehouse, inactiveProduct, 9, false);
+
+        authenticated(get("/api/v1/warehouses/{warehouse}/inventory/settings", warehouse),
+                        salesToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].warehouseId").value(warehouse.toString()))
+                .andExpect(jsonPath("$.content[0].productId").value(activeProduct.toString()))
+                .andExpect(jsonPath("$.content[0].sku").value("SETTINGS-ACTIVE"))
+                .andExpect(jsonPath("$.content[0].minimumStock").value(4))
+                .andExpect(jsonPath("$.content[0].active").value(true))
+                .andExpect(jsonPath("$.content[1].productId").value(inactiveProduct.toString()))
+                .andExpect(jsonPath("$.content[1].minimumStock").value(9))
+                .andExpect(jsonPath("$.content[1].active").value(false));
+
+        authenticated(get(
+                        "/api/v1/warehouses/{warehouse}/inventory/{product}/settings",
+                        warehouse, inactiveProduct), salesToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warehouseId").value(warehouse.toString()))
+                .andExpect(jsonPath("$.productId").value(inactiveProduct.toString()))
+                .andExpect(jsonPath("$.sku").value("SETTINGS-INACTIVE"))
+                .andExpect(jsonPath("$.name").value("SETTINGS-INACTIVE"))
+                .andExpect(jsonPath("$.minimumStock").value(9))
+                .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
     void reservationsCompeteInsideOneWarehouseButRemainIndependentAcrossWarehouses()
             throws Exception {
         UUID first = createWarehouse("RES-A");

@@ -58,6 +58,46 @@ interface InventoryRepository extends JpaRepository<InventoryItem, InventoryId> 
     Page<InventoryBalanceProjection> findBalances(
             @Param("warehouseId") UUID warehouseId, Pageable pageable);
 
+    @Query(value = """
+            SELECT setting.warehouse_id AS "warehouseId",
+                   setting.product_id AS "productId",
+                   product.sku AS sku,
+                   product.name AS name,
+                   setting.minimum_stock AS "minimumStock",
+                   setting.active AS active
+            FROM warehouse_product_settings setting
+            JOIN products product ON product.id = setting.product_id
+            WHERE setting.warehouse_id = :warehouseId
+              AND product.deleted = false
+            ORDER BY product.sku, product.id
+            """,
+            countQuery = """
+            SELECT count(*)
+            FROM warehouse_product_settings setting
+            JOIN products product ON product.id = setting.product_id
+            WHERE setting.warehouse_id = :warehouseId
+              AND product.deleted = false
+            """, nativeQuery = true)
+    Page<InventorySettingProjection> findSettings(
+            @Param("warehouseId") UUID warehouseId, Pageable pageable);
+
+    @Query(value = """
+            SELECT setting.warehouse_id AS "warehouseId",
+                   setting.product_id AS "productId",
+                   product.sku AS sku,
+                   product.name AS name,
+                   setting.minimum_stock AS "minimumStock",
+                   setting.active AS active
+            FROM warehouse_product_settings setting
+            JOIN products product ON product.id = setting.product_id
+            WHERE setting.warehouse_id = :warehouseId
+              AND setting.product_id = :productId
+              AND product.deleted = false
+            """, nativeQuery = true)
+    Optional<InventorySettingProjection> findSetting(
+            @Param("warehouseId") UUID warehouseId,
+            @Param("productId") UUID productId);
+
     @Modifying
     @Query(value = "insert into inventory (warehouse_id, product_id, quantity, updated_at) values (:warehouseId, :productId, 0, current_timestamp) on conflict (warehouse_id, product_id) do nothing", nativeQuery = true)
     int ensureExists(@Param("warehouseId") UUID warehouseId,

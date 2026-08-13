@@ -3,6 +3,7 @@ package com.example.inventory.inventory;
 import com.example.inventory.products.ProductCatalog;
 import com.example.inventory.shared.BadRequestException;
 import com.example.inventory.shared.ConflictException;
+import com.example.inventory.shared.NotFoundException;
 import com.example.inventory.shared.PageResponse;
 import com.example.inventory.shared.PageSupport;
 import com.example.inventory.warehouses.WarehouseDirectory;
@@ -46,6 +47,24 @@ class InventoryService implements InventoryOperations {
         var pageable = PageSupport.request(page, size, Sort.unsorted());
         return PageResponse.from(repository.findBalances(warehouseId, pageable),
                 InventoryResponse::from);
+    }
+
+    InventorySettingResponse findSetting(UUID warehouseId, UUID productId) {
+        warehouses.requireWarehouse(warehouseId);
+        productCatalog.requireProduct(productId);
+        return repository.findSetting(warehouseId, productId)
+                .map(InventorySettingResponse::from)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory setting for warehouse %s and product %s was not found"
+                                .formatted(warehouseId, productId)));
+    }
+
+    PageResponse<InventorySettingResponse> findSettings(UUID warehouseId,
+                                                        int page, int size) {
+        warehouses.requireWarehouse(warehouseId);
+        var pageable = PageSupport.request(page, size, Sort.unsorted());
+        return PageResponse.from(repository.findSettings(warehouseId, pageable),
+                InventorySettingResponse::from);
     }
 
     @Transactional

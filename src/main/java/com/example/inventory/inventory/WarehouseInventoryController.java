@@ -50,6 +50,22 @@ class WarehouseInventoryController {
         return service.findByProductId(warehouseId, productId);
     }
 
+    @GetMapping("/settings")
+    @Operation(summary = "List warehouse product settings")
+    PageResponse<InventorySettingResponse> findSettings(
+            @PathVariable UUID warehouseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return service.findSettings(warehouseId, page, size);
+    }
+
+    @GetMapping("/{productId}/settings")
+    @Operation(summary = "Get warehouse settings for one product")
+    InventorySettingResponse findSetting(@PathVariable UUID warehouseId,
+                                         @PathVariable UUID productId) {
+        return service.findSetting(warehouseId, productId);
+    }
+
     @PatchMapping("/{productId}/adjustments")
     @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
     @Operation(summary = "Adjust warehouse stock atomically")
