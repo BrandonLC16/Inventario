@@ -13,6 +13,10 @@ public record StockMovementPageResponse(
         boolean first,
         boolean last) {
 
+    public StockMovementPageResponse {
+        content = List.copyOf(content);
+    }
+
     static StockMovementPageResponse from(Page<StockMovement> result) {
         return new StockMovementPageResponse(
                 result.getContent().stream().map(StockMovementResponse::from).toList(),

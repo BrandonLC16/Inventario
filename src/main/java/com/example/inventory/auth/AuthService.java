@@ -46,7 +46,10 @@ public class AuthService {
             Authentication authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(
                             request.identifier().trim(), request.password()));
-            InventoryUserDetails principal = (InventoryUserDetails) authentication.getPrincipal();
+            if (authentication == null
+                    || !(authentication.getPrincipal() instanceof InventoryUserDetails principal)) {
+                throw new InvalidAuthenticationException();
+            }
             UserAccount user = users.findByIdWithRoles(principal.id())
                     .orElseThrow(InvalidAuthenticationException::new);
             return issuePair(InventoryUserDetails.from(user), refreshTokens.issue(user));

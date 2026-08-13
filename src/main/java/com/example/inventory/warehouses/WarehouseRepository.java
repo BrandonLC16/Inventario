@@ -31,6 +31,14 @@ interface WarehouseRepository extends JpaRepository<Warehouse, UUID> {
     boolean isProductActive(@Param("warehouseId") UUID warehouseId,
                             @Param("productId") UUID productId);
 
+    @Query(value = "select exists (select 1 from inventory where warehouse_id = :warehouseId and product_id = :productId and quantity > 0)", nativeQuery = true)
+    boolean hasProductStock(@Param("warehouseId") UUID warehouseId,
+                            @Param("productId") UUID productId);
+
+    @Query(value = "select exists (select 1 from inventory_reservations where warehouse_id = :warehouseId and product_id = :productId)", nativeQuery = true)
+    boolean hasProductReservations(@Param("warehouseId") UUID warehouseId,
+                                   @Param("productId") UUID productId);
+
     @Modifying
     @Query(value = "insert into warehouse_product_settings (warehouse_id, product_id, minimum_stock, active) select :warehouseId, product.id, 0, true from products product on conflict (warehouse_id, product_id) do nothing", nativeQuery = true)
     void initializeProductSettings(@Param("warehouseId") UUID warehouseId);

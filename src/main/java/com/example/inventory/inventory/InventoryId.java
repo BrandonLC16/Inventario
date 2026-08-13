@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Embeddable
-public class InventoryId implements Serializable {
+public final class InventoryId implements Serializable {
     @Column(name = "warehouse_id", nullable = false) private UUID warehouseId;
     @Column(name = "product_id", nullable = false) private UUID productId;
 

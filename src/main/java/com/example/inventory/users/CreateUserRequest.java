@@ -17,4 +17,8 @@ public record CreateUserRequest(
         @NotBlank @Email @Size(max = 254) String email,
         @NotBlank @Size(min = 12, max = 128) String password,
         @NotEmpty Set<@NotNull RoleName> roles) {
+
+    public CreateUserRequest {
+        if (roles != null) roles = Set.copyOf(roles);
+    }
 }

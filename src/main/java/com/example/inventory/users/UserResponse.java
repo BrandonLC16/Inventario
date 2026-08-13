@@ -15,6 +15,10 @@ public record UserResponse(
         Instant createdAt,
         Instant updatedAt) {
 
+    public UserResponse {
+        roles = Set.copyOf(roles);
+    }
+
     static UserResponse from(UserAccount account) {
         return new UserResponse(account.getId(), account.getUsername(), account.getEmail(),
                 account.isEnabled(), account.isLocked(),

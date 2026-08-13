@@ -12,4 +12,8 @@ public record ApiError(
         String path,
         String correlationId,
         Map<String, String> validationErrors) {
+
+    public ApiError {
+        validationErrors = Map.copyOf(validationErrors);
+    }
 }

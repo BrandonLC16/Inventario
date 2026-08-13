@@ -25,6 +25,10 @@ public record OrderResponse(
         Instant confirmedAt,
         Instant cancelledAt) {
 
+    public OrderResponse {
+        items = List.copyOf(items);
+    }
+
     static OrderResponse from(SalesOrder order) {
         List<OrderItemResponse> items = order.getItems().stream()
                 .sorted(Comparator.comparing(OrderItem::getProductId))

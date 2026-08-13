@@ -7,4 +7,8 @@ import java.util.Set;
 
 public record UpdateUserRolesRequest(
         @NotEmpty Set<@NotNull RoleName> roles) {
+
+    public UpdateUserRolesRequest {
+        if (roles != null) roles = Set.copyOf(roles);
+    }
 }

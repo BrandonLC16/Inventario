@@ -40,6 +40,7 @@ El proyecto implementa:
 - Springdoc OpenAPI 3.0.2
 - Maven Wrapper
 - JUnit, Mockito y Testcontainers
+- SpotBugs y Trivy en integración continua
 - Docker Compose
 
 ## Requisitos
@@ -123,6 +124,8 @@ El servidor persiste únicamente el hash SHA-256 del refresh token aleatorio, nu
 
 Los fallos de login, los usuarios inexistentes, deshabilitados o bloqueados y los refresh tokens inválidos al renovar usan la misma respuesta genérica `401`. Un refresh token rotado o revocado no puede reutilizarse. El logout revoca toda su familia y es idempotente: un token desconocido también recibe `204`.
 
+`login` y `refresh` limitan intentos por cliente y por huella SHA-256 de la credencial, sin conservar identificadores ni tokens en claro. El valor predeterminado permite 5 intentos por credencial y 100 por cliente en una ventana de un minuto; al excederlo responde `429`, código `RATE_LIMIT_EXCEEDED` y cabecera `Retry-After`. El almacenamiento es acotado y local a cada instancia; en despliegues con varias réplicas se debe complementar con un límite distribuido en el gateway.
+
 Cada access token incluye una versión de seguridad que se contrasta con PostgreSQL en todas las peticiones autenticadas. El logout revoca su familia refresh e invalida inmediatamente los access tokens anteriores; repetirlo no invalida tokens nuevos. Bloquear, deshabilitar, cambiar roles o cambiar/restablecer la contraseña incrementa esa versión y revoca todas las familias refresh activas del usuario dentro de la misma transacción. La revocación administrativa de sesiones aplica la misma regla sin cambiar la contraseña.
 
 Para cambiar la contraseña propia envía `{"currentPassword":"<ACTUAL>","newPassword":"<NUEVA>"}`. La nueva contraseña debe tener entre 12 y 128 caracteres y ser diferente de la actual.
@@ -136,6 +139,7 @@ Para cambiar la contraseña propia envía `{"currentPassword":"<ACTUAL>","newPas
 | Ajustar inventario | Sí | Sí | No |
 | Consultar el kardex | Sí | Sí | No |
 | Consultar alertas de stock bajo | Sí | Sí | No |
+| Crear, actualizar o desactivar almacenes y cambiar su configuración | Sí | Sí | No |
 | Crear, consultar, actualizar o desactivar clientes | Sí | No | Sí |
 | Crear, consultar, reservar, liberar, confirmar o cancelar pedidos | Sí | No | Sí |
 | Administrar usuarios y roles | Sí | No | No |
@@ -179,7 +183,7 @@ V10 crea el almacén determinista `MAIN` (`00000000-0000-0000-0000-000000000001`
 | `GET` | `/api/v1/warehouses/{id}/inventory/{productId}/settings` | Autenticado | Consulta `minimumStock` y activación del producto en el almacén |
 | `PUT` | `/api/v1/warehouses/{id}/inventory/{productId}/settings` | `ADMIN`, `INVENTORY_MANAGER` | Configura `minimumStock` y activación por almacén |
 
-Cada balance, movimiento y alerta incluye `warehouseId`. Un almacén inactivo no admite ajustes ni reservas. La disponibilidad se calcula siempre como `quantity - reservedQuantity` y ninguna operación permite existencia o disponibilidad negativa.
+Cada balance, movimiento y alerta incluye `warehouseId`. Un almacén inactivo no admite ajustes ni reservas. Un producto no puede desactivarse en un almacén mientras conserve existencias físicas o reservas; primero deben retirarse o liberarse. La disponibilidad se calcula siempre como `quantity - reservedQuantity` y ninguna operación permite existencia o disponibilidad negativa.
 Producto de ejemplo:
 
 ```json
@@ -343,6 +347,10 @@ El contrato se genera de forma reproducible desde los controllers durante `verif
 | `JWT_AUDIENCE` | `inventory-clients` | Claim `aud` |
 | `JWT_ACCESS_TOKEN_TTL` | `15m` | TTL de access; entre 1 minuto y 1 hora |
 | `JWT_REFRESH_TOKEN_TTL` | `14d` | TTL de refresh; entre 1 hora y 90 días |
+| `AUTH_RATE_LIMIT_PER_CREDENTIAL` | `5` | Intentos de login o refresh por credencial y ventana |
+| `AUTH_RATE_LIMIT_PER_CLIENT` | `100` | Intentos totales por cliente y ventana |
+| `AUTH_RATE_LIMIT_WINDOW` | `1m` | Ventana entre 1 segundo y 1 hora |
+| `AUTH_RATE_LIMIT_MAX_TRACKED_KEYS` | `10000` | Límite de contadores en memoria |
 | `CORS_ALLOWED_ORIGINS` | Lista vacía | Orígenes separados por comas |
 | `SWAGGER_ENABLED` | `false` | Habilita Swagger para `ADMIN` |
 | `BOOTSTRAP_ADMIN_ENABLED` | `false` | Habilita el administrador inicial |
@@ -376,11 +384,11 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 121 pruebas: 65 unitarias y 56 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 126 pruebas: 67 unitarias y 59 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
 
 Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 
-El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta `./mvnw --batch-mode verify` en cada `push` y `pull_request`.
+El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta pruebas, SpotBugs con severidad media, escaneo de vulnerabilidades de las dependencias de producción y detección de secretos en cada `push` y `pull_request`. La acción de Trivy está fijada por SHA para evitar cambios de código no revisados en la cadena de suministro.
 
 ## Construcción
 

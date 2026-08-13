@@ -87,7 +87,19 @@ public class WarehouseService implements WarehouseDirectory {
     public void configureProduct(UUID warehouseId, UUID productId, int minimumStock, boolean active) {
         if (minimumStock < 0) throw new BadRequestException("Minimum stock cannot be negative");
         lockWarehouse(warehouseId);
+        if (!active) ensureProductCanBeDeactivated(warehouseId, productId);
         repository.configureProduct(warehouseId, productId, minimumStock, active);
+    }
+
+    private void ensureProductCanBeDeactivated(UUID warehouseId, UUID productId) {
+        if (repository.hasProductStock(warehouseId, productId)) {
+            throw new ConflictException(
+                    "A warehouse product with stock cannot be deactivated");
+        }
+        if (repository.hasProductReservations(warehouseId, productId)) {
+            throw new ConflictException(
+                    "A warehouse product with reservations cannot be deactivated");
+        }
     }
 
     private void ensureCanDeactivate(UUID id) {

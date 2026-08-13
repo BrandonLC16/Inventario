@@ -230,6 +230,32 @@ class WarehouseInventoryIntegrationTest extends AbstractIntegrationTest {
         adjust(empty, product, 1).andExpect(status().isConflict());
     }
 
+    @Test
+    void warehouseProductWithStockCannotBeDeactivated() throws Exception {
+        UUID warehouse = createWarehouse("PRODUCT-WITH-STOCK");
+        UUID product = createProduct("PRODUCT-DEACTIVATE", 0);
+        adjust(warehouse, product, 3).andExpect(status().isOk());
+
+        authenticated(put(
+                        "/api/v1/warehouses/{warehouse}/inventory/{product}/settings",
+                        warehouse, product).contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"minimumStock":2,"active":false}
+                                """), adminToken)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"));
+
+        authenticated(get(
+                        "/api/v1/warehouses/{warehouse}/inventory/{product}/settings",
+                        warehouse, product), salesToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.minimumStock").value(0))
+                .andExpect(jsonPath("$.active").value(true));
+        adjust(warehouse, product, -3).andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(0));
+        configure(warehouse, product, 2, false);
+    }
+
     private UUID createWarehouse(String code) throws Exception {
         String location = authenticated(post("/api/v1/warehouses")
                         .contentType(MediaType.APPLICATION_JSON)

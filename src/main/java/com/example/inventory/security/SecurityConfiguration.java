@@ -1,5 +1,6 @@
 package com.example.inventory.security;
 
+import com.example.inventory.auth.AuthenticationRateLimitProperties;
 import com.example.inventory.shared.CorrelationIdFilter;
 import com.example.inventory.users.RoleName;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -51,7 +52,10 @@ import java.util.UUID;
 
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
-@EnableConfigurationProperties(SecurityProperties.class)
+@EnableConfigurationProperties({
+        SecurityProperties.class,
+        AuthenticationRateLimitProperties.class
+})
 public class SecurityConfiguration {
 
     private static final Set<String> ALLOWED_ROLES = EnumSet.allOf(RoleName.class).stream()

@@ -26,10 +26,12 @@ class AccessTokenValidator implements OAuth2TokenValidator<Jwt> {
 
     @Override
     public OAuth2TokenValidatorResult validate(Jwt token) {
+        String subject = token.getSubject();
+        if (subject == null) return failure();
         UUID userId;
         try {
-            userId = UUID.fromString(token.getSubject());
-        } catch (IllegalArgumentException | NullPointerException exception) {
+            userId = UUID.fromString(subject);
+        } catch (IllegalArgumentException exception) {
             return failure();
         }
         OptionalLong version = tokenVersion(token);

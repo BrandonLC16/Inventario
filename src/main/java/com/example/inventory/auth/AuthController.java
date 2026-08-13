@@ -2,6 +2,7 @@ package com.example.inventory.auth;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
@@ -23,21 +24,33 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService service;
+    private final AuthenticationRateLimiter rateLimiter;
 
-    public AuthController(AuthService service) {
+    public AuthController(AuthService service, AuthenticationRateLimiter rateLimiter) {
         this.service = service;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate with username or email")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        return tokenResponse(service.login(request));
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest servletRequest) {
+        String remoteAddress = servletRequest.getRemoteAddr();
+        rateLimiter.checkLogin(remoteAddress, request.identifier());
+        TokenResponse response = service.login(request);
+        rateLimiter.loginSucceeded(remoteAddress, request.identifier());
+        return tokenResponse(response);
     }
 
     @PostMapping("/refresh")
     @Operation(summary = "Rotate a refresh token")
-    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        return tokenResponse(service.refresh(request));
+    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request,
+                                                 HttpServletRequest servletRequest) {
+        String remoteAddress = servletRequest.getRemoteAddr();
+        rateLimiter.checkRefresh(remoteAddress, request.refreshToken());
+        TokenResponse response = service.refresh(request);
+        rateLimiter.refreshSucceeded(remoteAddress, request.refreshToken());
+        return tokenResponse(response);
     }
 
     @PostMapping("/logout")

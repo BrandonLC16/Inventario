@@ -9,13 +9,17 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.RETRY_AFTER;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -145,6 +149,95 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/orders")
                         .header(AUTHORIZATION, "Bearer " + managerToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void salesCannotManageWarehousesOrProductSettings() throws Exception {
+        createUser("warehouse-security-admin", PASSWORD, true, false, RoleName.ADMIN);
+        createUser("warehouse-security-sales", PASSWORD, true, false, RoleName.SALES);
+        String adminToken = login("warehouse-security-admin", PASSWORD);
+        String salesToken = login("warehouse-security-sales", PASSWORD);
+
+        String warehouseLocation = mockMvc.perform(post("/api/v1/warehouses")
+                        .header(AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"SEC-WH","name":"Security warehouse","active":true}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+        UUID warehouseId = UUID.fromString(
+                warehouseLocation.substring(warehouseLocation.lastIndexOf('/') + 1));
+        String productLocation = mockMvc.perform(post("/api/v1/products")
+                        .header(AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"SEC-WH-PRODUCT","name":"Secured product",
+                                 "price":10,"active":true}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getHeader("Location");
+        UUID productId = UUID.fromString(
+                productLocation.substring(productLocation.lastIndexOf('/') + 1));
+
+        mockMvc.perform(post("/api/v1/warehouses")
+                        .header(AUTHORIZATION, "Bearer " + salesToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"DENIED","name":"Denied","active":true}
+                                """))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/warehouses/{id}", warehouseId)
+                        .header(AUTHORIZATION, "Bearer " + salesToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code":"SEC-WH","name":"Changed","active":true}
+                                """))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/v1/warehouses/{id}", warehouseId)
+                        .header(AUTHORIZATION, "Bearer " + salesToken))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put(
+                        "/api/v1/warehouses/{warehouseId}/inventory/{productId}/settings",
+                        warehouseId, productId)
+                        .header(AUTHORIZATION, "Bearer " + salesToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"minimumStock":4,"active":false}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void loginAndRefreshAttemptsAreRateLimited() throws Exception {
+        String correlationId = "authentication-rate-limit-test";
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginJson("rate-limited-user", "invalid-password")))
+                    .andExpect(status().isUnauthorized());
+        }
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Correlation-ID", correlationId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginJson("rate-limited-user", "invalid-password")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(RETRY_AFTER, matchesPattern("[1-9][0-9]*")))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"))
+                .andExpect(jsonPath("$.correlationId").value(correlationId));
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            mockMvc.perform(post("/api/v1/auth/refresh")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"invalid-rate-limited-token\"}"))
+                    .andExpect(status().isUnauthorized());
+        }
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"invalid-rate-limited-token\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(RETRY_AFTER))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
     }
 
     @Test

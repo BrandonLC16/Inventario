@@ -10,4 +10,8 @@ public record CurrentUserResponse(
         String username,
         String email,
         Set<RoleName> roles) {
+
+    public CurrentUserResponse {
+        roles = Set.copyOf(roles);
+    }
 }

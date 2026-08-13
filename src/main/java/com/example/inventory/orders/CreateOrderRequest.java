@@ -12,6 +12,10 @@ public record CreateOrderRequest(
         UUID fulfillmentWarehouseId,
         @NotEmpty @Size(max = 100) List<@Valid CreateOrderItemRequest> items) {
 
+    public CreateOrderRequest {
+        if (items != null) items = List.copyOf(items);
+    }
+
     public CreateOrderRequest(List<CreateOrderItemRequest> items) {
         this(null, null, items);
     }
