@@ -184,6 +184,11 @@ Producto de ejemplo:
 {"sku":"KBD-001","name":"Teclado","description":null,"price":1299.90,"active":true,"minimumStock":5}
 ```
 
+`minimumStock` en la creación sólo inicializa la configuración de `MAIN`.
+`PUT /api/v1/products/{id}` actualiza exclusivamente el catálogo y nunca modifica
+el mínimo ni la activación de ningún almacén; esos valores se cambian mediante el
+endpoint de `settings` del almacén.
+
 El SKU se recorta y guarda en mayúsculas. Su unicidad no distingue mayúsculas y el SKU de un producto eliminado continúa reservado.
 
 Para ajustar inventario envía `{"quantityDelta":10,"reference":"PURCHASE-RECEIPT-42"}`. El valor debe ser distinto de cero: uno positivo registra una entrada y uno negativo una salida. `reference` es opcional, admite hasta 128 caracteres y permite identificar una compra, recepción u otra operación. Una salida responde `400` si consume unidades reservadas o deja el saldo físico negativo.
@@ -369,7 +374,7 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 119 pruebas: 65 unitarias y 54 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 120 pruebas: 65 unitarias y 55 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
 
 Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 

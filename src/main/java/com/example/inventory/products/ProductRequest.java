@@ -21,6 +21,8 @@ public record ProductRequest(
         @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal price,
         @Schema(example = "true")
         @NotNull Boolean active,
+        @Schema(description = "Initial minimum for MAIN when creating a product; "
+                + "catalog updates do not modify warehouse settings")
         @PositiveOrZero Integer minimumStock) {
 
     public ProductRequest(String sku, String name, String description, BigDecimal price,

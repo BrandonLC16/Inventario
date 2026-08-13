@@ -59,8 +59,6 @@ class ProductService implements ProductCatalog {
         ensureSkuIsAvailable(sku, id);
         product.update(sku, request.name().trim(), trimToNull(request.description()),
                 request.price(), request.active());
-        warehouses.configureProduct(WarehouseDirectory.MAIN_WAREHOUSE_ID,
-                product.getId(), minimumStock(request.minimumStock()), true);
         return ProductResponse.from(product);
     }
 

@@ -70,6 +70,31 @@ class WarehouseInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void catalogUpdatePreservesMinimumAndActivationInEveryWarehouse() throws Exception {
+        UUID warehouse = createWarehouse("CATALOG-SEPARATION");
+        UUID product = createProduct("CATALOG-PRODUCT", 3);
+        UUID main = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        configure(main, product, 11, false);
+        configure(warehouse, product, 7, false);
+
+        authenticated(put("/api/v1/products/{id}", product)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"CATALOG-PRODUCT","name":"Updated catalog name",
+                                 "description":"Updated catalog description",
+                                 "price":25.50,"active":true}
+                                """), adminToken)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Updated catalog name"))
+                .andExpect(jsonPath("$.description")
+                        .value("Updated catalog description"))
+                .andExpect(jsonPath("$.price").value(25.50));
+
+        assertSetting(main, product, 11, false);
+        assertSetting(warehouse, product, 7, false);
+    }
+
+    @Test
     void reservationsCompeteInsideOneWarehouseButRemainIndependentAcrossWarehouses()
             throws Exception {
         UUID first = createWarehouse("RES-A");
@@ -196,12 +221,28 @@ class WarehouseInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void configure(UUID warehouse, UUID product, int minimumStock) throws Exception {
+        configure(warehouse, product, minimumStock, true);
+    }
+
+    private void configure(UUID warehouse, UUID product, int minimumStock, boolean active)
+            throws Exception {
         authenticated(put("/api/v1/warehouses/{warehouse}/inventory/{product}/settings",
                         warehouse, product).contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"minimumStock":%d,"active":true}
-                                """.formatted(minimumStock)), adminToken)
+                                {"minimumStock":%d,"active":%s}
+                                """.formatted(minimumStock, active)), adminToken)
                 .andExpect(status().isNoContent());
+    }
+
+    private void assertSetting(UUID warehouse, UUID product, int minimumStock,
+                               boolean active) {
+        var setting = jdbcTemplate.queryForMap("""
+                SELECT minimum_stock, active
+                FROM warehouse_product_settings
+                WHERE warehouse_id = ? AND product_id = ?
+                """, warehouse, product);
+        assertEquals(minimumStock, ((Number) setting.get("minimum_stock")).intValue());
+        assertEquals(active, setting.get("active"));
     }
 
     private ResultActions adjust(UUID warehouse, UUID product, int quantity) throws Exception {

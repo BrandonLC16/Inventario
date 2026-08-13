@@ -27,6 +27,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -148,6 +149,7 @@ class ProductServiceTest {
         assertEquals("New name", response.name());
         assertEquals("New description", response.description());
         verify(repository, never()).save(any());
+        verifyNoInteractions(warehouses);
     }
 
     @Test
