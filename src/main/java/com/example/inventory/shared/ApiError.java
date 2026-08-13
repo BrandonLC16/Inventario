@@ -7,7 +7,9 @@ public record ApiError(
         Instant timestamp,
         int status,
         String error,
+        ApiErrorCode code,
         String message,
         String path,
+        String correlationId,
         Map<String, String> validationErrors) {
 }

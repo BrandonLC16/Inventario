@@ -37,6 +37,11 @@ class InventoryService implements InventoryOperations {
                 .orElseGet(() -> InventoryResponse.empty(productId));
     }
 
+    PageResponse<InventoryResponse> findAll(int page, int size) {
+        var pageable = PageSupport.request(page, size, Sort.unsorted());
+        return PageResponse.from(repository.findBalances(pageable), InventoryResponse::from);
+    }
+
     @Transactional
     InventoryResponse adjust(UUID productId, int delta, String responsibleUser) {
         return adjust(productId, delta, null, responsibleUser);

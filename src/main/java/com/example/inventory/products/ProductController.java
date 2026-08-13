@@ -21,7 +21,7 @@ import java.net.URI;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping("/api/v1/products")
 @Tag(name = "Products", description = "Product catalog operations")
 class ProductController {
 
@@ -53,7 +53,7 @@ class ProductController {
     @Operation(summary = "Create a product")
     ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         ProductResponse response = service.create(request);
-        return ResponseEntity.created(URI.create("/api/products/" + response.id())).body(response);
+        return ResponseEntity.created(URI.create("/api/v1/products/" + response.id())).body(response);
     }
 
     @PutMapping("/{id}")

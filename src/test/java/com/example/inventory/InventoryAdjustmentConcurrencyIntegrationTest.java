@@ -113,7 +113,7 @@ class InventoryAdjustmentConcurrencyIntegrationTest extends AbstractIntegrationT
                                                                CyclicBarrier barrier) {
         return () -> {
             barrier.await(10, TimeUnit.SECONDS);
-            var response = mockMvc.perform(patch("/api/inventory/{id}/adjustments", productId)
+            var response = mockMvc.perform(patch("/api/v1/inventory/{id}/adjustments", productId)
                             .header(AUTHORIZATION, "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
@@ -125,7 +125,7 @@ class InventoryAdjustmentConcurrencyIntegrationTest extends AbstractIntegrationT
     }
 
     private void adjust(UUID productId, int delta) throws Exception {
-        mockMvc.perform(patch("/api/inventory/{id}/adjustments", productId)
+        mockMvc.perform(patch("/api/v1/inventory/{id}/adjustments", productId)
                         .header(AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -135,7 +135,7 @@ class InventoryAdjustmentConcurrencyIntegrationTest extends AbstractIntegrationT
     }
 
     private UUID createProduct(String sku) throws Exception {
-        String location = mockMvc.perform(post("/api/products")
+        String location = mockMvc.perform(post("/api/v1/products")
                         .header(AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

@@ -34,7 +34,9 @@ class StockMovementQueryService {
         validatePage(page, size);
         validateDateRange(from, to);
         String normalizedReference = normalizeReference(reference);
-        products.requireStoredProduct(productId);
+        if (productId != null) {
+            products.requireStoredProduct(productId);
+        }
 
         PageRequest pageable = PageRequest.of(page, size,
                 Sort.by(Sort.Direction.DESC, "occurredAt")
@@ -48,7 +50,9 @@ class StockMovementQueryService {
                                                   String reference) {
         return (root, query, builder) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(builder.equal(root.get("productId"), productId));
+            if (productId != null) {
+                predicates.add(builder.equal(root.get("productId"), productId));
+            }
             if (type != null) {
                 predicates.add(builder.equal(root.get("movementType"), type));
             }

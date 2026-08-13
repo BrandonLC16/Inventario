@@ -117,7 +117,9 @@ La API queda disponible en `http://localhost:8080`. Flyway aplica las migracione
 
 `identifier` acepta el nombre de usuario o el correo. La respuesta incluye `tokenType`, `accessToken`, `accessTokenExpiresAt`, `refreshToken` y `refreshTokenExpiresAt`.
 
-Envía el access token como `Authorization: Bearer <ACCESS_TOKEN>`. Para renovar o cerrar la sesión, envía `{"refreshToken":"<REFRESH_TOKEN>"}` como JSON a la ruta correspondiente.
+Envía el access token como `Authorization: Bearer <ACCESS_TOKEN>`. Para renovar o cerrar la sesión, envía `{"refreshToken":"<REFRESH_TOKEN>"}` como JSON a la ruta correspondiente. Las respuestas de login y renovación incluyen `Cache-Control: no-store` y `Pragma: no-cache`.
+
+El servidor persiste únicamente el hash SHA-256 del refresh token aleatorio, nunca su valor, y lo rota en cada renovación bajo bloqueo transaccional. El cliente debe mantener el access token en memoria. Una aplicación nativa debe guardar el refresh token en Keychain/Keystore; una aplicación web debe delegarlo a un BFF que use una cookie `HttpOnly`, `Secure` y `SameSite`, porque esta API recibe el refresh como JSON y no debe guardarse en `localStorage` ni `sessionStorage`. El cliente reemplaza el refresh anterior sólo después de recibir el nuevo par, serializa renovaciones concurrentes y, ante un `401`, elimina la sesión local y vuelve a autenticar.
 
 Los fallos de login, los usuarios inexistentes, deshabilitados o bloqueados y los refresh tokens inválidos al renovar usan la misma respuesta genérica `401`. Un refresh token rotado o revocado no puede reutilizarse. El logout revoca toda su familia y es idempotente: un token desconocido también recibe `204`.
 
@@ -145,15 +147,17 @@ Todos estos endpoints requieren un access token.
 
 | Método | Ruta | Permiso | Descripción |
 |---|---|---|---|
-| `GET` | `/api/products` | Autenticado | Lista paginada; filtros `sku`, `name` y `active` |
-| `GET` | `/api/products/{id}` | Autenticado | Consulta un producto no eliminado |
-| `POST` | `/api/products` | `ADMIN`, `INVENTORY_MANAGER` | Crea un producto |
-| `PUT` | `/api/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Reemplaza los campos editables |
-| `DELETE` | `/api/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Elimina lógicamente; responde `204` |
-| `GET` | `/api/inventory/{productId}` | Autenticado | Consulta las existencias |
-| `GET` | `/api/inventory/{productId}/movements` | `ADMIN`, `INVENTORY_MANAGER` | Consulta el kardex |
-| `GET` | `/api/inventory/low-stock` | `ADMIN`, `INVENTORY_MANAGER` | Lista alertas de stock bajo o agotado |
-| `PATCH` | `/api/inventory/{productId}/adjustments` | `ADMIN`, `INVENTORY_MANAGER` | Suma o resta existencias |
+| `GET` | `/api/v1/products` | Autenticado | Lista paginada; filtros `sku`, `name` y `active` |
+| `GET` | `/api/v1/products/{id}` | Autenticado | Consulta un producto no eliminado |
+| `POST` | `/api/v1/products` | `ADMIN`, `INVENTORY_MANAGER` | Crea un producto |
+| `PUT` | `/api/v1/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Reemplaza los campos editables |
+| `DELETE` | `/api/v1/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Elimina lógicamente; responde `204` |
+| `GET` | `/api/v1/inventory` | Autenticado | Lista paginada de existencias de todos los productos no eliminados |
+| `GET` | `/api/v1/inventory/{productId}` | Autenticado | Consulta las existencias |
+| `GET` | `/api/v1/inventory/movements` | `ADMIN`, `INVENTORY_MANAGER` | Lista paginada de movimientos de todos los productos |
+| `GET` | `/api/v1/inventory/{productId}/movements` | `ADMIN`, `INVENTORY_MANAGER` | Consulta el kardex de un producto |
+| `GET` | `/api/v1/inventory/low-stock` | `ADMIN`, `INVENTORY_MANAGER` | Lista alertas de stock bajo o agotado |
+| `PATCH` | `/api/v1/inventory/{productId}/adjustments` | `ADMIN`, `INVENTORY_MANAGER` | Suma o resta existencias |
 
 Producto de ejemplo:
 
@@ -165,19 +169,19 @@ El SKU se recorta y guarda en mayúsculas. Su unicidad no distingue mayúsculas 
 
 Para ajustar inventario envía `{"quantityDelta":10,"reference":"PURCHASE-RECEIPT-42"}`. El valor debe ser distinto de cero: uno positivo registra una entrada y uno negativo una salida. `reference` es opcional, admite hasta 128 caracteres y permite identificar una compra, recepción u otra operación. Una salida responde `400` si consume unidades reservadas o deja el saldo físico negativo.
 
-`GET /api/inventory/{productId}` devuelve `quantity` como existencia física, `reservedQuantity`, `availableQuantity` y `updatedAt`. Se cumple `availableQuantity = quantity - reservedQuantity`. Si todavía no hay inventario, los tres saldos son cero y `updatedAt` es `null`.
+`GET /api/v1/inventory` y `GET /api/v1/inventory/{productId}` devuelven `quantity` como existencia física, `reservedQuantity`, `availableQuantity` y `updatedAt`. El listado general incluye también productos sin fila de inventario con saldos cero. Siempre se cumple `availableQuantity = quantity - reservedQuantity`; en la consulta individual de un producto todavía sin inventario, los tres saldos son cero y `updatedAt` es `null`.
 
 Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, referencia y el UUID del usuario autenticado en `responsible_user`. La primera entrada usa `INITIAL_STOCK`; las siguientes, `MANUAL_IN` o `MANUAL_OUT`.
 
-`GET /api/products` usa `page=0`, `size=20` y admite tamaños entre 1 y 100. Los filtros de SKU y nombre son coincidencias parciales sin distinguir mayúsculas. Todos los listados paginados devuelven `content`, `page`, `size`, `totalElements`, `totalPages`, `first` y `last`.
+`GET /api/v1/products` usa `page=0`, `size=20` y admite tamaños entre 1 y 100. Los filtros de SKU y nombre son coincidencias parciales sin distinguir mayúsculas. Todos los listados paginados devuelven `content`, `page`, `size`, `totalElements`, `totalPages`, `first` y `last`.
 
 ### Alertas y reposición
 
-`GET /api/inventory/low-stock` incluye productos activos no eliminados cuya existencia disponible es menor o igual a `minimumStock`, aunque todavía no tengan fila de inventario. Admite `page`, `size`, búsqueda parcial por SKU o nombre mediante `search`, y `outOfStockOnly=true`. Cada resultado contiene existencia física, reservada y disponible, mínimo, cantidad sugerida de reposición y una alerta `LOW_STOCK` u `OUT_OF_STOCK`.
+`GET /api/v1/inventory/low-stock` incluye productos activos no eliminados cuya existencia disponible es menor o igual a `minimumStock`, aunque todavía no tengan fila de inventario. Admite `page`, `size`, búsqueda parcial por SKU o nombre mediante `search`, y `outOfStockOnly=true`. Cada resultado contiene existencia física, reservada y disponible, mínimo, cantidad sugerida de reposición y una alerta `LOW_STOCK` u `OUT_OF_STOCK`.
 
 ### Consulta del kardex
 
-`GET /api/inventory/{productId}/movements` devuelve los movimientos en orden descendente por `occurredAt` y usa `id` como desempate para mantener estable la paginación. El historial se puede consultar incluso si el producto fue eliminado lógicamente.
+`GET /api/v1/inventory/movements` y `GET /api/v1/inventory/{productId}/movements` devuelven los movimientos en orden descendente por `occurredAt` y usan `id` como desempate para mantener estable la paginación. El historial se puede consultar incluso si el producto fue eliminado lógicamente.
 
 | Parámetro | Predeterminado | Descripción |
 |---|---|---|
@@ -187,6 +191,7 @@ Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, r
 | `from` | Sin filtro | Fecha inicial inclusiva en ISO-8601 |
 | `to` | Sin filtro | Fecha final inclusiva en ISO-8601 |
 | `reference` | Sin filtro | Coincidencia exacta con la referencia de negocio |
+| `productId` | Sin filtro | Sólo en el listado general; limita el resultado a un producto |
 
 Los filtros son opcionales y combinables. `from` no puede ser posterior a `to`. Cada elemento contiene `movementType`, el efecto físico mediante `quantityDelta`, `balanceBefore` y `balanceAfter`, y el efecto comprometido mediante `reservationDelta`, `reservedBefore` y `reservedAfter`. También incluye `businessReference`, `occurredAt`, `responsibleUser` y los identificadores.
 
@@ -198,11 +203,11 @@ Estas rutas requieren `ADMIN` o `SALES`.
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/customers` | Crea un cliente |
-| `GET` | `/api/customers` | Busca clientes con paginación |
-| `GET` | `/api/customers/{id}` | Consulta un cliente |
-| `PUT` | `/api/customers/{id}` | Reemplaza sus datos editables |
-| `DELETE` | `/api/customers/{id}` | Lo desactiva lógicamente; responde `204` |
+| `POST` | `/api/v1/customers` | Crea un cliente |
+| `GET` | `/api/v1/customers` | Busca clientes con paginación |
+| `GET` | `/api/v1/customers/{id}` | Consulta un cliente |
+| `PUT` | `/api/v1/customers/{id}` | Reemplaza sus datos editables |
+| `DELETE` | `/api/v1/customers/{id}` | Lo desactiva lógicamente; responde `204` |
 
 Ejemplo:
 
@@ -218,15 +223,15 @@ Estas rutas requieren `ADMIN` o `SALES`.
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/orders` | Crea un pedido `PENDING` |
-| `GET` | `/api/orders` | Lista pedidos paginados por fecha descendente |
-| `GET` | `/api/orders/{id}` | Consulta un pedido y sus artículos |
-| `PUT` | `/api/orders/{id}/items` | Reemplaza artículos; libera antes si estaba reservado |
-| `DELETE` | `/api/orders/{id}` | Elimina un pendiente o reservado; libera si aplica |
-| `POST` | `/api/orders/{id}/reserve` | Reserva atómicamente todos los artículos |
-| `POST` | `/api/orders/{id}/release` | Libera la reserva y vuelve a `PENDING` |
-| `POST` | `/api/orders/{id}/confirm` | Convierte la reserva en salida física |
-| `POST` | `/api/orders/{id}/cancel` | Cancela un confirmado y restaura existencias |
+| `POST` | `/api/v1/orders` | Crea un pedido `PENDING` |
+| `GET` | `/api/v1/orders` | Lista pedidos paginados por fecha descendente |
+| `GET` | `/api/v1/orders/{id}` | Consulta un pedido y sus artículos |
+| `PUT` | `/api/v1/orders/{id}/items` | Reemplaza artículos; libera antes si estaba reservado |
+| `DELETE` | `/api/v1/orders/{id}` | Elimina un pendiente o reservado; libera si aplica |
+| `POST` | `/api/v1/orders/{id}/reserve` | Reserva atómicamente todos los artículos |
+| `POST` | `/api/v1/orders/{id}/release` | Libera la reserva y vuelve a `PENDING` |
+| `POST` | `/api/v1/orders/{id}/confirm` | Convierte la reserva en salida física |
+| `POST` | `/api/v1/orders/{id}/cancel` | Cancela un confirmado y restaura existencias |
 
 Ejemplo de creación:
 
@@ -238,7 +243,7 @@ Un pedido admite de 1 a 100 productos distintos y cada cantidad debe ser positiv
 
 Al crear el pedido se captura el precio unitario vigente y se calculan el subtotal de cada artículo y el total. Esos importes no cambian aunque después se modifique el producto. La moneda actual es fija, `MXN`; el diseño persiste el código para permitir una futura estrategia multimoneda. También se genera un folio `ORD-##########` y se registra el UUID de quien creó, confirmó o canceló, junto con las fechas correspondientes.
 
-`GET /api/orders` admite `page`, `size`, `status`, `customerId`, coincidencia parcial de `folio`, y rango inclusivo `from`/`to` en ISO-8601 sobre `createdAt`. Todos los filtros son combinables.
+`GET /api/v1/orders` admite `page`, `size`, `status`, `customerId`, coincidencia parcial de `folio`, y rango inclusivo `from`/`to` en ISO-8601 sobre `createdAt`. Todos los filtros son combinables.
 
 El ciclo es `PENDING → RESERVED → CONFIRMED → CANCELLED`. Un `RESERVED` puede volver a `PENDING` mediante `release`. Confirmar exige reserva previa; cancelar exige `CONFIRMED`. Reservar, liberar, confirmar y cancelar son idempotentes cuando se repiten sobre el estado que ya representan.
 
@@ -274,7 +279,9 @@ El listado admite `page`, `size`, búsqueda parcial por `username` y `email`, ad
 
 ## Errores HTTP
 
-Los errores usan los campos `timestamp`, `status`, `error`, `message`, `path` y `validationErrors`.
+Los errores usan los campos `timestamp`, `status`, `error`, `code`, `message`, `path`, `correlationId` y `validationErrors`. `code` es estable y apto para lógica de cliente: `INVALID_REQUEST`, `VALIDATION_FAILED`, `RESOURCE_NOT_FOUND`, `CONFLICT`, `DATA_INTEGRITY_VIOLATION`, `AUTHENTICATION_FAILED`, `AUTHENTICATION_REQUIRED`, `ACCESS_DENIED`, `METHOD_NOT_ALLOWED`, `UNSUPPORTED_MEDIA_TYPE` o `INTERNAL_ERROR`.
+
+Toda respuesta incluye `X-Correlation-ID`. Si la petición trae un valor seguro de hasta 128 caracteres, se conserva; de lo contrario se genera un UUID. En un error, la cabecera y `correlationId` contienen el mismo valor. Usa este identificador para soporte y trazabilidad, no mensajes variables ni el texto de `error`.
 
 - `400`: cuerpo inválido, ajuste cero, inventario insuficiente o filtros/paginación inválidos.
 - `401`: autenticación ausente o inválida.
@@ -290,6 +297,12 @@ La documentación está deshabilitada por defecto. Define `SWAGGER_ENABLED=true`
 - OpenAPI: `http://localhost:8080/v3/api-docs`
 
 Ambas rutas siguen protegidas y requieren un access token con rol `ADMIN`.
+
+El contrato se genera de forma reproducible desde los controllers durante `verify` en `target/openapi/inventory-api-v1.json`. La prueba falla si aparece una ruta fuera de `/api/v1` o si faltan los listados globales. Para regenerarlo de forma aislada, con Docker iniciado:
+
+```powershell
+./mvnw.cmd "-Dtest=OpenApiContractIntegrationTest" test
+```
 
 ## Configuración
 
@@ -311,7 +324,13 @@ Ambas rutas siguen protegidas y requieren un access token con rol `ADMIN`.
 | `BOOTSTRAP_ADMIN_EMAIL` | Sin valor | Correo inicial |
 | `BOOTSTRAP_ADMIN_PASSWORD` | Sin valor | Contraseña inicial, 12 a 128 caracteres |
 
-En producción usa un gestor de secretos. CORS no admite credenciales ni el comodín `*`; sin orígenes configurados rechaza cross-origin. La autenticación usa Bearer y JSON, no cookies, por lo que la API es stateless y CSRF está deshabilitado.
+En producción usa un gestor de secretos. CORS no admite credenciales ni el comodín `*`; sin orígenes configurados rechaza cross-origin. La autenticación directa usa Bearer y JSON, no cookies, por lo que la API es stateless y CSRF está deshabilitado. `X-Correlation-ID` está permitido y expuesto a los clientes CORS.
+
+La política es explícita por ambiente:
+
+- Predeterminado, staging y producción: cierre seguro; define `CORS_ALLOWED_ORIGINS` con los orígenes HTTPS exactos de ese ambiente, separados por comas. No se configura un origen de producción en el repositorio.
+- Local: activa `SPRING_PROFILES_ACTIVE=local`; `application-local.yml` admite por defecto `http://localhost:3000` y `http://localhost:5173`, reemplazables mediante `CORS_ALLOWED_ORIGINS`.
+- Pruebas: Testcontainers configura únicamente `https://allowed.example`.
 
 ## Pruebas
 
@@ -331,7 +350,7 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 110 pruebas: 65 unitarias y 45 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 113 pruebas: 65 unitarias y 48 de integración. Cubren productos, inventario, reservas, kardex, clientes, pedidos, usuarios, autenticación, refresh tokens, JWT y autorización HTTP.
 
 Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V8→V9 con datos históricos; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 

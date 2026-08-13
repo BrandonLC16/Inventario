@@ -88,7 +88,7 @@ class SecuritySessionIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void getProducts(String token, int expectedStatus) throws Exception {
-        mockMvc.perform(get("/api/products")
+        mockMvc.perform(get("/api/v1/products")
                         .header(AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().is(expectedStatus));
     }

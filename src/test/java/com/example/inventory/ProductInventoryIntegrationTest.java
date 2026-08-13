@@ -40,7 +40,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.sku").value("KBD-001"))
                 .andExpect(jsonPath("$.price").value(99.90));
 
-        performAuthenticated(get("/api/products"))
+        performAuthenticated(get("/api/v1/products"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)));
 
@@ -58,13 +58,13 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     void duplicateSkuAndInvalidProductReturnUsefulErrors() throws Exception {
         createProduct("SKU-1", "First");
 
-        performAuthenticated(post("/api/products")
+        performAuthenticated(post("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson("sku-1", "Duplicate", "10.00")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("SKU SKU-1 already exists"));
 
-        performAuthenticated(post("/api/products")
+        performAuthenticated(post("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"sku":"", "name":"", "price":-1, "active":true}
@@ -78,7 +78,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     void stockCanBeReceivedAndConsumedButNeverBecomesNegative() throws Exception {
         UUID productId = idFromLocation(createProduct("STOCK-1", "Stocked product"));
 
-        performAuthenticated(get("/api/inventory/{id}", productId))
+        performAuthenticated(get("/api/v1/inventory/{id}", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quantity").value(0));
 
@@ -88,6 +88,32 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.quantity").value(7));
         adjust(productId, -8).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Inventory quantity cannot be negative"));
+    }
+
+    @Test
+    void generalInventoryAndMovementListingsArePagedAndFilterable() throws Exception {
+        UUID firstProduct = idFromLocation(createProduct("LIST-1", "First listed product"));
+        UUID secondProduct = idFromLocation(createProduct("LIST-2", "Second listed product"));
+        adjust(firstProduct, 7).andExpect(status().isOk());
+        adjust(secondProduct, 3).andExpect(status().isOk());
+
+        performAuthenticated(get("/api/v1/inventory").param("page", "0").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].productId").value(firstProduct.toString()))
+                .andExpect(jsonPath("$.content[0].quantity").value(7))
+                .andExpect(jsonPath("$.content[1].productId").value(secondProduct.toString()))
+                .andExpect(jsonPath("$.content[1].quantity").value(3));
+
+        performAuthenticated(get("/api/v1/inventory/movements")
+                        .param("page", "0").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2));
+        performAuthenticated(get("/api/v1/inventory/movements")
+                        .param("productId", firstProduct.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].productId").value(firstProduct.toString()));
     }
 
     @Test
@@ -106,7 +132,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void inventoryRequiresAnExistingProduct() throws Exception {
         UUID missingId = UUID.randomUUID();
-        performAuthenticated(get("/api/inventory/{id}", missingId))
+        performAuthenticated(get("/api/v1/inventory/{id}", missingId))
                 .andExpect(status().isNotFound());
         adjust(missingId, 1).andExpect(status().isNotFound());
     }
@@ -134,7 +160,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String createProduct(String sku, String name) throws Exception {
-        return performAuthenticated(post("/api/products")
+        return performAuthenticated(post("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson(sku, name, "99.90")))
                 .andExpect(status().isCreated())
@@ -144,7 +170,7 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
 
     private org.springframework.test.web.servlet.ResultActions adjust(UUID productId, int delta)
             throws Exception {
-        return performAuthenticated(patch("/api/inventory/{id}/adjustments", productId)
+        return performAuthenticated(patch("/api/v1/inventory/{id}/adjustments", productId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"quantityDelta\":%d}".formatted(delta)));
     }

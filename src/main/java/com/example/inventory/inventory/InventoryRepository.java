@@ -32,6 +32,30 @@ interface InventoryRepository extends JpaRepository<InventoryItem, UUID> {
     Optional<InventoryBalanceProjection> findBalance(
             @Param("productId") UUID productId);
 
+    @Query(value = """
+            SELECT product.id AS "productId",
+                   COALESCE(item.quantity, 0) AS quantity,
+                   COALESCE(reservation.reserved_quantity, 0)
+                       AS "reservedQuantity",
+                   item.updated_at AS "updatedAt"
+            FROM products product
+            LEFT JOIN inventory item ON item.product_id = product.id
+            LEFT JOIN (
+                SELECT product_id, SUM(quantity)::integer AS reserved_quantity
+                FROM inventory_reservations
+                GROUP BY product_id
+            ) reservation ON reservation.product_id = product.id
+            WHERE product.deleted = false
+            ORDER BY product.sku, product.id
+            """,
+            countQuery = """
+            SELECT count(*)
+            FROM products product
+            WHERE product.deleted = false
+            """,
+            nativeQuery = true)
+    Page<InventoryBalanceProjection> findBalances(Pageable pageable);
+
     @Modifying
     @Query(value = "insert into inventory (product_id, quantity, updated_at) values (:productId, 0, current_timestamp) on conflict (product_id) do nothing", nativeQuery = true)
     int ensureExists(@Param("productId") UUID productId);

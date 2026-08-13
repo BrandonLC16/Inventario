@@ -53,8 +53,8 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         UUID secondOrder = createOrder(new Item(productId, 4));
 
         List<Integer> statuses = concurrently(
-                "/api/orders/" + firstOrder + "/reserve",
-                "/api/orders/" + secondOrder + "/reserve");
+                "/api/v1/orders/" + firstOrder + "/reserve",
+                "/api/v1/orders/" + secondOrder + "/reserve");
 
         assertEquals(List.of(200, 400), statuses);
         assertBalance(productId, 5, 4, 1);
@@ -63,7 +63,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         assertEquals(List.of("PENDING", "RESERVED"), jdbcTemplate.queryForList(
                 "SELECT status FROM orders ORDER BY status", String.class));
 
-        authenticated(patch("/api/inventory/{id}/adjustments", productId)
+        authenticated(patch("/api/v1/inventory/{id}/adjustments", productId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantityDelta":-2}
@@ -73,7 +73,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
 
         UUID reservedOrder = jdbcTemplate.queryForObject(
                 "SELECT id FROM orders WHERE status = 'RESERVED'", UUID.class);
-        authenticated(post("/api/orders/{id}/reserve", reservedOrder), salesToken)
+        authenticated(post("/api/v1/orders/{id}/reserve", reservedOrder), salesToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESERVED"));
         assertEquals(1, reservationCount(productId));
@@ -88,7 +88,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         UUID orderId = createOrder(
                 new Item(firstProduct, 3), new Item(secondProduct, 2));
 
-        authenticated(post("/api/orders/{id}/reserve", orderId), salesToken)
+        authenticated(post("/api/v1/orders/{id}/reserve", orderId), salesToken)
                 .andExpect(status().isBadRequest());
 
         assertBalance(firstProduct, 5, 0, 5);
@@ -111,7 +111,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         reserve(orderId);
         assertBalance(oldProduct, 6, 4, 2);
 
-        authenticated(put("/api/orders/{id}/items", orderId)
+        authenticated(put("/api/v1/orders/{id}/items", orderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"items":[{"productId":"%s","quantity":3}]}
@@ -140,10 +140,10 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         UUID releasedOrder = createOrder(new Item(productId, 4));
         reserve(releasedOrder);
 
-        authenticated(post("/api/orders/{id}/release", releasedOrder), salesToken)
+        authenticated(post("/api/v1/orders/{id}/release", releasedOrder), salesToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"));
-        authenticated(post("/api/orders/{id}/release", releasedOrder), salesToken)
+        authenticated(post("/api/v1/orders/{id}/release", releasedOrder), salesToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"));
 
@@ -153,7 +153,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
 
         UUID deletedOrder = createOrder(new Item(productId, 6));
         reserve(deletedOrder);
-        authenticated(delete("/api/orders/{id}", deletedOrder), salesToken)
+        authenticated(delete("/api/v1/orders/{id}", deletedOrder), salesToken)
                 .andExpect(status().isNoContent());
 
         assertBalance(productId, 10, 0, 10);
@@ -173,10 +173,10 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         reserve(orderId);
 
         assertBalance(productId, 10, 4, 6);
-        authenticated(post("/api/orders/{id}/confirm", orderId), salesToken)
+        authenticated(post("/api/v1/orders/{id}/confirm", orderId), salesToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
-        authenticated(post("/api/orders/{id}/confirm", orderId), salesToken)
+        authenticated(post("/api/v1/orders/{id}/confirm", orderId), salesToken)
                 .andExpect(status().isOk());
 
         assertBalance(productId, 6, 0, 6);
@@ -193,10 +193,10 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         assertEquals(4, number(confirmedMovement.get("reserved_before")));
         assertEquals(0, number(confirmedMovement.get("reserved_after")));
 
-        authenticated(post("/api/orders/{id}/cancel", orderId), salesToken)
+        authenticated(post("/api/v1/orders/{id}/cancel", orderId), salesToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
-        authenticated(post("/api/orders/{id}/cancel", orderId), salesToken)
+        authenticated(post("/api/v1/orders/{id}/cancel", orderId), salesToken)
                 .andExpect(status().isOk());
 
         assertBalance(productId, 10, 0, 10);
@@ -210,7 +210,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
         UUID orderId = createOrder(new Item(productId, 4));
         reserve(orderId);
 
-        authenticated(get("/api/inventory/low-stock")
+        authenticated(get("/api/v1/inventory/low-stock")
                         .param("search", "RESERVE-AVAILABLE"), adminToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
@@ -289,7 +289,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
 
     private UUID createProduct(String sku, int stock, int minimumStock)
             throws Exception {
-        String location = authenticated(post("/api/products")
+        String location = authenticated(post("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"sku":"%s","name":"%s","price":10,
@@ -299,7 +299,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getHeader("Location");
         UUID productId = idFromLocation(location);
         if (stock > 0) {
-            authenticated(patch("/api/inventory/{id}/adjustments", productId)
+            authenticated(patch("/api/v1/inventory/{id}/adjustments", productId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"quantityDelta":%d}
@@ -315,7 +315,7 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
                         {"productId":"%s","quantity":%d}
                         """.formatted(item.productId(), item.quantity()).trim())
                 .collect(Collectors.joining(","));
-        String location = authenticated(post("/api/orders")
+        String location = authenticated(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"items":[%s]}
@@ -326,14 +326,14 @@ class InventoryReservationIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void reserve(UUID orderId) throws Exception {
-        authenticated(post("/api/orders/{id}/reserve", orderId), salesToken)
+        authenticated(post("/api/v1/orders/{id}/reserve", orderId), salesToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESERVED"));
     }
 
     private void assertBalance(UUID productId, int physical, int reserved,
                                int available) throws Exception {
-        authenticated(get("/api/inventory/{id}", productId), salesToken)
+        authenticated(get("/api/v1/inventory/{id}", productId), salesToken)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quantity").value(physical))
                 .andExpect(jsonPath("$.reservedQuantity").value(reserved))

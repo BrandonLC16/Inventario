@@ -48,7 +48,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
     @Test
     void customersSupportCrudUniquenessSearchDeactivationAndPermissions()
             throws Exception {
-        String location = performSales(post("/api/customers")
+        String location = performSales(post("/api/v1/customers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(customerJson(
                                 "Cliente Uno", "mx-rfc-100", "CLIENTE@EXAMPLE.COM", true)))
@@ -58,13 +58,13 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getHeader("Location");
         UUID customerId = idFromLocation(location);
 
-        performAdmin(post("/api/customers")
+        performAdmin(post("/api/v1/customers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(customerJson(
                                 "Duplicado", null, "cliente@example.com", true)))
                 .andExpect(status().isConflict());
 
-        performSales(get("/api/customers")
+        performSales(get("/api/v1/customers")
                         .param("page", "0")
                         .param("size", "1")
                         .param("search", "rfc-100")
@@ -74,22 +74,22 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].id").value(customerId.toString()))
                 .andExpect(jsonPath("$.totalElements").value(1));
 
-        performSales(put("/api/customers/{id}", customerId)
+        performSales(put("/api/v1/customers/{id}", customerId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(customerJson(
                                 "Cliente Actualizado", "MX-RFC-100",
                                 "cliente@example.com", true)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Cliente Actualizado"));
-        performSales(delete("/api/customers/{id}", customerId))
+        performSales(delete("/api/v1/customers/{id}", customerId))
                 .andExpect(status().isNoContent());
-        performSales(get("/api/customers")
+        performSales(get("/api/v1/customers")
                         .param("search", "actualizado")
                         .param("active", "false"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].active").value(false));
 
-        mockMvc.perform(get("/api/customers")
+        mockMvc.perform(get("/api/v1/customers")
                         .header(AUTHORIZATION, "Bearer " + managerToken))
                 .andExpect(status().isForbidden());
     }
@@ -101,7 +101,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
         createProduct("FILTER-B", "Beta filter", "20.00", false, 0);
         createProduct("OTHER-C", "Gamma", "30.00", true, 0);
 
-        mockMvc.perform(get("/api/products")
+        mockMvc.perform(get("/api/v1/products")
                         .header(AUTHORIZATION, "Bearer " + salesToken)
                         .param("page", "0")
                         .param("size", "1")
@@ -140,7 +140,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
                 "PRICE-HISTORY", "Historical product", "25.50", true, 0);
         adjust(productId, 10, "RECEIPT-HISTORY");
 
-        String created = performSales(post("/api/orders")
+        String created = performSales(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"customerId":"%s","items":[
@@ -159,31 +159,31 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
         UUID orderId = UUID.fromString(JsonPath.read(created, "$.id"));
         String folio = JsonPath.read(created, "$.folio");
 
-        performAdmin(put("/api/products/{id}", productId)
+        performAdmin(put("/api/v1/products/{id}", productId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson(
                                 "PRICE-HISTORY", "Historical product",
                                 "99.00", true, 0)))
                 .andExpect(status().isOk());
-        performSales(get("/api/orders/{id}", orderId))
+        performSales(get("/api/v1/orders/{id}", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(51.0))
                 .andExpect(jsonPath("$.items[0].unitPrice").value(25.5));
 
-        performSales(post("/api/orders/{id}/reserve", orderId))
+        performSales(post("/api/v1/orders/{id}/reserve", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reservedBy").value(salesUserId.toString()))
                 .andExpect(jsonPath("$.reservedAt").isNotEmpty());
-        performSales(post("/api/orders/{id}/confirm", orderId))
+        performSales(post("/api/v1/orders/{id}/confirm", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.confirmedBy").value(salesUserId.toString()))
                 .andExpect(jsonPath("$.confirmedAt").isNotEmpty());
-        performSales(post("/api/orders/{id}/cancel", orderId))
+        performSales(post("/api/v1/orders/{id}/cancel", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cancelledBy").value(salesUserId.toString()))
                 .andExpect(jsonPath("$.cancelledAt").isNotEmpty());
 
-        performSales(get("/api/orders")
+        performSales(get("/api/v1/orders")
                         .param("page", "0")
                         .param("size", "1")
                         .param("status", "CANCELLED")
@@ -206,7 +206,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
                 "PENDING-B", "Pending B", "7.00", true, 0);
         adjust(firstProduct, 5, "RECEIPT-PENDING");
 
-        String location = performSales(post("/api/orders")
+        String location = performSales(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"items":[{"productId":"%s","quantity":2}]}
@@ -216,7 +216,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
         UUID orderId = idFromLocation(location);
         assertEquals(5, stock(firstProduct));
 
-        performSales(put("/api/orders/{id}/items", orderId)
+        performSales(put("/api/v1/orders/{id}/items", orderId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"items":[{"productId":"%s","quantity":3}]}
@@ -228,9 +228,9 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
         assertEquals(5, stock(firstProduct));
         assertEquals(0, stock(secondProduct));
 
-        performSales(delete("/api/orders/{id}", orderId))
+        performSales(delete("/api/v1/orders/{id}", orderId))
                 .andExpect(status().isNoContent());
-        performSales(get("/api/orders/{id}", orderId))
+        performSales(get("/api/v1/orders/{id}", orderId))
                 .andExpect(status().isNotFound());
         assertEquals(0, jdbcTemplate.queryForObject("""
                 SELECT count(*) FROM stock_movements
@@ -245,7 +245,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
         UUID productId = createProduct(
                 "LOW-STOCK", "Low stock product", "5.00", true, 5);
 
-        performAdmin(get("/api/inventory/low-stock")
+        performAdmin(get("/api/v1/inventory/low-stock")
                         .param("search", "LOW-STOCK")
                         .param("outOfStockOnly", "true"))
                 .andExpect(status().isOk())
@@ -258,13 +258,13 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].alert").value("OUT_OF_STOCK"));
 
         adjust(productId, 3, "PURCHASE-RECEIPT-42");
-        performAdmin(get("/api/inventory/low-stock")
+        performAdmin(get("/api/v1/inventory/low-stock")
                         .param("search", "low stock"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].quantity").value(3))
                 .andExpect(jsonPath("$.content[0].replenishmentQuantity").value(2))
                 .andExpect(jsonPath("$.content[0].alert").value("LOW_STOCK"));
-        performAdmin(get("/api/inventory/{id}/movements", productId)
+        performAdmin(get("/api/v1/inventory/{id}/movements", productId)
                         .param("reference", "PURCHASE-RECEIPT-42"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
@@ -298,7 +298,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
 
     private UUID createProduct(String sku, String name, String price,
                                boolean active, int minimumStock) throws Exception {
-        String location = performAdmin(post("/api/products")
+        String location = performAdmin(post("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson(sku, name, price, active, minimumStock)))
                 .andExpect(status().isCreated())
@@ -308,7 +308,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
 
     private UUID createCustomer(String name, String fiscalIdentifier, String email)
             throws Exception {
-        String location = performSales(post("/api/customers")
+        String location = performSales(post("/api/v1/customers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(customerJson(name, fiscalIdentifier, email, true)))
                 .andExpect(status().isCreated())
@@ -317,7 +317,7 @@ class BusinessCapabilitiesIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void adjust(UUID productId, int delta, String reference) throws Exception {
-        performAdmin(patch("/api/inventory/{id}/adjustments", productId)
+        performAdmin(patch("/api/v1/inventory/{id}/adjustments", productId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantityDelta":%d,"reference":"%s"}

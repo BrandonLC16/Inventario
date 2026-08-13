@@ -33,6 +33,8 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginJson("SALES@EXAMPLE.COM", PASSWORD)))
                 .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("Pragma", "no-cache"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
@@ -53,15 +55,42 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
         createUser("sales", PASSWORD, true, false, RoleName.SALES);
         String salesToken = login("sales", PASSWORD);
 
-        mockMvc.perform(get("/api/products")).andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/api/products").header(AUTHORIZATION, "Bearer malformed"))
+        mockMvc.perform(get("/api/v1/products")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/products").header(AUTHORIZATION, "Bearer malformed"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(content().string(not(containsString("malformed"))));
-        mockMvc.perform(patch("/api/inventory/{id}/adjustments", UUID.randomUUID())
+        mockMvc.perform(patch("/api/v1/inventory/{id}/adjustments", UUID.randomUUID())
                         .header(AUTHORIZATION, "Bearer " + salesToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quantityDelta\":1}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void errorsExposeStableCodesAndPropagateCorrelationIds() throws Exception {
+        createUser("correlation-admin", PASSWORD, true, false, RoleName.ADMIN);
+        String adminToken = login("correlation-admin", PASSWORD);
+        String correlationId = "inventory-test-123";
+
+        mockMvc.perform(get("/api/v1/products/not-a-uuid")
+                        .header(AUTHORIZATION, "Bearer " + adminToken)
+                        .header("X-Correlation-ID", correlationId))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string("X-Correlation-ID", correlationId))
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.correlationId").value(correlationId));
+
+        mockMvc.perform(get("/api/v1/products")
+                        .header("X-Correlation-ID", correlationId))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("X-Correlation-ID", correlationId))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"))
+                .andExpect(jsonPath("$.correlationId").value(correlationId));
+
+        mockMvc.perform(get("/api/products")
+                        .header(AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
     }
 
     @Test
@@ -85,7 +114,7 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(content().string(not(containsString("another-password-123"))))
                 .andExpect(content().string(not(containsString("passwordHash"))));
 
-        String productLocation = mockMvc.perform(post("/api/products")
+        String productLocation = mockMvc.perform(post("/api/v1/products")
                         .header(AUTHORIZATION, "Bearer " + managerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -94,18 +123,18 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated()).andReturn().getResponse().getHeader("Location");
         UUID productId = UUID.fromString(productLocation.substring(productLocation.lastIndexOf('/') + 1));
 
-        mockMvc.perform(patch("/api/inventory/{id}/adjustments", productId)
+        mockMvc.perform(patch("/api/v1/inventory/{id}/adjustments", productId)
                         .header(AUTHORIZATION, "Bearer " + managerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quantityDelta\":5}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.quantity").value(5));
-        mockMvc.perform(patch("/api/inventory/{id}/adjustments", productId)
+        mockMvc.perform(patch("/api/v1/inventory/{id}/adjustments", productId)
                         .header(AUTHORIZATION, "Bearer " + salesToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quantityDelta\":1}"))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/v1/orders")
                         .header(AUTHORIZATION, "Bearer " + salesToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -113,7 +142,7 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(productId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"));
-        mockMvc.perform(get("/api/orders")
+        mockMvc.perform(get("/api/v1/orders")
                         .header(AUTHORIZATION, "Bearer " + managerToken))
                 .andExpect(status().isForbidden());
     }
@@ -190,12 +219,12 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void corsIsRestrictiveAndSwaggerIsClosed() throws Exception {
-        mockMvc.perform(options("/api/products")
+        mockMvc.perform(options("/api/v1/products")
                         .header("Origin", "https://allowed.example")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(ACCESS_CONTROL_ALLOW_ORIGIN, "https://allowed.example"));
-        mockMvc.perform(options("/api/products")
+        mockMvc.perform(options("/api/v1/products")
                         .header("Origin", "https://evil.example")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isForbidden())

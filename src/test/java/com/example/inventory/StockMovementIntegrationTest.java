@@ -191,7 +191,7 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
     void returnsHistoricalMovementsAfterProductIsSoftDeleted() throws Exception {
         UUID productId = createProduct("KARDEX-DELETED");
         adjust(productId, 7, managerToken);
-        mockMvc.perform(delete("/api/products/{id}", productId)
+        mockMvc.perform(delete("/api/v1/products/{id}", productId)
                         .header(AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
@@ -212,12 +212,12 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(movements(productId, adminToken)).andExpect(status().isOk());
         mockMvc.perform(movements(productId, managerToken)).andExpect(status().isOk());
         mockMvc.perform(movements(productId, salesToken)).andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/inventory/{id}/movements", productId))
+        mockMvc.perform(get("/api/v1/inventory/{id}/movements", productId))
                 .andExpect(status().isUnauthorized());
     }
 
     private UUID createProduct(String sku) throws Exception {
-        String location = mockMvc.perform(post("/api/products")
+        String location = mockMvc.perform(post("/api/v1/products")
                         .header(AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -229,7 +229,7 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void adjust(UUID productId, int delta, String token) throws Exception {
-        mockMvc.perform(patch("/api/inventory/{id}/adjustments", productId)
+        mockMvc.perform(patch("/api/v1/inventory/{id}/adjustments", productId)
                         .header(AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quantityDelta\":" + delta + "}"))
@@ -237,7 +237,7 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
     }
 
     private UUID createAndConfirmOrder(UUID productId, int quantity) throws Exception {
-        String location = mockMvc.perform(post("/api/orders")
+        String location = mockMvc.perform(post("/api/v1/orders")
                         .header(AUTHORIZATION, "Bearer " + salesToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -246,24 +246,24 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getHeader("Location");
         UUID orderId = UUID.fromString(location.substring(location.lastIndexOf('/') + 1));
-        mockMvc.perform(post("/api/orders/{id}/reserve", orderId)
+        mockMvc.perform(post("/api/v1/orders/{id}/reserve", orderId)
                         .header(AUTHORIZATION, "Bearer " + salesToken))
                 .andExpect(status().isOk());
-        mockMvc.perform(post("/api/orders/{id}/confirm", orderId)
+        mockMvc.perform(post("/api/v1/orders/{id}/confirm", orderId)
                         .header(AUTHORIZATION, "Bearer " + salesToken))
                 .andExpect(status().isOk());
         return orderId;
     }
 
     private void cancelOrder(UUID orderId) throws Exception {
-        mockMvc.perform(post("/api/orders/{id}/cancel", orderId)
+        mockMvc.perform(post("/api/v1/orders/{id}/cancel", orderId)
                         .header(AUTHORIZATION, "Bearer " + salesToken))
                 .andExpect(status().isOk());
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder movements(
             UUID productId, String token) {
-        return get("/api/inventory/{id}/movements", productId)
+        return get("/api/v1/inventory/{id}/movements", productId)
                 .header(AUTHORIZATION, "Bearer " + token);
     }
 

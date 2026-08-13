@@ -21,7 +21,7 @@ import java.net.URI;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/customers")
+@RequestMapping("/api/v1/customers")
 @Tag(name = "Customers", description = "Customer management")
 class CustomerController {
 
@@ -51,7 +51,7 @@ class CustomerController {
     @Operation(summary = "Create a customer")
     ResponseEntity<CustomerResponse> create(@Valid @RequestBody CustomerRequest request) {
         CustomerResponse response = service.create(request);
-        return ResponseEntity.created(URI.create("/api/customers/" + response.id()))
+        return ResponseEntity.created(URI.create("/api/v1/customers/" + response.id()))
                 .body(response);
     }
 

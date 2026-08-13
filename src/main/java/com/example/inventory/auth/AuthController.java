@@ -3,7 +3,10 @@ package com.example.inventory.auth;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,14 +30,14 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate with username or email")
-    public TokenResponse login(@Valid @RequestBody LoginRequest request) {
-        return service.login(request);
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+        return tokenResponse(service.login(request));
     }
 
     @PostMapping("/refresh")
     @Operation(summary = "Rotate a refresh token")
-    public TokenResponse refresh(@Valid @RequestBody RefreshRequest request) {
-        return service.refresh(request);
+    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return tokenResponse(service.refresh(request));
     }
 
     @PostMapping("/logout")
@@ -56,5 +59,12 @@ public class AuthController {
     public void changePassword(@AuthenticationPrincipal Jwt jwt,
                                @Valid @RequestBody ChangePasswordRequest request) {
         service.changePassword(jwt.getSubject(), request);
+    }
+
+    private ResponseEntity<TokenResponse> tokenResponse(TokenResponse body) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .body(body);
     }
 }

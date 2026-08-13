@@ -25,7 +25,7 @@ import java.net.URI;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping("/api/v1/orders")
 @Tag(name = "Orders", description = "Order creation and lifecycle operations")
 public class OrderController {
 
@@ -62,7 +62,7 @@ public class OrderController {
             @Valid @RequestBody CreateOrderRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         OrderResponse response = service.create(request, jwt.getSubject());
-        return ResponseEntity.created(URI.create("/api/orders/" + response.id())).body(response);
+        return ResponseEntity.created(URI.create("/api/v1/orders/" + response.id())).body(response);
     }
 
     @PostMapping("/{id}/confirm")

@@ -20,7 +20,7 @@ import java.util.UUID;
 import com.example.inventory.shared.PageResponse;
 
 @RestController
-@RequestMapping("/api/inventory")
+@RequestMapping("/api/v1/inventory")
 @Tag(name = "Inventory", description = "Stock query and adjustment operations")
 class InventoryController {
 
@@ -30,6 +30,31 @@ class InventoryController {
     InventoryController(InventoryService service, StockMovementQueryService movementQueries) {
         this.service = service;
         this.movementQueries = movementQueries;
+    }
+
+    @GetMapping
+    @Operation(summary = "List inventory balances")
+    PageResponse<InventoryResponse> findAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return service.findAll(page, size);
+    }
+
+    @GetMapping("/movements")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INVENTORY_MANAGER')")
+    @Operation(summary = "List stock movements across all products")
+    StockMovementPageResponse findAllMovements(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) UUID productId,
+            @RequestParam(required = false) StockMovementType type,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) String reference) {
+        return movementQueries.findMovements(
+                productId, page, size, type, from, to, reference);
     }
 
     @GetMapping("/{productId}")

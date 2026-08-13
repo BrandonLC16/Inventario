@@ -46,49 +46,49 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         UUID productId = createProduct("ORDER-1", 10);
         UUID orderId = createOrder(new RequestedItem(productId, 4));
 
-        performSales(get("/api/orders/{id}", orderId))
+        performSales(get("/api/v1/orders/{id}", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.items[0].quantity").value(4));
-        performSales(get("/api/orders"))
+        performSales(get("/api/v1/orders"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(orderId.toString()));
-        performSales(post("/api/orders/{id}/cancel", orderId))
+        performSales(post("/api/v1/orders/{id}/cancel", orderId))
                 .andExpect(status().isConflict());
 
-        performSales(post("/api/orders/{id}/confirm", orderId))
+        performSales(post("/api/v1/orders/{id}/confirm", orderId))
                 .andExpect(status().isConflict());
-        performSales(post("/api/orders/{id}/reserve", orderId))
+        performSales(post("/api/v1/orders/{id}/reserve", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESERVED"))
                 .andExpect(jsonPath("$.reservedBy").value(salesUserId.toString()))
                 .andExpect(jsonPath("$.reservedAt").isNotEmpty());
-        performSales(post("/api/orders/{id}/reserve", orderId))
+        performSales(post("/api/v1/orders/{id}/reserve", orderId))
                 .andExpect(status().isOk());
         assertEquals(10, stock(productId));
         assertEquals(4, reserved(productId));
         assertEquals(1, movementCount(orderId, "ORDER_RESERVED"));
 
-        performSales(post("/api/orders/{id}/confirm", orderId))
+        performSales(post("/api/v1/orders/{id}/confirm", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
-        performSales(post("/api/orders/{id}/confirm", orderId))
+        performSales(post("/api/v1/orders/{id}/confirm", orderId))
                 .andExpect(status().isOk());
         assertEquals(6, stock(productId));
         assertEquals(1, movementCount(orderId, "ORDER_CONFIRMED"));
 
-        mockMvc.perform(delete("/api/products/{id}", productId)
+        mockMvc.perform(delete("/api/v1/products/{id}", productId)
                         .header(AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
-        performSales(post("/api/orders/{id}/cancel", orderId))
+        performSales(post("/api/v1/orders/{id}/cancel", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
-        performSales(post("/api/orders/{id}/cancel", orderId))
+        performSales(post("/api/v1/orders/{id}/cancel", orderId))
                 .andExpect(status().isOk());
         assertEquals(10, stock(productId));
         assertEquals(1, movementCount(orderId, "ORDER_CANCELLED"));
-        performSales(post("/api/orders/{id}/confirm", orderId))
+        performSales(post("/api/v1/orders/{id}/confirm", orderId))
                 .andExpect(status().isConflict());
 
         List<String> actors = jdbcTemplate.queryForList("""
@@ -108,7 +108,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
                 new RequestedItem(firstProduct, 3),
                 new RequestedItem(secondProduct, 2));
 
-        performSales(post("/api/orders/{id}/reserve", orderId))
+        performSales(post("/api/v1/orders/{id}/reserve", orderId))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
                         .value("Inventory quantity cannot be negative"));
@@ -123,7 +123,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
     void creationRejectsDuplicateOrMissingProductsWithoutSavingOrder() throws Exception {
         UUID productId = createProduct("INVALID-ORDER-1", 0);
 
-        performSales(post("/api/orders")
+        performSales(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"items":[
@@ -132,7 +132,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
                                 ]}
                                 """.formatted(productId, productId)))
                 .andExpect(status().isBadRequest());
-        performSales(post("/api/orders")
+        performSales(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"items":[{"productId":"%s","quantity":1}]}
@@ -150,9 +150,9 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         UUID orderId = createOrder(
                 new RequestedItem(firstProduct, 2),
                 new RequestedItem(secondProduct, 2));
-        performSales(post("/api/orders/{id}/reserve", orderId))
+        performSales(post("/api/v1/orders/{id}/reserve", orderId))
                 .andExpect(status().isOk());
-        performSales(post("/api/orders/{id}/confirm", orderId))
+        performSales(post("/api/v1/orders/{id}/confirm", orderId))
                 .andExpect(status().isOk());
 
         UUID lastLocked = firstProduct.compareTo(secondProduct) > 0 ? firstProduct : secondProduct;
@@ -160,7 +160,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         jdbcTemplate.update("UPDATE inventory SET quantity = ? WHERE product_id = ?",
                 Integer.MAX_VALUE, lastLocked);
 
-        performSales(post("/api/orders/{id}/cancel", orderId))
+        performSales(post("/api/v1/orders/{id}/cancel", orderId))
                 .andExpect(status().isConflict());
 
         assertEquals(8, stock(firstLocked));
@@ -173,17 +173,17 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
     void concurrentConfirmationAndCancellationApplyInventoryExactlyOnce() throws Exception {
         UUID productId = createProduct("CONCURRENT-1", 10);
         UUID orderId = createOrder(new RequestedItem(productId, 4));
-        performSales(post("/api/orders/{id}/reserve", orderId))
+        performSales(post("/api/v1/orders/{id}/reserve", orderId))
                 .andExpect(status().isOk());
 
         assertEquals(List.of(200, 200), concurrently(
-                "/api/orders/" + orderId + "/confirm"));
+                "/api/v1/orders/" + orderId + "/confirm"));
         assertEquals(6, stock(productId));
         assertEquals(1, movementCount(orderId, "ORDER_CONFIRMED"));
         assertEquals("CONFIRMED", orderStatus(orderId));
 
         assertEquals(List.of(200, 200), concurrently(
-                "/api/orders/" + orderId + "/cancel"));
+                "/api/v1/orders/" + orderId + "/cancel"));
         assertEquals(10, stock(productId));
         assertEquals(1, movementCount(orderId, "ORDER_CANCELLED"));
         assertEquals("CANCELLED", orderStatus(orderId));
@@ -196,8 +196,8 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         UUID secondOrder = createOrder(new RequestedItem(productId, 4));
 
         List<Integer> statuses = concurrentlyDifferent(
-                "/api/orders/" + firstOrder + "/reserve",
-                "/api/orders/" + secondOrder + "/reserve");
+                "/api/v1/orders/" + firstOrder + "/reserve",
+                "/api/v1/orders/" + secondOrder + "/reserve");
 
         assertEquals(List.of(200, 400), statuses);
         assertEquals(5, stock(productId));
@@ -243,7 +243,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
     }
 
     private UUID createProduct(String sku, int initialStock) throws Exception {
-        String location = mockMvc.perform(post("/api/products")
+        String location = mockMvc.perform(post("/api/v1/products")
                         .header(AUTHORIZATION, "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -253,7 +253,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
                 .andReturn().getResponse().getHeader("Location");
         UUID productId = UUID.fromString(location.substring(location.lastIndexOf('/') + 1));
         if (initialStock > 0) {
-            mockMvc.perform(patch("/api/inventory/{id}/adjustments", productId)
+            mockMvc.perform(patch("/api/v1/inventory/{id}/adjustments", productId)
                             .header(AUTHORIZATION, "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"quantityDelta\":" + initialStock + "}"))
@@ -268,7 +268,7 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
                         {"productId":"%s","quantity":%d}
                         """.formatted(item.productId(), item.quantity()).trim())
                 .collect(Collectors.joining(","));
-        String location = mockMvc.perform(post("/api/orders")
+        String location = mockMvc.perform(post("/api/v1/orders")
                         .header(AUTHORIZATION, "Bearer " + salesToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

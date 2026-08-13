@@ -1,5 +1,6 @@
 package com.example.inventory.security;
 
+import com.example.inventory.shared.CorrelationIdFilter;
 import com.example.inventory.users.RoleName;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -92,23 +93,29 @@ public class SecurityConfiguration {
                     }
                     authorize.requestMatchers("/api/v1/users", "/api/v1/users/**")
                             .hasRole(RoleName.ADMIN.name());
-                    authorize.requestMatchers("/api/customers", "/api/customers/**")
+                    authorize.requestMatchers("/api/v1/customers", "/api/v1/customers/**")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.SALES.name());
-                    authorize.requestMatchers(HttpMethod.GET, "/api/products", "/api/products/*")
+                    authorize.requestMatchers(HttpMethod.GET,
+                            "/api/v1/products", "/api/v1/products/*")
                             .authenticated();
-                    authorize.requestMatchers(HttpMethod.POST, "/api/products")
+                    authorize.requestMatchers(HttpMethod.POST, "/api/v1/products")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
-                    authorize.requestMatchers(HttpMethod.PUT, "/api/products/*")
+                    authorize.requestMatchers(HttpMethod.PUT, "/api/v1/products/*")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
-                    authorize.requestMatchers(HttpMethod.DELETE, "/api/products/*")
+                    authorize.requestMatchers(HttpMethod.DELETE, "/api/v1/products/*")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
-                    authorize.requestMatchers(HttpMethod.GET, "/api/inventory/*/movements")
+                    authorize.requestMatchers(HttpMethod.GET,
+                            "/api/v1/inventory/movements",
+                            "/api/v1/inventory/*/movements",
+                            "/api/v1/inventory/low-stock")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
-                    authorize.requestMatchers(HttpMethod.GET, "/api/inventory/*")
+                    authorize.requestMatchers(HttpMethod.GET,
+                            "/api/v1/inventory", "/api/v1/inventory/*")
                             .authenticated();
-                    authorize.requestMatchers(HttpMethod.PATCH, "/api/inventory/*/adjustments")
+                    authorize.requestMatchers(HttpMethod.PATCH,
+                            "/api/v1/inventory/*/adjustments")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
-                    authorize.requestMatchers("/api/orders", "/api/orders/**")
+                    authorize.requestMatchers("/api/v1/orders", "/api/v1/orders/**")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.SALES.name());
                     authorize.anyRequest().authenticated();
                 });
@@ -188,8 +195,10 @@ public class SecurityConfiguration {
                 : properties.cors().allowedOrigins().stream().filter(origin -> !origin.isBlank()).toList();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
-        configuration.setExposedHeaders(List.of("Location"));
+        configuration.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "Accept", CorrelationIdFilter.HEADER_NAME));
+        configuration.setExposedHeaders(List.of(
+                "Location", CorrelationIdFilter.HEADER_NAME));
         configuration.setAllowCredentials(false);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

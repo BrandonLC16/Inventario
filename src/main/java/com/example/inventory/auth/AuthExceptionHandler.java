@@ -1,6 +1,8 @@
 package com.example.inventory.auth;
 
 import com.example.inventory.shared.ApiError;
+import com.example.inventory.shared.ApiErrorCode;
+import com.example.inventory.shared.CorrelationIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +19,8 @@ public class AuthExceptionHandler {
     ResponseEntity<ApiError> handleAuthentication(HttpServletRequest request) {
         HttpStatus status = HttpStatus.UNAUTHORIZED;
         ApiError body = new ApiError(Instant.now(), status.value(), status.getReasonPhrase(),
-                "Authentication failed", request.getRequestURI(), Map.of());
+                ApiErrorCode.AUTHENTICATION_FAILED, "Authentication failed",
+                request.getRequestURI(), CorrelationIdFilter.from(request), Map.of());
         return ResponseEntity.status(status).body(body);
     }
 }
