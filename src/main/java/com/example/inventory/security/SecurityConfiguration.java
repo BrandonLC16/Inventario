@@ -99,6 +99,9 @@ public class SecurityConfiguration {
                             .hasRole(RoleName.ADMIN.name());
                     authorize.requestMatchers("/api/v1/customers", "/api/v1/customers/**")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.SALES.name());
+                    authorize.requestMatchers("/api/v1/suppliers", "/api/v1/suppliers/**")
+                            .hasAnyRole(RoleName.ADMIN.name(),
+                                    RoleName.INVENTORY_MANAGER.name());
                     authorize.requestMatchers(HttpMethod.GET,
                             "/api/v1/products", "/api/v1/products/*")
                             .authenticated();
