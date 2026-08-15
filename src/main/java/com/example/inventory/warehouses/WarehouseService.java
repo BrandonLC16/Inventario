@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -89,6 +90,12 @@ public class WarehouseService implements WarehouseDirectory {
         lockWarehouse(warehouseId);
         if (!active) ensureProductCanBeDeactivated(warehouseId, productId);
         repository.configureProduct(warehouseId, productId, minimumStock, active);
+    }
+
+    @Override
+    public List<UUID> productIdsForPhysicalCount(UUID warehouseId) {
+        requireWarehouse(warehouseId);
+        return List.copyOf(repository.findProductIdsForPhysicalCount(warehouseId));
     }
 
     private void ensureProductCanBeDeactivated(UUID warehouseId, UUID productId) {

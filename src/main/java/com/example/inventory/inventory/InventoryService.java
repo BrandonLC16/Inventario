@@ -309,6 +309,72 @@ class InventoryService implements InventoryOperations {
                 balanceBefore, 0, reserved, reserved, transferId.toString(), actor);
     }
 
+    @Override
+    @Transactional
+    public int lockAndGetQuantityForPhysicalCount(
+            UUID warehouseId, UUID productId) {
+        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        return lockInventory(warehouseId, productId).getQuantity();
+    }
+
+    @Override
+    @Transactional
+    public PhysicalCountSnapshot capturePhysicalCountExpectation(
+            UUID warehouseId, UUID productId, int previousExpectedQuantity,
+            java.time.Instant previousSnapshotAt) {
+        if (previousExpectedQuantity < 0 || previousSnapshotAt == null) {
+            throw new IllegalArgumentException(
+                    "The previous physical count snapshot is required");
+        }
+        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        lockInventory(warehouseId, productId);
+        java.time.Instant capturedAt = java.time.Instant.now();
+        long movementDelta = movementRepository.quantityDeltaBetween(
+                warehouseId, productId, previousSnapshotAt, capturedAt);
+        long expected = previousExpectedQuantity + movementDelta;
+        if (expected < 0 || expected > Integer.MAX_VALUE) {
+            throw new ConflictException(
+                    "Expected physical count quantity is outside the supported range");
+        }
+        return new PhysicalCountSnapshot((int) expected, capturedAt);
+    }
+
+    @Override
+    @Transactional
+    public void postPhysicalCountAdjustment(
+            UUID warehouseId, UUID productId, int variance,
+            UUID countId, String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
+        if (countId == null) {
+            throw new IllegalArgumentException("The physical inventory count is required");
+        }
+        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
+        int balanceBefore = item.getQuantity();
+        int reserved = reservedQuantity(warehouseId, productId);
+        long adjustedQuantity = balanceBefore + (long) variance;
+        if (adjustedQuantity < reserved) {
+            throw new ConflictException(
+                    "Physical count result cannot be below reserved inventory");
+        }
+        if (adjustedQuantity > Integer.MAX_VALUE) {
+            throw new ConflictException(
+                    "Inventory quantity is outside the supported range");
+        }
+        if (variance == 0) return;
+        try {
+            item.changeQuantity(variance);
+        } catch (IllegalArgumentException exception) {
+            throw new ConflictException(exception.getMessage());
+        }
+        recordMovement(item, StockMovementType.PHYSICAL_COUNT_ADJUSTMENT,
+                variance, balanceBefore, 0, reserved, reserved,
+                countId.toString(), actor);
+    }
+
     private void lockActiveStoredWarehouseProduct(UUID warehouseId, UUID productId) {
         warehouses.lockActiveWarehouse(warehouseId);
         productCatalog.requireStoredProduct(productId);

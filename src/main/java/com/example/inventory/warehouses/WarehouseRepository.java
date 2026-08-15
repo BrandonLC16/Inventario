@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,8 +25,12 @@ interface WarehouseRepository extends JpaRepository<Warehouse, UUID> {
     @Query(value = "select exists (select 1 from inventory_reservations where warehouse_id = :warehouseId)", nativeQuery = true)
     boolean hasReservations(@Param("warehouseId") UUID warehouseId);
 
-    @Query(value = "select exists (select 1 from orders where fulfillment_warehouse_id = :warehouseId and status in ('PENDING', 'RESERVED')) or exists (select 1 from purchase_orders where destination_warehouse_id = :warehouseId and status in ('DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED')) or exists (select 1 from inventory_transfers where (source_warehouse_id = :warehouseId or destination_warehouse_id = :warehouseId) and status in ('DRAFT', 'IN_TRANSIT'))", nativeQuery = true)
+    @Query(value = "select exists (select 1 from orders where fulfillment_warehouse_id = :warehouseId and status in ('PENDING', 'RESERVED')) or exists (select 1 from purchase_orders where destination_warehouse_id = :warehouseId and status in ('DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED')) or exists (select 1 from inventory_transfers where (source_warehouse_id = :warehouseId or destination_warehouse_id = :warehouseId) and status in ('DRAFT', 'IN_TRANSIT')) or exists (select 1 from inventory_counts where warehouse_id = :warehouseId and status in ('DRAFT', 'OPEN', 'SUBMITTED'))", nativeQuery = true)
     boolean hasOpenOrders(@Param("warehouseId") UUID warehouseId);
+
+    @Query(value = "select setting.product_id from warehouse_product_settings setting join products product on product.id = setting.product_id where setting.warehouse_id = :warehouseId and product.deleted = false order by setting.product_id", nativeQuery = true)
+    List<UUID> findProductIdsForPhysicalCount(
+            @Param("warehouseId") UUID warehouseId);
 
     @Query(value = "select exists (select 1 from warehouse_product_settings where warehouse_id = :warehouseId and product_id = :productId and active = true)", nativeQuery = true)
     boolean isProductActive(@Param("warehouseId") UUID warehouseId,

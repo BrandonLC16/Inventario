@@ -1,5 +1,6 @@
 package com.example.inventory.warehouses;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Public contract exposed by warehouses to transactional business modules. */
@@ -12,4 +13,5 @@ public interface WarehouseDirectory {
     void requireActiveProduct(UUID warehouseId, UUID productId);
     void registerProduct(UUID productId);
     void configureProduct(UUID warehouseId, UUID productId, int minimumStock, boolean active);
+    List<UUID> productIdsForPhysicalCount(UUID warehouseId);
 }

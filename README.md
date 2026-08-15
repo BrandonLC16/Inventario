@@ -21,6 +21,7 @@ El proyecto implementa:
 - Órdenes de compra con emisión, recepciones parciales, costos históricos e idempotencia por referencia externa.
 - Recepción transaccional de compras con incremento de existencia y movimiento `PURCHASE_RECEIVED`.
 - Transferencias entre almacenes con despacho, tránsito consultable, recepción e idempotencia.
+- Conteos físicos completos o selectivos con captura no bloqueante, publicación idempotente y ajustes trazables.
 - Autenticación por nombre de usuario o correo electrónico.
 - Access tokens JWT firmados con RS256.
 - Refresh tokens opacos, almacenados como hash, con rotación, revocación por familia y detección de reutilización.
@@ -147,6 +148,7 @@ Para cambiar la contraseña propia envía `{"currentPassword":"<ACTUAL>","newPas
 | Crear, consultar, reservar, liberar, confirmar o cancelar pedidos | Sí | No | Sí |
 | Crear, emitir, recibir o cancelar órdenes de compra | Sí | Sí | No |
 | Crear, despachar, recibir o cancelar transferencias | Sí | Sí | No |
+| Crear, capturar, publicar o cancelar conteos físicos | Sí | Sí | No |
 | Administrar usuarios y roles | Sí | No | No |
 | Acceder a OpenAPI/Swagger habilitado | Sí | No | No |
 
@@ -222,7 +224,7 @@ Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, r
 |---|---|---|
 | `page` | `0` | Índice de página, desde cero |
 | `size` | `20` | Elementos por página, entre 1 y 100 |
-| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_RESERVED`, `ORDER_RESERVATION_RELEASED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `PURCHASE_RECEIVED`, `TRANSFER_OUT` o `TRANSFER_IN` |
+| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_RESERVED`, `ORDER_RESERVATION_RELEASED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `PURCHASE_RECEIVED`, `TRANSFER_OUT`, `TRANSFER_IN` o `PHYSICAL_COUNT_ADJUSTMENT` |
 | `from` | Sin filtro | Fecha inicial inclusiva en ISO-8601 |
 | `to` | Sin filtro | Fecha final inclusiva en ISO-8601 |
 | `reference` | Sin filtro | Coincidencia exacta con la referencia de negocio |
@@ -376,6 +378,39 @@ Cada artículo expone `quantity` e `inTransitQuantity`; esta última solo es dis
 
 `GET /api/v1/inventory-transfers` admite `page`, `size`, `status`, `sourceWarehouseId`, `destinationWarehouseId`, coincidencia parcial de `folio` y rango inclusivo `from`/`to` sobre `createdAt`.
 
+## Conteos físicos
+
+Estas rutas requieren `ADMIN` o `INVENTORY_MANAGER`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/inventory-counts` | Lista conteos paginados y filtrables |
+| `POST` | `/api/v1/inventory-counts` | Crea un conteo `DRAFT` completo o selectivo |
+| `GET` | `/api/v1/inventory-counts/{id}` | Consulta el documento, snapshots y variaciones |
+| `POST` | `/api/v1/inventory-counts/{id}/open` | Abre el conteo y captura saldos iniciales |
+| `PUT` | `/api/v1/inventory-counts/{id}/lines/{productId}` | Captura o corrige la cantidad física |
+| `POST` | `/api/v1/inventory-counts/{id}/submit` | Envía un conteo totalmente capturado |
+| `POST` | `/api/v1/inventory-counts/{id}/post` | Publica sus variaciones de forma idempotente |
+| `POST` | `/api/v1/inventory-counts/{id}/cancel` | Cancela un conteo que aún no fue publicado |
+
+Un conteo selectivo usa `scope: "SELECTED"` y una lista de productos; uno completo usa `scope: "FULL"` y toma todos los productos registrados en el almacén:
+
+```json
+{
+  "warehouseId": "<WAREHOUSE_ID>",
+  "scope": "SELECTED",
+  "productIds": ["<PRODUCT_ID>"]
+}
+```
+
+El ciclo es `DRAFT → OPEN → SUBMITTED → POSTED`; cualquier estado no publicado puede pasar a `CANCELLED`. No puede existir más de un conteo activo para el mismo almacén y producto, incluso ante creaciones concurrentes. `OPEN` es el único estado que acepta cantidades y todas deben ser no negativas; `SUBMITTED` exige que cada línea haya sido capturada.
+
+La apertura toma snapshots consistentes bajo bloqueos breves de los inventarios, pero no detiene el almacén después de confirmar la transacción. Al capturar una línea, el servicio bloquea ese inventario y suma a su snapshot los movimientos físicos posteriores usando el kardex; así obtiene el saldo esperado en `countedAt` y calcula `variance = countedQuantity - expectedQuantity`. Una corrección posterior repite el cálculo desde el snapshot anterior, sin perder entradas o salidas concurrentes.
+
+Publicar bloquea el documento, sus líneas y los inventarios en orden de UUID, y aplica cada variación sobre el saldo actual. Si cualquier saldo resultante queda por debajo de sus reservas de venta, toda la publicación se rechaza y revierte. Solo las variaciones distintas de cero generan `PHYSICAL_COUNT_ADJUSTMENT`, con el UUID del conteo como `businessReference`; repetir una publicación exitosa no duplica saldos ni movimientos.
+
+`GET /api/v1/inventory-counts` admite `page`, `size`, `status`, `scope`, `warehouseId` y coincidencia parcial de `folio`.
+
 ## Administración de usuarios
 
 Todas estas rutas requieren el rol `ADMIN`.
@@ -477,9 +512,9 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 141 pruebas: 70 unitarias y 71 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, compras, recepciones, transferencias, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 147 pruebas: 70 unitarias y 77 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, compras, recepciones, transferencias, conteos físicos, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
 
-Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; recepciones parciales e idempotentes; transferencias competitivas y contra stock reservado; conservación origen-tránsito-destino; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios y costos históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
+Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; recepciones parciales e idempotentes; transferencias competitivas y contra stock reservado; conservación origen-tránsito-destino; conteos físicos concurrentes, no bloqueantes, idempotentes y compatibles con reservas; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios y costos históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 
 El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta pruebas, SpotBugs con severidad media, escaneo de vulnerabilidades de las dependencias de producción y detección de secretos en cada `push` y `pull_request`. La acción de Trivy está fijada por SHA para evitar cambios de código no revisados en la cadena de suministro.
 
@@ -500,6 +535,7 @@ En macOS o Linux usa `./mvnw` y separadores de ruta `/`. PostgreSQL y las variab
 src/main/java/com/example/inventory/
 ├── auth/          Login, refresh, logout, sesión y cambio de contraseña
 ├── config/        Configuración de OpenAPI
+├── counts/        Conteos físicos, snapshots, variaciones y publicación
 ├── customers/     Clientes, búsqueda y desactivación lógica
 ├── inventory/     Existencias, reservas, ajustes, kardex y alertas
 ├── orders/        Pedidos, precios históricos y ciclo transaccional

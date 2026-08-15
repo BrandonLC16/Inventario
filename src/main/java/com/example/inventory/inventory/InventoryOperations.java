@@ -1,5 +1,6 @@
 package com.example.inventory.inventory;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /** Public write contract exposed by inventory to business modules. */
@@ -18,4 +19,11 @@ public interface InventoryOperations {
                      UUID transferId, String responsibleUser);
     void transferIn(UUID warehouseId, UUID productId, int quantity,
                     UUID transferId, String responsibleUser);
+    int lockAndGetQuantityForPhysicalCount(UUID warehouseId, UUID productId);
+    PhysicalCountSnapshot capturePhysicalCountExpectation(
+            UUID warehouseId, UUID productId, int previousExpectedQuantity,
+            Instant previousSnapshotAt);
+    void postPhysicalCountAdjustment(UUID warehouseId, UUID productId,
+                                     int variance, UUID countId,
+                                     String responsibleUser);
 }
