@@ -24,7 +24,7 @@ interface WarehouseRepository extends JpaRepository<Warehouse, UUID> {
     @Query(value = "select exists (select 1 from inventory_reservations where warehouse_id = :warehouseId)", nativeQuery = true)
     boolean hasReservations(@Param("warehouseId") UUID warehouseId);
 
-    @Query(value = "select exists (select 1 from orders where fulfillment_warehouse_id = :warehouseId and status in ('PENDING', 'RESERVED')) or exists (select 1 from purchase_orders where destination_warehouse_id = :warehouseId and status in ('DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED'))", nativeQuery = true)
+    @Query(value = "select exists (select 1 from orders where fulfillment_warehouse_id = :warehouseId and status in ('PENDING', 'RESERVED')) or exists (select 1 from purchase_orders where destination_warehouse_id = :warehouseId and status in ('DRAFT', 'ISSUED', 'PARTIALLY_RECEIVED')) or exists (select 1 from inventory_transfers where (source_warehouse_id = :warehouseId or destination_warehouse_id = :warehouseId) and status in ('DRAFT', 'IN_TRANSIT'))", nativeQuery = true)
     boolean hasOpenOrders(@Param("warehouseId") UUID warehouseId);
 
     @Query(value = "select exists (select 1 from warehouse_product_settings where warehouse_id = :warehouseId and product_id = :productId and active = true)", nativeQuery = true)

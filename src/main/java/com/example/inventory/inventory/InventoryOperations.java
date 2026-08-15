@@ -14,4 +14,8 @@ public interface InventoryOperations {
                          UUID orderId, String responsibleUser);
     void receivePurchase(UUID warehouseId, UUID productId, int quantity,
                          UUID receiptId, String responsibleUser);
+    void transferOut(UUID warehouseId, UUID productId, int quantity,
+                     UUID transferId, String responsibleUser);
+    void transferIn(UUID warehouseId, UUID productId, int quantity,
+                    UUID transferId, String responsibleUser);
 }

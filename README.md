@@ -20,6 +20,7 @@ El proyecto implementa:
 - Cancelación transaccional: restaura existencias exactamente una vez.
 - Órdenes de compra con emisión, recepciones parciales, costos históricos e idempotencia por referencia externa.
 - Recepción transaccional de compras con incremento de existencia y movimiento `PURCHASE_RECEIVED`.
+- Transferencias entre almacenes con despacho, tránsito consultable, recepción e idempotencia.
 - Autenticación por nombre de usuario o correo electrónico.
 - Access tokens JWT firmados con RS256.
 - Refresh tokens opacos, almacenados como hash, con rotación, revocación por familia y detección de reutilización.
@@ -145,6 +146,7 @@ Para cambiar la contraseña propia envía `{"currentPassword":"<ACTUAL>","newPas
 | Crear, consultar, actualizar o desactivar clientes | Sí | No | Sí |
 | Crear, consultar, reservar, liberar, confirmar o cancelar pedidos | Sí | No | Sí |
 | Crear, emitir, recibir o cancelar órdenes de compra | Sí | Sí | No |
+| Crear, despachar, recibir o cancelar transferencias | Sí | Sí | No |
 | Administrar usuarios y roles | Sí | No | No |
 | Acceder a OpenAPI/Swagger habilitado | Sí | No | No |
 
@@ -220,7 +222,7 @@ Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, r
 |---|---|---|
 | `page` | `0` | Índice de página, desde cero |
 | `size` | `20` | Elementos por página, entre 1 y 100 |
-| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_RESERVED`, `ORDER_RESERVATION_RELEASED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED` o `PURCHASE_RECEIVED` |
+| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_RESERVED`, `ORDER_RESERVATION_RELEASED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED`, `PURCHASE_RECEIVED`, `TRANSFER_OUT` o `TRANSFER_IN` |
 | `from` | Sin filtro | Fecha inicial inclusiva en ISO-8601 |
 | `to` | Sin filtro | Fecha final inclusiva en ISO-8601 |
 | `reference` | Sin filtro | Coincidencia exacta con la referencia de negocio |
@@ -340,6 +342,40 @@ La recepción bloquea la orden, sus artículos y los inventarios en orden de UUI
 
 `GET /api/v1/purchase-orders` admite `page`, `size`, `status`, `supplierId`, `destinationWarehouseId`, coincidencia parcial de `folio` y rango inclusivo `from`/`to` sobre `createdAt`.
 
+## Transferencias entre almacenes
+
+Estas rutas requieren `ADMIN` o `INVENTORY_MANAGER`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/inventory-transfers` | Lista transferencias paginadas y filtrables |
+| `POST` | `/api/v1/inventory-transfers` | Crea una transferencia `DRAFT` |
+| `GET` | `/api/v1/inventory-transfers/{id}` | Consulta el documento y sus unidades en tránsito |
+| `PUT` | `/api/v1/inventory-transfers/{id}/items` | Reemplaza artículos o almacenes de un borrador |
+| `POST` | `/api/v1/inventory-transfers/{id}/dispatch` | Despacha existencias del origen |
+| `POST` | `/api/v1/inventory-transfers/{id}/receive` | Recibe existencias en el destino |
+| `POST` | `/api/v1/inventory-transfers/{id}/cancel` | Cancela un borrador |
+
+Ejemplo de creación:
+
+```json
+{
+  "sourceWarehouseId": "<SOURCE_WAREHOUSE_ID>",
+  "destinationWarehouseId": "<DESTINATION_WAREHOUSE_ID>",
+  "items": [{"productId": "<PRODUCT_ID>", "quantity": 5}]
+}
+```
+
+El ciclo es `DRAFT → IN_TRANSIT → RECEIVED`; únicamente `DRAFT` se puede editar o cancelar. Origen y destino deben ser distintos y permanecer activos mientras el documento esté abierto. Una transferencia despachada no se cancela: debe recibirse o compensarse mediante otra transferencia.
+
+El despacho bloquea el documento, sus artículos, ambos almacenes y los inventarios en orden estable por UUID de producto. Valida la existencia disponible (`quantity - reservedQuantity`), conserva intactas las reservas de venta, descuenta físicamente del origen y registra `TRANSFER_OUT`. La recepción suma exactamente las mismas cantidades en el destino y registra `TRANSFER_IN`. Ambos movimientos usan el UUID de la transferencia como `businessReference`.
+
+Despacho y recepción son idempotentes. Repetir cualquiera de los comandos después de su aplicación devuelve el estado actual sin duplicar saldos ni movimientos. Cualquier fallo multiartículo revierte todos los saldos, movimientos y el cambio de estado.
+
+Cada artículo expone `quantity` e `inTransitQuantity`; esta última solo es distinta de cero en `IN_TRANSIT`. La respuesta también incluye los totales `totalQuantity` e `inTransitQuantity`, por lo que la conservación se consulta como existencia en origen más tránsito más existencia en destino.
+
+`GET /api/v1/inventory-transfers` admite `page`, `size`, `status`, `sourceWarehouseId`, `destinationWarehouseId`, coincidencia parcial de `folio` y rango inclusivo `from`/`to` sobre `createdAt`.
+
 ## Administración de usuarios
 
 Todas estas rutas requieren el rol `ADMIN`.
@@ -441,9 +477,9 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 136 pruebas: 70 unitarias y 66 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, compras, recepciones, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 141 pruebas: 70 unitarias y 71 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, compras, recepciones, transferencias, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
 
-Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; recepciones parciales e idempotentes; competencia concurrente por cantidades pendientes; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios y costos históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
+Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; recepciones parciales e idempotentes; transferencias competitivas y contra stock reservado; conservación origen-tránsito-destino; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios y costos históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 
 El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta pruebas, SpotBugs con severidad media, escaneo de vulnerabilidades de las dependencias de producción y detección de secretos en cada `push` y `pull_request`. La acción de Trivy está fijada por SHA para evitar cambios de código no revisados en la cadena de suministro.
 
@@ -472,6 +508,7 @@ src/main/java/com/example/inventory/
 ├── security/      JWT, CORS y autorización
 ├── shared/        Excepciones, errores y paginación
 ├── suppliers/     Proveedores y asociaciones de abastecimiento
+├── transfers/     Transferencias, tránsito e idempotencia entre almacenes
 └── users/         Cuentas, roles y bootstrap
 
 src/main/resources/

@@ -263,6 +263,63 @@ class InventoryService implements InventoryOperations {
                 balanceBefore, 0, reserved, reserved, receiptId.toString(), actor);
     }
 
+    @Override
+    @Transactional
+    public void transferOut(UUID warehouseId, UUID productId, int quantity,
+                            UUID transferId, String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
+        requirePositive(quantity);
+        requireTransfer(transferId);
+        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
+        int balanceBefore = item.getQuantity();
+        int reserved = reservedQuantity(warehouseId, productId);
+        if (quantity > item.getQuantity() - (long) reserved) {
+            throw new BadRequestException(
+                    "Insufficient available inventory for transfer");
+        }
+        try {
+            item.changeQuantity(-quantity);
+        } catch (IllegalArgumentException exception) {
+            throw insufficientStock(productId);
+        }
+        recordMovement(item, StockMovementType.TRANSFER_OUT, -quantity,
+                balanceBefore, 0, reserved, reserved, transferId.toString(), actor);
+    }
+
+    @Override
+    @Transactional
+    public void transferIn(UUID warehouseId, UUID productId, int quantity,
+                           UUID transferId, String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
+        requirePositive(quantity);
+        requireTransfer(transferId);
+        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
+        int balanceBefore = item.getQuantity();
+        int reserved = reservedQuantity(warehouseId, productId);
+        try {
+            item.changeQuantity(quantity);
+        } catch (IllegalArgumentException exception) {
+            throw new ConflictException(exception.getMessage());
+        }
+        recordMovement(item, StockMovementType.TRANSFER_IN, quantity,
+                balanceBefore, 0, reserved, reserved, transferId.toString(), actor);
+    }
+
+    private void lockActiveStoredWarehouseProduct(UUID warehouseId, UUID productId) {
+        warehouses.lockActiveWarehouse(warehouseId);
+        productCatalog.requireStoredProduct(productId);
+    }
+
+    private void requireTransfer(UUID transferId) {
+        if (transferId == null) {
+            throw new IllegalArgumentException("The inventory transfer is required");
+        }
+    }
+
     private void requirePositive(int quantity) {
         if (quantity <= 0) throw new BadRequestException("Quantity must be greater than zero");
     }
