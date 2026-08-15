@@ -375,6 +375,12 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(ACCESS_CONTROL_ALLOW_ORIGIN, "https://allowed.example"));
         mockMvc.perform(options("/api/v1/products")
+                        .header("Origin", "http://localhost:4200")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:4200"));
+        mockMvc.perform(options("/api/v1/products")
                         .header("Origin", "https://evil.example")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isForbidden())

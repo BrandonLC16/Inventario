@@ -508,8 +508,8 @@ En producción usa un gestor de secretos. CORS no admite credenciales ni el como
 La política es explícita por ambiente:
 
 - Predeterminado, staging y producción: cierre seguro; define `CORS_ALLOWED_ORIGINS` con los orígenes HTTPS exactos de ese ambiente, separados por comas. No se configura un origen de producción en el repositorio.
-- Local: activa `SPRING_PROFILES_ACTIVE=local`; `application-local.yml` admite por defecto `http://localhost:3000` y `http://localhost:5173`, reemplazables mediante `CORS_ALLOWED_ORIGINS`.
-- Pruebas: Testcontainers configura únicamente `https://allowed.example`.
+- Local: activa `SPRING_PROFILES_ACTIVE=local`; `application-local.yml` admite por defecto `http://localhost:3000`, `http://localhost:4200` (Angular CLI) y `http://localhost:5173`, reemplazables mediante `CORS_ALLOWED_ORIGINS`.
+- Pruebas: Testcontainers valida `https://allowed.example` y el origen local de Angular CLI.
 
 ## Pruebas
 

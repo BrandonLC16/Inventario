@@ -50,6 +50,7 @@ abstract class AbstractIntegrationTest {
         registry.add("inventory.security.jwt.issuer", () -> "inventory-integration");
         registry.add("inventory.security.jwt.audience", () -> "inventory-integration-clients");
         registry.add("inventory.security.cors.allowed-origins[0]", () -> "https://allowed.example");
+        registry.add("inventory.security.cors.allowed-origins[1]", () -> "http://localhost:4200");
         registry.add("springdoc.swagger-ui.enabled", () -> false);
     }
 
