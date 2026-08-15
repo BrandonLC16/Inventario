@@ -191,13 +191,14 @@ class StockMovementIntegrationTest extends AbstractIntegrationTest {
     void returnsHistoricalMovementsAfterProductIsSoftDeleted() throws Exception {
         UUID productId = createProduct("KARDEX-DELETED");
         adjust(productId, 7, managerToken);
+        adjust(productId, -7, managerToken);
         mockMvc.perform(delete("/api/v1/products/{id}", productId)
                         .header(AUTHORIZATION, "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(movements(productId, managerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.content[0].productId")
                         .value(productId.toString()));
         mockMvc.perform(movements(UUID.randomUUID(), managerToken))

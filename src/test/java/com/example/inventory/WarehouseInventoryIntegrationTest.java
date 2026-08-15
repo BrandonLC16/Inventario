@@ -95,6 +95,33 @@ class WarehouseInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void concurrentProductAndWarehouseCreationAlwaysCreatesTheirSetting() throws Exception {
+        CyclicBarrier barrier = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<UUID> warehouse = executor.submit(() -> {
+                barrier.await(10, TimeUnit.SECONDS);
+                return createWarehouse("CONCURRENT-CATALOG");
+            });
+            Future<UUID> product = executor.submit(() -> {
+                barrier.await(10, TimeUnit.SECONDS);
+                return createProduct("CONCURRENT-CATALOG", 0);
+            });
+
+            UUID warehouseId = awaitValue(warehouse);
+            UUID productId = awaitValue(product);
+            Integer settings = jdbcTemplate.queryForObject("""
+                    SELECT count(*) FROM warehouse_product_settings
+                    WHERE warehouse_id = ? AND product_id = ?
+                    """, Integer.class, warehouseId, productId);
+
+            assertEquals(1, settings);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void productSettingsCanBeListedAndReadEvenWhenInactive() throws Exception {
         UUID warehouse = createWarehouse("SETTINGS-READ");
         UUID activeProduct = createProduct("SETTINGS-ACTIVE", 0);
@@ -373,6 +400,14 @@ class WarehouseInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private int await(Future<Integer> future) {
+        try {
+            return future.get(15, TimeUnit.SECONDS);
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private <T> T awaitValue(Future<T> future) {
         try {
             return future.get(15, TimeUnit.SECONDS);
         } catch (Exception exception) {

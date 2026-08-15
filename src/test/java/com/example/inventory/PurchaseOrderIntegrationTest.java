@@ -94,6 +94,8 @@ class PurchaseOrderIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.externalReference")
                         .value("SUPPLIER-DOC-1"))
+                .andExpect(jsonPath("$.updateSupplierProductLastCost")
+                        .value(true))
                 .andExpect(jsonPath("$.items[0].unitCost").value(12.5))
                 .andReturn().getResponse().getContentAsString();
         UUID firstReceiptId = UUID.fromString(
@@ -115,6 +117,31 @@ class PurchaseOrderIntegrationTest extends AbstractIntegrationTest {
                         .content(firstReceipt))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(firstReceiptId.toString()));
+        assertEquals(2, stock(productId));
+        assertEquals(1, purchaseMovementCount(firstReceiptId));
+
+        jdbcTemplate.update("""
+                UPDATE purchase_receipts
+                SET update_supplier_product_last_cost = NULL
+                WHERE id = ?
+                """, firstReceiptId);
+        performManager(post("/api/v1/purchase-orders/{id}/receipts", orderId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(firstReceipt))
+                .andExpect(status().isConflict());
+        jdbcTemplate.update("""
+                UPDATE purchase_receipts
+                SET update_supplier_product_last_cost = TRUE
+                WHERE id = ?
+                """, firstReceiptId);
+
+        performManager(post("/api/v1/purchase-orders/{id}/receipts", orderId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(receiptJson("SUPPLIER-DOC-1", false,
+                                new ReceiptLine(itemId, 2, "12.5000"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(
+                        "External reference SUPPLIER-DOC-1 was already used with different receipt content"));
         assertEquals(2, stock(productId));
         assertEquals(1, purchaseMovementCount(firstReceiptId));
 

@@ -128,7 +128,9 @@ El servidor persiste únicamente el hash SHA-256 del refresh token aleatorio, nu
 
 Los fallos de login, los usuarios inexistentes, deshabilitados o bloqueados y los refresh tokens inválidos al renovar usan la misma respuesta genérica `401`. Un refresh token rotado o revocado no puede reutilizarse. El logout revoca toda su familia y es idempotente: un token desconocido también recibe `204`.
 
-`login` y `refresh` limitan intentos por cliente y por huella SHA-256 de la credencial, sin conservar identificadores ni tokens en claro. El valor predeterminado permite 5 intentos por credencial y 100 por cliente en una ventana de un minuto; al excederlo responde `429`, código `RATE_LIMIT_EXCEEDED` y cabecera `Retry-After`. El almacenamiento es acotado y local a cada instancia; en despliegues con varias réplicas se debe complementar con un límite distribuido en el gateway.
+`login`, `refresh` y `logout` limitan intentos por cliente y por huella SHA-256 de la credencial, sin conservar identificadores ni tokens en claro. La huella de credencial es global y no incluye la IP, por lo que cambiar de origen no reinicia su contador. El valor predeterminado permite 5 intentos por credencial y 100 por cliente en una ventana de un minuto; al excederlo responde `429`, código `RATE_LIMIT_EXCEEDED` y cabecera `Retry-After`. Los contadores y ventanas se actualizan atómicamente en PostgreSQL y se comparten entre réplicas; las ventanas vencidas dejan de contar inmediatamente y sus filas se limpian periódicamente.
+
+Sin proxies confiables configurados se usa exclusivamente la dirección TCP del peer y se ignora `X-Forwarded-For`. Detrás de un gateway, `AUTH_TRUSTED_PROXIES` debe contener sus IP o redes CIDR; sólo entonces se recorre la cadena de derecha a izquierda hasta encontrar el cliente no confiable más cercano. El gateway debe anexar o reemplazar correctamente esa cabecera y mantener su propio límite perimetral como defensa adicional.
 
 Cada access token incluye una versión de seguridad que se contrasta con PostgreSQL en todas las peticiones autenticadas. El logout revoca su familia refresh e invalida inmediatamente los access tokens anteriores; repetirlo no invalida tokens nuevos. Bloquear, deshabilitar, cambiar roles o cambiar/restablecer la contraseña incrementa esa versión y revoca todas las familias refresh activas del usuario dentro de la misma transacción. La revocación administrativa de sesiones aplica la misma regla sin cambiar la contraseña.
 
@@ -152,6 +154,8 @@ Para cambiar la contraseña propia envía `{"currentPassword":"<ACTUAL>","newPas
 | Administrar usuarios y roles | Sí | No | No |
 | Acceder a OpenAPI/Swagger habilitado | Sí | No | No |
 
+La autorización HTTP es cerrada por defecto: toda ruta debe incorporarse explícitamente a esta matriz. Una ruta nueva sin regla recibe `403` incluso con un token válido.
+
 ## Productos e inventario
 
 Todos estos endpoints requieren un access token.
@@ -162,7 +166,7 @@ Todos estos endpoints requieren un access token.
 | `GET` | `/api/v1/products/{id}` | Autenticado | Consulta un producto no eliminado |
 | `POST` | `/api/v1/products` | `ADMIN`, `INVENTORY_MANAGER` | Crea un producto |
 | `PUT` | `/api/v1/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Reemplaza los campos editables |
-| `DELETE` | `/api/v1/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Elimina lógicamente; responde `204` |
+| `DELETE` | `/api/v1/products/{id}` | `ADMIN`, `INVENTORY_MANAGER` | Elimina lógicamente sólo si no hay existencias, reservas ni documentos pendientes; responde `204` |
 | `GET` | `/api/v1/inventory` | Autenticado | Lista paginada de existencias de todos los productos no eliminados |
 | `GET` | `/api/v1/inventory/{productId}` | Autenticado | Consulta las existencias |
 | `GET` | `/api/v1/inventory/movements` | `ADMIN`, `INVENTORY_MANAGER` | Lista paginada de movimientos de todos los productos |
@@ -203,6 +207,12 @@ el mínimo ni la activación de ningún almacén; esos valores se cambian median
 endpoint de `settings` del almacén.
 
 El SKU se recorta y guarda en mayúsculas. Su unicidad no distingue mayúsculas y el SKU de un producto eliminado continúa reservado.
+
+### Ciclo de vida de un producto
+
+`active=false` representa una suspensión reversible. El producto continúa visible en el catálogo, los balances y la configuración de almacenes para que sus existencias físicas no queden ocultas, pero no admite nuevas ventas, compras, transferencias, ajustes ni conteos físicos. Las operaciones compensatorias de ventas ya confirmadas —como cancelar y restaurar existencias— sí pueden terminar para conservar la integridad contable.
+
+`deleted=true` representa una baja lógica terminal: también fuerza `active=false` y oculta el producto de las vistas operativas, aunque conserva el registro y su kardex histórico. La baja se rechaza con `409` mientras exista stock físico, una reserva o un documento pendiente que todavía pueda mover inventario: pedidos `PENDING`, `RESERVED` o `CONFIRMED`; compras `DRAFT`, `ISSUED` o `PARTIALLY_RECEIVED`; transferencias `DRAFT` o `IN_TRANSIT`; y conteos `DRAFT`, `OPEN` o `SUBMITTED`. Primero debe cerrarse el documento y llevarse el saldo a cero.
 
 Para ajustar inventario envía `{"quantityDelta":10,"reference":"PURCHASE-RECEIPT-42"}`. El valor debe ser distinto de cero: uno positivo registra una entrada y uno negativo una salida. `reference` es opcional, admite hasta 128 caracteres y permite identificar una compra, recepción u otra operación. Una salida responde `400` si consume unidades reservadas o deja el saldo físico negativo.
 
@@ -288,7 +298,7 @@ La reserva crea una fila por pedido y producto, conserva intacta la existencia f
 
 Editar un `RESERVED` libera todos sus artículos y lo devuelve a `PENDING` antes de reemplazarlos y recapturar precios; cualquier fallo posterior revierte también la liberación. Eliminar un reservado aplica la misma liberación transaccional.
 
-La confirmación elimina cada reserva y registra en un único `ORDER_CONFIRMED` tanto el descenso físico como el descenso reservado, por lo que no descuenta dos veces. La cancelación restaura existencia física una sola vez mediante `ORDER_CANCELLED`. `ORDER_RESERVED` y `ORDER_RESERVATION_RELEASED` auditan reservas/liberaciones con referencia al pedido y UUID del actor. La cancelación sigue funcionando aunque un producto haya sido eliminado lógicamente.
+La confirmación elimina cada reserva y registra en un único `ORDER_CONFIRMED` tanto el descenso físico como el descenso reservado, por lo que no descuenta dos veces. La cancelación restaura existencia física una sola vez mediante `ORDER_CANCELLED`. `ORDER_RESERVED` y `ORDER_RESERVATION_RELEASED` auditan reservas/liberaciones con referencia al pedido y UUID del actor. La cancelación sigue funcionando si el producto fue desactivado; el producto no puede eliminarse mientras exista un pedido confirmado pendiente de esa compensación.
 
 ## Compras y recepciones
 
@@ -338,7 +348,7 @@ Para recibir se envía una referencia externa obligatoria y artículos identific
 }
 ```
 
-La primera recepción responde `201`; repetir la misma referencia y contenido devuelve la recepción existente con `200`, sin duplicar existencia ni movimientos. Reutilizar la referencia con otro contenido responde `409`. No se puede recibir más de lo pendiente ni cancelar una orden que ya tenga recepciones.
+La primera recepción responde `201`; repetir la misma referencia, artículos, cantidades, costos y valor de `updateSupplierProductLastCost` devuelve la recepción existente con `200`, sin duplicar existencia, movimientos ni actualizaciones de costo. Cambiar cualquiera de esos datos responde `409`. Las recepciones creadas antes de la migración V16 conservan la bandera como desconocida y sus reintentos se rechazan de forma segura. No se puede recibir más de lo pendiente ni cancelar una orden que ya tenga recepciones.
 
 La recepción bloquea la orden, sus artículos y los inventarios en orden de UUID de producto. En una sola transacción crea la recepción, incrementa el almacén destino, registra `PURCHASE_RECEIVED`, actualiza cantidades y estado y, cuando se solicita, actualiza `lastUnitCost` de una asociación proveedor-producto existente. Un fallo revierte todos esos efectos.
 
@@ -402,6 +412,8 @@ Un conteo selectivo usa `scope: "SELECTED"` y una lista de productos; uno comple
   "productIds": ["<PRODUCT_ID>"]
 }
 ```
+
+Todo conteo está limitado a 1,000 productos. Para `FULL` la consulta obtiene como máximo 1,001 identificadores: si detecta el exceso responde `409` antes de crear líneas o iniciar los bloqueos; el inventario debe dividirse en conteos `SELECTED` de hasta 1,000 productos. La apertura, envío y publicación también rechazan documentos históricos que excedan ese límite.
 
 El ciclo es `DRAFT → OPEN → SUBMITTED → POSTED`; cualquier estado no publicado puede pasar a `CANCELLED`. No puede existir más de un conteo activo para el mismo almacén y producto, incluso ante creaciones concurrentes. `OPEN` es el único estado que acepta cantidades y todas deben ser no negativas; `SUBMITTED` exige que cada línea haya sido capturada.
 
@@ -475,10 +487,11 @@ El contrato se genera de forma reproducible desde los controllers durante `verif
 | `JWT_AUDIENCE` | `inventory-clients` | Claim `aud` |
 | `JWT_ACCESS_TOKEN_TTL` | `15m` | TTL de access; entre 1 minuto y 1 hora |
 | `JWT_REFRESH_TOKEN_TTL` | `14d` | TTL de refresh; entre 1 hora y 90 días |
-| `AUTH_RATE_LIMIT_PER_CREDENTIAL` | `5` | Intentos de login o refresh por credencial y ventana |
-| `AUTH_RATE_LIMIT_PER_CLIENT` | `100` | Intentos totales por cliente y ventana |
+| `AUTH_RATE_LIMIT_PER_CREDENTIAL` | `5` | Intentos de login, refresh o logout por credencial y ventana |
+| `AUTH_RATE_LIMIT_PER_CLIENT` | `100` | Intentos totales de autenticación por cliente y ventana |
 | `AUTH_RATE_LIMIT_WINDOW` | `1m` | Ventana entre 1 segundo y 1 hora |
-| `AUTH_RATE_LIMIT_MAX_TRACKED_KEYS` | `10000` | Límite de contadores en memoria |
+| `AUTH_RATE_LIMIT_MAX_TRACKED_KEYS` | `10000` | Máximo de contadores activos compartidos; al agotarse se rechazan claves nuevas |
+| `AUTH_TRUSTED_PROXIES` | Lista vacía | IP o CIDR de proxies confiables, separados por comas, autorizados a aportar `X-Forwarded-For` |
 | `CORS_ALLOWED_ORIGINS` | Lista vacía | Orígenes separados por comas |
 | `SWAGGER_ENABLED` | `false` | Habilita Swagger para `ADMIN` |
 | `BOOTSTRAP_ADMIN_ENABLED` | `false` | Habilita el administrador inicial |
@@ -512,7 +525,7 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 147 pruebas: 70 unitarias y 77 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, compras, recepciones, transferencias, conteos físicos, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
+La suite combina pruebas unitarias y de integración sobre PostgreSQL. Cubre productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, compras, recepciones, transferencias, conteos físicos, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
 
 Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; recepciones parciales e idempotentes; transferencias competitivas y contra stock reservado; conservación origen-tránsito-destino; conteos físicos concurrentes, no bloqueantes, idempotentes y compatibles con reservas; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios y costos históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 

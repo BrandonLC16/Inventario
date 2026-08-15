@@ -138,18 +138,58 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void productWithStockMovementsCanBeDeletedWithoutLosingHistory() throws Exception {
+    void inactiveProductRemainsVisibleButRejectsNewOperations() throws Exception {
+        String location = createProduct("INACTIVE-1", "Inactive product");
+        UUID productId = idFromLocation(location);
+
+        performAuthenticated(put(location)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(productJson("INACTIVE-1", "Inactive product", "99.90", false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+
+        performAuthenticated(get(location))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+        performAuthenticated(get("/api/v1/inventory/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(0));
+        adjust(productId, 1)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Product %s is inactive".formatted(productId)));
+        performAuthenticated(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":"%s","quantity":1}]}
+                                """.formatted(productId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Product %s is inactive".formatted(productId)));
+    }
+
+    @Test
+    void productCanOnlyBeDeletedAfterRemovingPhysicalInventoryWithoutLosingHistory() throws Exception {
         String location = createProduct("DELETE-1", "Deleted product");
         UUID productId = idFromLocation(location);
         adjust(productId, 5).andExpect(status().isOk());
 
+        performAuthenticated(delete(location))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("A product with physical inventory cannot be deleted"));
+        performAuthenticated(get("/api/v1/inventory/{id}", productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(5));
+
+        adjust(productId, -5).andExpect(status().isOk());
         performAuthenticated(delete(location)).andExpect(status().isNoContent());
         performAuthenticated(get(location)).andExpect(status().isNotFound());
 
         Integer movements = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM stock_movements WHERE product_id = ?",
                 Integer.class, productId);
-        org.junit.jupiter.api.Assertions.assertEquals(1, movements);
+        org.junit.jupiter.api.Assertions.assertEquals(2, movements);
     }
 
     @Test
@@ -185,8 +225,12 @@ class ProductInventoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String productJson(String sku, String name, String price) {
+        return productJson(sku, name, price, true);
+    }
+
+    private String productJson(String sku, String name, String price, boolean active) {
         return """
-                {"sku":"%s", "name":"%s", "description":"Test product", "price":%s, "active":true}
-                """.formatted(sku, name, price);
+                {"sku":"%s", "name":"%s", "description":"Test product", "price":%s, "active":%s}
+                """.formatted(sku, name, price, active);
     }
 }

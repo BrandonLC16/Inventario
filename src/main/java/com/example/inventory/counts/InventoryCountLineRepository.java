@@ -20,6 +20,10 @@ interface InventoryCountLineRepository
     List<InventoryCountLine> findByCountIdForUpdate(
             @Param("countId") UUID countId);
 
+    @Query("select count(line) from InventoryCountLine line "
+            + "where line.inventoryCount.id = :countId")
+    long countByCountId(@Param("countId") UUID countId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select line from InventoryCountLine line "
             + "where line.inventoryCount.id = :countId "

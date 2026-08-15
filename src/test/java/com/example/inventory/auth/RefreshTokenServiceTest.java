@@ -3,6 +3,7 @@ package com.example.inventory.auth;
 import com.example.inventory.security.SecurityProperties;
 import com.example.inventory.users.RoleName;
 import com.example.inventory.users.UserAccount;
+import com.example.inventory.users.UserAccountRepository;
 import com.example.inventory.users.UserTestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,19 +39,23 @@ class RefreshTokenServiceTest {
     private static final Duration TTL = Duration.ofDays(7);
 
     private RefreshTokenRepository repository;
+    private UserAccountRepository users;
     private RefreshTokenService service;
     private UserAccount user;
 
     @BeforeEach
     void setUp() {
         repository = mock(RefreshTokenRepository.class);
+        users = mock(UserAccountRepository.class);
         SecurityProperties properties = new SecurityProperties(
                 new SecurityProperties.Jwt("issuer", "audience", Duration.ofMinutes(5), "", ""),
                 TTL, new SecurityProperties.Cors(List.of()), false,
                 new SecurityProperties.BootstrapAdmin(false, "", "", ""));
-        service = new RefreshTokenService(repository, properties, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new RefreshTokenService(
+                repository, users, properties, Clock.fixed(NOW, ZoneOffset.UTC));
         user = UserTestFixtures.user("sales", "sales@example.com", "{noop}hidden",
                 true, false, RoleName.SALES);
+        when(users.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
         when(repository.saveAndFlush(any(RefreshToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
@@ -76,6 +81,7 @@ class RefreshTokenServiceTest {
         RefreshToken current = new RefreshToken(user, familyId,
                 RefreshTokenService.hash("old-refresh"), NOW.plusSeconds(600));
         RefreshToken replacement = new RefreshToken(user, familyId, new byte[32], NOW.plus(TTL));
+        tokenBelongsTo(user);
         when(repository.findByTokenHashForUpdate(any(byte[].class)))
                 .thenReturn(Optional.of(current), Optional.of(replacement));
 
@@ -93,6 +99,7 @@ class RefreshTokenServiceTest {
     void expiredTokenIsRevokedAndRejected() {
         RefreshToken expired = new RefreshToken(user, UUID.randomUUID(),
                 RefreshTokenService.hash("expired"), NOW);
+        tokenBelongsTo(user);
         when(repository.findByTokenHashForUpdate(any(byte[].class))).thenReturn(Optional.of(expired));
 
         assertThrows(InvalidAuthenticationException.class, () -> service.rotate("expired"));
@@ -109,6 +116,7 @@ class RefreshTokenServiceTest {
         RefreshToken revoked = new RefreshToken(user, familyId,
                 RefreshTokenService.hash("used"), NOW.plusSeconds(600));
         revoked.revoke(NOW.minusSeconds(30), null);
+        tokenBelongsTo(user);
         when(repository.findByTokenHashForUpdate(any(byte[].class))).thenReturn(Optional.of(revoked));
 
         assertThrows(InvalidAuthenticationException.class, () -> service.rotate("used"));
@@ -124,6 +132,7 @@ class RefreshTokenServiceTest {
         UUID familyId = UUID.randomUUID();
         RefreshToken token = new RefreshToken(disabled, familyId,
                 RefreshTokenService.hash("disabled-token"), NOW.plusSeconds(600));
+        tokenBelongsTo(disabled);
         when(repository.findByTokenHashForUpdate(any(byte[].class))).thenReturn(Optional.of(token));
 
         assertThrows(InvalidAuthenticationException.class, () -> service.rotate("disabled-token"));
@@ -136,8 +145,9 @@ class RefreshTokenServiceTest {
         UUID familyId = UUID.randomUUID();
         RefreshToken token = new RefreshToken(user, familyId,
                 RefreshTokenService.hash("logout-token"), NOW.plusSeconds(600));
-        when(repository.findByTokenHashForUpdate(any(byte[].class)))
-                .thenReturn(Optional.of(token), Optional.empty());
+        when(repository.findUserIdByTokenHash(any(byte[].class)))
+                .thenReturn(Optional.of(user.getId()), Optional.empty());
+        when(repository.findByTokenHashForUpdate(any(byte[].class))).thenReturn(Optional.of(token));
         when(repository.revokeActiveFamily(familyId, NOW)).thenReturn(1);
 
         service.logout("logout-token");
@@ -146,8 +156,25 @@ class RefreshTokenServiceTest {
         verify(repository).revokeActiveFamily(familyId, NOW);
         assertEquals(1L, user.getAccessTokenVersion());
         ArgumentCaptor<byte[]> hash = ArgumentCaptor.forClass(byte[].class);
-        verify(repository, org.mockito.Mockito.times(2)).findByTokenHashForUpdate(hash.capture());
+        verify(repository, org.mockito.Mockito.times(2)).findUserIdByTokenHash(hash.capture());
         assertArrayEquals(RefreshTokenService.hash("logout-token"), hash.getAllValues().get(0));
         assertArrayEquals(RefreshTokenService.hash("unknown-token"), hash.getAllValues().get(1));
+    }
+
+    @Test
+    void revokeAllLocksTheUserBeforeInvalidatingEverySession() {
+        service.revokeAll(user);
+
+        var inOrder = org.mockito.Mockito.inOrder(users, repository);
+        inOrder.verify(users).findByIdForUpdate(user.getId());
+        inOrder.verify(repository).revokeAllActiveByUserId(user.getId(), NOW);
+        assertEquals(1L, user.getAccessTokenVersion());
+    }
+
+    private void tokenBelongsTo(UserAccount account) {
+        when(repository.findUserIdByTokenHash(any(byte[].class)))
+                .thenReturn(Optional.of(account.getId()));
+        when(users.findByIdForUpdate(account.getId())).thenReturn(Optional.of(account));
+        when(users.findByIdWithRoles(account.getId())).thenReturn(Optional.of(account));
     }
 }

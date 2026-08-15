@@ -1,7 +1,9 @@
 package com.example.inventory.users;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.repository.query.Param;
@@ -22,6 +24,17 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID>,
     @Query("select distinct account from UserAccount account left join fetch account.roles "
             + "where account.id = :id")
     Optional<UserAccount> findByIdWithRoles(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select account from UserAccount account where account.id = :id")
+    Optional<UserAccount> findByIdForUpdate(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select account from UserAccount account
+            where account.username = :identifier or account.email = :identifier
+            """)
+    Optional<UserAccount> findByIdentifierForUpdate(@Param("identifier") String identifier);
 
     @EntityGraph(attributePaths = "roles")
     List<UserAccount> findAllByOrderByUsernameAsc();

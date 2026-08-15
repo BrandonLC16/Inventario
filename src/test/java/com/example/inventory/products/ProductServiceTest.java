@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -90,6 +91,10 @@ class ProductServiceTest {
         assertEquals("Keyboard", response.name());
         assertEquals("Compact", response.description());
         verify(repository).saveAndFlush(any(Product.class));
+        var order = inOrder(warehouses, repository);
+        order.verify(warehouses).lockCatalogRegistration();
+        order.verify(repository).existsBySkuIgnoreCase("SKU-1");
+        order.verify(repository).saveAndFlush(any(Product.class));
     }
 
     @Test
@@ -140,7 +145,8 @@ class ProductServiceTest {
     void updateNormalizesFieldsAndExcludesCurrentProductFromSkuCheck() {
         Product product = product("OLD", "Old name");
         ProductRequest request = request(" new-sku ", " New name ", " New description ");
-        when(repository.findByIdAndDeletedFalse(product.getId())).thenReturn(Optional.of(product));
+        when(repository.findByIdAndDeletedFalseForUpdate(product.getId()))
+                .thenReturn(Optional.of(product));
         when(repository.existsBySkuIgnoreCaseAndIdNot("NEW-SKU", product.getId())).thenReturn(false);
 
         ProductResponse response = service().update(product.getId(), request);
@@ -156,7 +162,8 @@ class ProductServiceTest {
     void updateRejectsDuplicateSkuWithoutChangingProduct() {
         Product product = product("ORIGINAL", "Original name");
         ProductRequest request = request("TAKEN", "Changed", null);
-        when(repository.findByIdAndDeletedFalse(product.getId())).thenReturn(Optional.of(product));
+        when(repository.findByIdAndDeletedFalseForUpdate(product.getId()))
+                .thenReturn(Optional.of(product));
         when(repository.existsBySkuIgnoreCaseAndIdNot("TAKEN", product.getId())).thenReturn(true);
 
         assertThrows(ConflictException.class, () -> service().update(product.getId(), request));
@@ -169,7 +176,7 @@ class ProductServiceTest {
     @Test
     void updateRejectsMissingProductBeforeCheckingSku() {
         UUID productId = UUID.randomUUID();
-        when(repository.findByIdAndDeletedFalse(productId)).thenReturn(Optional.empty());
+        when(repository.findByIdAndDeletedFalseForUpdate(productId)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
                 () -> service().update(productId, request("SKU", "Name", null)));
@@ -180,18 +187,36 @@ class ProductServiceTest {
     @Test
     void deleteMarksExistingProductAsDeleted() {
         Product product = spy(product("SKU-1", "Product"));
-        when(repository.findByIdAndDeletedFalse(product.getId())).thenReturn(Optional.of(product));
+        UUID productId = product.getId();
+        when(repository.findByIdAndDeletedFalseForUpdate(productId))
+                .thenReturn(Optional.of(product));
 
-        service().delete(product.getId());
+        service().delete(productId);
 
         verify(product).markDeleted();
+        assertFalse(product.isActive());
+        verify(warehouses).ensureProductCanBeDeleted(productId);
         verify(repository, never()).delete(any(Product.class));
+    }
+
+    @Test
+    void deleteRejectsProductWithInventoryWithoutMarkingItDeleted() {
+        Product product = spy(product("SKU-STOCK", "Product with stock"));
+        UUID productId = product.getId();
+        when(repository.findByIdAndDeletedFalseForUpdate(productId))
+                .thenReturn(Optional.of(product));
+        doThrow(new ConflictException("stock"))
+                .when(warehouses).ensureProductCanBeDeleted(productId);
+
+        assertThrows(ConflictException.class, () -> service().delete(productId));
+
+        verify(product, never()).markDeleted();
     }
 
     @Test
     void deleteRejectsMissingProduct() {
         UUID productId = UUID.randomUUID();
-        when(repository.findByIdAndDeletedFalse(productId)).thenReturn(Optional.empty());
+        when(repository.findByIdAndDeletedFalseForUpdate(productId)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class, () -> service().delete(productId));
 
@@ -200,12 +225,40 @@ class ProductServiceTest {
 
     @Test
     void requireProductAcceptsExistingNonDeletedProduct() {
-        UUID productId = UUID.randomUUID();
-        when(repository.existsByIdAndDeletedFalse(productId)).thenReturn(true);
+        Product product = product("ACTIVE", "Active product");
+        when(repository.findByIdAndDeletedFalseForUpdate(product.getId()))
+                .thenReturn(Optional.of(product));
 
-        service().requireProduct(productId);
+        service().requireProduct(product.getId());
 
-        verify(repository).existsByIdAndDeletedFalse(productId);
+        verify(repository).findByIdAndDeletedFalseForUpdate(product.getId());
+    }
+
+    @Test
+    void requireProductRejectsInactiveProduct() {
+        Product product = new Product("INACTIVE", "Inactive product", null,
+                new BigDecimal("10.00"), false);
+        when(repository.findByIdAndDeletedFalseForUpdate(product.getId()))
+                .thenReturn(Optional.of(product));
+
+        ConflictException error = assertThrows(
+                ConflictException.class, () -> service().requireProduct(product.getId()));
+
+        assertEquals("Product %s is inactive".formatted(product.getId()), error.getMessage());
+    }
+
+    @Test
+    void requireProductSnapshotRejectsInactiveProduct() {
+        Product product = new Product("INACTIVE-SNAPSHOT", "Inactive product", null,
+                new BigDecimal("10.00"), false);
+        when(repository.findByIdAndDeletedFalseForUpdate(product.getId()))
+                .thenReturn(Optional.of(product));
+
+        ConflictException error = assertThrows(
+                ConflictException.class,
+                () -> service().requireProductSnapshot(product.getId()));
+
+        assertEquals("Product %s is inactive".formatted(product.getId()), error.getMessage());
     }
 
     @Test
@@ -222,12 +275,22 @@ class ProductServiceTest {
     void requireProductPropagatesPersistenceError() {
         UUID productId = UUID.randomUUID();
         RuntimeException failure = new RuntimeException("database unavailable");
-        when(repository.existsByIdAndDeletedFalse(productId)).thenThrow(failure);
+        when(repository.findByIdAndDeletedFalseForUpdate(productId)).thenThrow(failure);
 
         RuntimeException thrown = assertThrows(
                 RuntimeException.class, () -> service().requireProduct(productId));
 
         assertSame(failure, thrown);
+    }
+
+    @Test
+    void requireVisibleProductAcceptsInactiveNonDeletedProduct() {
+        UUID productId = UUID.randomUUID();
+        when(repository.existsByIdAndDeletedFalse(productId)).thenReturn(true);
+
+        service().requireVisibleProduct(productId);
+
+        verify(repository).existsByIdAndDeletedFalse(productId);
     }
 
     @Test

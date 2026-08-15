@@ -28,7 +28,7 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class InventoryCountService {
 
-    private static final int MAX_SELECTED_PRODUCTS = 1000;
+    private static final int MAX_PRODUCTS_PER_COUNT = 1000;
 
     private final InventoryCountRepository counts;
     private final InventoryCountLineRepository countLines;
@@ -93,6 +93,7 @@ public class InventoryCountService {
             throw new ConflictException(
                     "Only a draft inventory count can be opened");
         }
+        ensureCountIsBounded(id);
         List<InventoryCountLine> lines = countLines
                 .findByCountIdForUpdate(id);
         if (lines.isEmpty()) {
@@ -153,6 +154,7 @@ public class InventoryCountService {
             throw new ConflictException(
                     "Only an open inventory count can be submitted");
         }
+        ensureCountIsBounded(id);
         List<InventoryCountLine> lines = countLines
                 .findByCountIdForUpdate(id);
         if (lines.isEmpty() || lines.stream().anyMatch(
@@ -168,8 +170,6 @@ public class InventoryCountService {
     @Transactional
     public InventoryCountResponse post(UUID id, String responsibleUser) {
         InventoryCount inventoryCount = requireForUpdate(id);
-        List<InventoryCountLine> lines = countLines
-                .findByCountIdForUpdate(id);
         if (inventoryCount.getStatus() == InventoryCountStatus.POSTED) {
             return InventoryCountResponse.from(inventoryCount);
         }
@@ -177,6 +177,9 @@ public class InventoryCountService {
             throw new ConflictException(
                     "Only a submitted inventory count can be posted");
         }
+        ensureCountIsBounded(id);
+        List<InventoryCountLine> lines = countLines
+                .findByCountIdForUpdate(id);
         warehouses.lockActiveWarehouse(inventoryCount.getWarehouseId());
         String actor = requireActor(responsibleUser);
         for (InventoryCountLine line : lines) {
@@ -218,18 +221,23 @@ public class InventoryCountService {
                         "A full inventory count must not specify products");
             }
             List<UUID> allProductIds = warehouses
-                    .productIdsForPhysicalCount(request.warehouseId());
+                    .productIdsForPhysicalCount(request.warehouseId(),
+                            MAX_PRODUCTS_PER_COUNT + 1);
             if (allProductIds.isEmpty()) {
                 throw new BadRequestException(
                         "The warehouse has no products to count");
             }
-            return allProductIds.stream().sorted().toList();
+            if (allProductIds.size() > MAX_PRODUCTS_PER_COUNT) {
+                throw new ConflictException(
+                        "A full inventory count cannot contain more than 1000 products; use selected inventory counts");
+            }
+            return List.copyOf(allProductIds);
         }
         if (requestedIds.isEmpty()) {
             throw new BadRequestException(
                     "A selected inventory count requires at least one product");
         }
-        if (requestedIds.size() > MAX_SELECTED_PRODUCTS) {
+        if (requestedIds.size() > MAX_PRODUCTS_PER_COUNT) {
             throw new BadRequestException(
                     "An inventory count cannot contain more than 1000 selected products");
         }
@@ -244,6 +252,7 @@ public class InventoryCountService {
                         "An inventory count must not contain duplicate products");
             }
             products.requireProduct(productId);
+            warehouses.requireActiveProduct(request.warehouseId(), productId);
         }
         return uniqueIds.stream().sorted(Comparator.naturalOrder()).toList();
     }
@@ -276,6 +285,13 @@ public class InventoryCountService {
     private InventoryCount requireForUpdate(UUID id) {
         return counts.findByIdForUpdate(id)
                 .orElseThrow(() -> notFound(id));
+    }
+
+    private void ensureCountIsBounded(UUID id) {
+        if (countLines.countByCountId(id) > MAX_PRODUCTS_PER_COUNT) {
+            throw new ConflictException(
+                    "An inventory count cannot contain more than 1000 products");
+        }
     }
 
     private String requireActor(String actor) {

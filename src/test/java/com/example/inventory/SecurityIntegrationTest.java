@@ -93,8 +93,19 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/products")
                         .header(AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void authenticatedRequestToUnlistedCapabilityIsDeniedByDefault() throws Exception {
+        createUser("default-deny-admin", PASSWORD, true, false, RoleName.ADMIN);
+        String adminToken = login("default-deny-admin", PASSWORD);
+
+        mockMvc.perform(get("/api/v1/future-capability")
+                        .header(AUTHORIZATION, "Bearer " + adminToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
@@ -212,12 +223,21 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
     void loginAndRefreshAttemptsAreRateLimited() throws Exception {
         String correlationId = "authentication-rate-limit-test";
         for (int attempt = 0; attempt < 5; attempt++) {
+            String remoteAddress = "198.51.100." + (attempt + 1);
             mockMvc.perform(post("/api/v1/auth/login")
+                            .with(request -> {
+                                request.setRemoteAddr(remoteAddress);
+                                return request;
+                            })
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(loginJson("rate-limited-user", "invalid-password")))
                     .andExpect(status().isUnauthorized());
         }
         mockMvc.perform(post("/api/v1/auth/login")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.10");
+                            return request;
+                        })
                         .header("X-Correlation-ID", correlationId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginJson("rate-limited-user", "invalid-password")))
@@ -227,17 +247,54 @@ class SecurityIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.correlationId").value(correlationId));
 
         for (int attempt = 0; attempt < 5; attempt++) {
+            String remoteAddress = "198.51.100." + (attempt + 20);
             mockMvc.perform(post("/api/v1/auth/refresh")
+                            .with(request -> {
+                                request.setRemoteAddr(remoteAddress);
+                                return request;
+                            })
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"refreshToken\":\"invalid-rate-limited-token\"}"))
                     .andExpect(status().isUnauthorized());
         }
         mockMvc.perform(post("/api/v1/auth/refresh")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.20");
+                            return request;
+                        })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"invalid-rate-limited-token\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists(RETRY_AFTER))
                 .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            String remoteAddress = "198.51.100." + (attempt + 40);
+            mockMvc.perform(post("/api/v1/auth/logout")
+                            .with(request -> {
+                                request.setRemoteAddr(remoteAddress);
+                                return request;
+                            })
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"invalid-logout-token\"}"))
+                    .andExpect(status().isNoContent());
+        }
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.30");
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"invalid-logout-token\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(RETRY_AFTER))
+                .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"));
+
+        assertEquals(3, jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM authentication_rate_limit_buckets
+                WHERE bucket_key LIKE '%:credential:%'
+                  AND attempt_count = 6
+                """, Integer.class));
     }
 
     @Test

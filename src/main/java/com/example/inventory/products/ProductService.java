@@ -42,6 +42,7 @@ class ProductService implements ProductCatalog {
 
     @Transactional
     ProductResponse create(ProductRequest request) {
+        warehouses.lockCatalogRegistration();
         String sku = normalizeSku(request.sku());
         ensureSkuIsAvailable(sku, null);
         Product product = repository.saveAndFlush(new Product(sku, request.name().trim(),
@@ -54,7 +55,7 @@ class ProductService implements ProductCatalog {
 
     @Transactional
     ProductResponse update(UUID id, ProductRequest request) {
-        Product product = findEntity(id);
+        Product product = findEntityForUpdate(id);
         String sku = normalizeSku(request.sku());
         ensureSkuIsAvailable(sku, id);
         product.update(sku, request.name().trim(), trimToNull(request.description()),
@@ -64,32 +65,64 @@ class ProductService implements ProductCatalog {
 
     @Transactional
     void delete(UUID id) {
-        findEntity(id).markDeleted();
+        Product product = findEntityForUpdate(id);
+        warehouses.ensureProductCanBeDeleted(id);
+        product.markDeleted();
     }
 
     @Override
+    @Transactional
     public void requireProduct(UUID productId) {
-        if (!repository.existsByIdAndDeletedFalse(productId)) {
-            throw new NotFoundException("Product %s was not found".formatted(productId));
-        }
+        requireActive(findEntityForUpdate(productId));
     }
 
     @Override
+    @Transactional
     public ProductSnapshot requireProductSnapshot(UUID productId) {
-        Product product = findEntity(productId);
+        Product product = requireActive(findEntityForUpdate(productId));
         return new ProductSnapshot(product.getId(), product.getPrice());
+    }
+
+    @Override
+    public void requireVisibleProduct(UUID productId) {
+        if (!repository.existsByIdAndDeletedFalse(productId)) {
+            throw notFound(productId);
+        }
     }
 
     @Override
     public void requireStoredProduct(UUID productId) {
         if (!repository.existsById(productId)) {
-            throw new NotFoundException("Product %s was not found".formatted(productId));
+            throw notFound(productId);
         }
+    }
+
+    @Override
+    @Transactional
+    public void lockStoredProduct(UUID productId) {
+        repository.findByIdForUpdate(productId)
+                .orElseThrow(() -> notFound(productId));
     }
 
     private Product findEntity(UUID id) {
         return repository.findByIdAndDeletedFalse(id)
-                .orElseThrow(() -> new NotFoundException("Product %s was not found".formatted(id)));
+                .orElseThrow(() -> notFound(id));
+    }
+
+    private Product findEntityForUpdate(UUID id) {
+        return repository.findByIdAndDeletedFalseForUpdate(id)
+                .orElseThrow(() -> notFound(id));
+    }
+
+    private Product requireActive(Product product) {
+        if (!product.isActive()) {
+            throw new ConflictException("Product %s is inactive".formatted(product.getId()));
+        }
+        return product;
+    }
+
+    private NotFoundException notFound(UUID id) {
+        return new NotFoundException("Product %s was not found".formatted(id));
     }
 
     private Specification<Product> filters(String sku, String name, Boolean active) {

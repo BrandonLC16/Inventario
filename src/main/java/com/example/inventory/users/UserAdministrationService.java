@@ -69,7 +69,7 @@ public class UserAdministrationService {
     @Transactional
     public UserResponse updateStatus(UUID id, UpdateUserStatusRequest request) {
         lockAdministratorChanges();
-        UserAccount account = requireUser(id);
+        UserAccount account = requireUserForUpdate(id);
         if (isActiveAdmin(account) && (!request.enabled() || request.locked())
                 && users.countActiveWithRole(RoleName.ADMIN) <= 1) {
             throw new ConflictException("The last active administrator cannot be disabled or locked");
@@ -86,7 +86,7 @@ public class UserAdministrationService {
     @Transactional
     public UserResponse replaceRoles(UUID id, UpdateUserRolesRequest request) {
         lockAdministratorChanges();
-        UserAccount account = requireUser(id);
+        UserAccount account = requireUserForUpdate(id);
         Set<Role> replacement = requireRoles(request.roles());
         if (isActiveAdmin(account) && !request.roles().contains(RoleName.ADMIN)
                 && users.countActiveWithRole(RoleName.ADMIN) <= 1) {
@@ -104,14 +104,14 @@ public class UserAdministrationService {
 
     @Transactional
     public void resetPassword(UUID id, ResetPasswordRequest request) {
-        UserAccount account = requireUser(id);
+        UserAccount account = requireUserForUpdate(id);
         account.replacePasswordHash(passwordEncoder.encode(request.newPassword()));
         sessions.revokeAll(account);
     }
 
     @Transactional
     public void revokeSessions(UUID id) {
-        sessions.revokeAll(requireUser(id));
+        sessions.revokeAll(requireUserForUpdate(id));
     }
 
     private void lockAdministratorChanges() {
@@ -121,6 +121,11 @@ public class UserAdministrationService {
 
     private UserAccount requireUser(UUID id) {
         return users.findByIdWithRoles(id)
+                .orElseThrow(() -> new NotFoundException("User %s was not found".formatted(id)));
+    }
+
+    private UserAccount requireUserForUpdate(UUID id) {
+        return users.findByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("User %s was not found".formatted(id)));
     }
 

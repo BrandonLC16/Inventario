@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -77,9 +78,19 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
         assertEquals(6, stock(productId));
         assertEquals(1, movementCount(orderId, "ORDER_CONFIRMED"));
 
+        mockMvc.perform(put("/api/v1/products/{id}", productId)
+                        .header(AUTHORIZATION, "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sku":"ORDER-1","name":"ORDER-1","price":10,"active":false}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
         mockMvc.perform(delete("/api/v1/products/{id}", productId)
                         .header(AUTHORIZATION, "Bearer " + adminToken))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("A product with physical inventory cannot be deleted"));
 
         performSales(post("/api/v1/orders/{id}/cancel", orderId))
                 .andExpect(status().isOk())

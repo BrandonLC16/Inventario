@@ -12,6 +12,8 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +22,22 @@ class WarehouseServiceTest {
 
     @Mock
     private WarehouseRepository repository;
+
+    @Test
+    void createLocksCatalogRegistrationBeforeCheckingAndInserting() {
+        Warehouse main = warehouse();
+        when(repository.findByIdForUpdate(WarehouseDirectory.MAIN_WAREHOUSE_ID))
+                .thenReturn(Optional.of(main));
+        when(repository.saveAndFlush(any(Warehouse.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service().create(new WarehouseRequest(" NEW ", " New warehouse ", null, true));
+
+        var order = inOrder(repository);
+        order.verify(repository).findByIdForUpdate(WarehouseDirectory.MAIN_WAREHOUSE_ID);
+        order.verify(repository).existsByCodeIgnoreCase("NEW");
+        order.verify(repository).saveAndFlush(any(Warehouse.class));
+    }
 
     @Test
     void productWithStockCannotBeDeactivated() {
@@ -51,6 +69,44 @@ class WarehouseServiceTest {
         assertEquals("A warehouse product with reservations cannot be deactivated",
                 error.getMessage());
         verify(repository, never()).configureProduct(warehouseId, productId, 3, false);
+    }
+
+    @Test
+    void productWithPhysicalInventoryCannotBeDeleted() {
+        UUID productId = UUID.randomUUID();
+        when(repository.hasStockForProduct(productId)).thenReturn(true);
+
+        ConflictException error = assertThrows(ConflictException.class,
+                () -> service().ensureProductCanBeDeleted(productId));
+
+        assertEquals("A product with physical inventory cannot be deleted",
+                error.getMessage());
+        verify(repository, never()).hasReservationsForProduct(productId);
+    }
+
+    @Test
+    void productWithReservationsCannotBeDeleted() {
+        UUID productId = UUID.randomUUID();
+        when(repository.hasReservationsForProduct(productId)).thenReturn(true);
+
+        ConflictException error = assertThrows(ConflictException.class,
+                () -> service().ensureProductCanBeDeleted(productId));
+
+        assertEquals("A product with inventory reservations cannot be deleted",
+                error.getMessage());
+        verify(repository, never()).hasPendingOperationsForProduct(productId);
+    }
+
+    @Test
+    void productUsedByPendingOperationsCannotBeDeleted() {
+        UUID productId = UUID.randomUUID();
+        when(repository.hasPendingOperationsForProduct(productId)).thenReturn(true);
+
+        ConflictException error = assertThrows(ConflictException.class,
+                () -> service().ensureProductCanBeDeleted(productId));
+
+        assertEquals("A product used by pending operations cannot be deleted",
+                error.getMessage());
     }
 
     private WarehouseService service() {

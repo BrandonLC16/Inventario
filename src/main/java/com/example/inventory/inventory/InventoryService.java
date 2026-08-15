@@ -36,7 +36,7 @@ class InventoryService implements InventoryOperations {
 
     InventoryResponse findByProductId(UUID warehouseId, UUID productId) {
         warehouses.requireWarehouse(warehouseId);
-        productCatalog.requireProduct(productId);
+        productCatalog.requireVisibleProduct(productId);
         return repository.findBalance(warehouseId, productId)
                 .map(InventoryResponse::from)
                 .orElseGet(() -> InventoryResponse.empty(warehouseId, productId));
@@ -51,7 +51,7 @@ class InventoryService implements InventoryOperations {
 
     InventorySettingResponse findSetting(UUID warehouseId, UUID productId) {
         warehouses.requireWarehouse(warehouseId);
-        productCatalog.requireProduct(productId);
+        productCatalog.requireVisibleProduct(productId);
         return repository.findSetting(warehouseId, productId)
                 .map(InventorySettingResponse::from)
                 .orElseThrow(() -> new NotFoundException(
@@ -207,7 +207,7 @@ class InventoryService implements InventoryOperations {
 
     private void lockStoredWarehouseProduct(UUID warehouseId, UUID productId) {
         warehouses.lockWarehouse(warehouseId);
-        productCatalog.requireStoredProduct(productId);
+        productCatalog.lockStoredProduct(productId);
     }
 
     private InventoryItem lockInventory(UUID warehouseId, UUID productId) {
@@ -249,7 +249,7 @@ class InventoryService implements InventoryOperations {
         if (receiptId == null) {
             throw new IllegalArgumentException("The purchase receipt is required");
         }
-        lockStoredWarehouseProduct(warehouseId, productId);
+        lockActiveWarehouseProduct(warehouseId, productId);
         repository.ensureExists(warehouseId, productId);
         InventoryItem item = lockInventory(warehouseId, productId);
         int balanceBefore = item.getQuantity();
@@ -270,7 +270,7 @@ class InventoryService implements InventoryOperations {
         String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
         requireTransfer(transferId);
-        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        lockActiveWarehouseProduct(warehouseId, productId);
         repository.ensureExists(warehouseId, productId);
         InventoryItem item = lockInventory(warehouseId, productId);
         int balanceBefore = item.getQuantity();
@@ -295,7 +295,7 @@ class InventoryService implements InventoryOperations {
         String actor = requireResponsibleUser(responsibleUser);
         requirePositive(quantity);
         requireTransfer(transferId);
-        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        lockActiveWarehouseProduct(warehouseId, productId);
         repository.ensureExists(warehouseId, productId);
         InventoryItem item = lockInventory(warehouseId, productId);
         int balanceBefore = item.getQuantity();
@@ -313,7 +313,7 @@ class InventoryService implements InventoryOperations {
     @Transactional
     public int lockAndGetQuantityForPhysicalCount(
             UUID warehouseId, UUID productId) {
-        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        lockActiveWarehouseProduct(warehouseId, productId);
         repository.ensureExists(warehouseId, productId);
         return lockInventory(warehouseId, productId).getQuantity();
     }
@@ -327,7 +327,7 @@ class InventoryService implements InventoryOperations {
             throw new IllegalArgumentException(
                     "The previous physical count snapshot is required");
         }
-        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        lockActiveWarehouseProduct(warehouseId, productId);
         repository.ensureExists(warehouseId, productId);
         lockInventory(warehouseId, productId);
         java.time.Instant capturedAt = java.time.Instant.now();
@@ -350,7 +350,7 @@ class InventoryService implements InventoryOperations {
         if (countId == null) {
             throw new IllegalArgumentException("The physical inventory count is required");
         }
-        lockActiveStoredWarehouseProduct(warehouseId, productId);
+        lockActiveWarehouseProduct(warehouseId, productId);
         repository.ensureExists(warehouseId, productId);
         InventoryItem item = lockInventory(warehouseId, productId);
         int balanceBefore = item.getQuantity();
@@ -373,11 +373,6 @@ class InventoryService implements InventoryOperations {
         recordMovement(item, StockMovementType.PHYSICAL_COUNT_ADJUSTMENT,
                 variance, balanceBefore, 0, reserved, reserved,
                 countId.toString(), actor);
-    }
-
-    private void lockActiveStoredWarehouseProduct(UUID warehouseId, UUID productId) {
-        warehouses.lockActiveWarehouse(warehouseId);
-        productCatalog.requireStoredProduct(productId);
     }
 
     private void requireTransfer(UUID transferId) {

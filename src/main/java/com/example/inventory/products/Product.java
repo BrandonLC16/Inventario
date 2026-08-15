@@ -60,6 +60,7 @@ class Product {
     }
 
     void markDeleted() {
+        active = false;
         deleted = true;
     }
 

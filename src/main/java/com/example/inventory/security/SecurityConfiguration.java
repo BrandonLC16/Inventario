@@ -88,6 +88,10 @@ public class SecurityConfiguration {
                     authorize.requestMatchers(HttpMethod.POST,
                             "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout")
                             .permitAll();
+                    authorize.requestMatchers(HttpMethod.GET, "/api/v1/auth/me")
+                            .authenticated();
+                    authorize.requestMatchers(HttpMethod.PUT, "/api/v1/auth/password")
+                            .authenticated();
                     if (properties.swaggerEnabled()) {
                         authorize.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**")
                                 .hasRole(RoleName.ADMIN.name());
@@ -144,7 +148,7 @@ public class SecurityConfiguration {
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.INVENTORY_MANAGER.name());
                     authorize.requestMatchers("/api/v1/orders", "/api/v1/orders/**")
                             .hasAnyRole(RoleName.ADMIN.name(), RoleName.SALES.name());
-                    authorize.anyRequest().authenticated();
+                    authorize.anyRequest().denyAll();
                 });
         return http.build();
     }

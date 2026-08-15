@@ -75,7 +75,7 @@ class UserAdministrationServiceTest {
     void lastActiveAdminCannotBeDisabledLockedOrDemoted() {
         UserAccount admin = UserTestFixtures.user("admin", "admin@example.com", "{noop}hidden",
                 true, false, RoleName.ADMIN);
-        when(users.findByIdWithRoles(admin.getId())).thenReturn(Optional.of(admin));
+        when(users.findByIdForUpdate(admin.getId())).thenReturn(Optional.of(admin));
         Role sales = UserTestFixtures.role(RoleName.SALES);
         when(roles.findAllByNameIn(Set.of(RoleName.SALES))).thenReturn(Set.of(sales));
         when(users.countActiveWithRole(RoleName.ADMIN)).thenReturn(1L);
@@ -92,7 +92,7 @@ class UserAdministrationServiceTest {
     void statusCanBeUpdatedWhenAnotherActiveAdminExists() {
         UserAccount admin = UserTestFixtures.user("admin", "admin@example.com", "{noop}hidden",
                 true, false, RoleName.ADMIN);
-        when(users.findByIdWithRoles(admin.getId())).thenReturn(Optional.of(admin));
+        when(users.findByIdForUpdate(admin.getId())).thenReturn(Optional.of(admin));
         when(users.countActiveWithRole(RoleName.ADMIN)).thenReturn(2L);
 
         UserResponse response = service.updateStatus(admin.getId(),

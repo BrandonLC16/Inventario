@@ -3,13 +3,15 @@ package com.example.inventory.auth;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
+import java.util.List;
 
 @ConfigurationProperties("inventory.security.authentication-rate-limit")
 public record AuthenticationRateLimitProperties(
         int maxAttemptsPerCredential,
         int maxAttemptsPerClient,
         Duration window,
-        int maxTrackedKeys) {
+        int maxTrackedKeys,
+        List<String> trustedProxies) {
 
     private static final Duration MIN_WINDOW = Duration.ofSeconds(1);
     private static final Duration MAX_WINDOW = Duration.ofHours(1);
@@ -26,6 +28,16 @@ public record AuthenticationRateLimitProperties(
         }
         requireRange(maxTrackedKeys, 100, 1_000_000,
                 "maximum tracked authentication keys");
+        trustedProxies = trustedProxies == null ? List.of()
+                : trustedProxies.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .toList();
+    }
+
+    @Override
+    public List<String> trustedProxies() {
+        return List.copyOf(trustedProxies);
     }
 
     private static void requireRange(int value, int minimum, int maximum,

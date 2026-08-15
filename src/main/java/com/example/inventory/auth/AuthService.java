@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -41,17 +42,29 @@ public class AuthService {
         this.clock = clock;
     }
 
+    @Transactional
     public TokenResponse login(LoginRequest request) {
         try {
-            Authentication authentication = authenticationManager.authenticate(
-                    UsernamePasswordAuthenticationToken.unauthenticated(
-                            request.identifier().trim(), request.password()));
-            if (authentication == null
-                    || !(authentication.getPrincipal() instanceof InventoryUserDetails principal)) {
+            String identifier = request.identifier().trim().toLowerCase(Locale.ROOT);
+            UserAccount user = users.findByIdentifierForUpdate(identifier).orElse(null);
+            if (user == null) {
+                authenticationManager.authenticate(
+                        UsernamePasswordAuthenticationToken.unauthenticated(
+                                identifier, request.password()));
                 throw new InvalidAuthenticationException();
             }
-            UserAccount user = users.findByIdWithRoles(principal.id())
-                    .orElseThrow(InvalidAuthenticationException::new);
+            Authentication authentication = authenticationManager.authenticate(
+                    UsernamePasswordAuthenticationToken.unauthenticated(
+                            identifier, request.password()));
+            if (authentication == null
+                    || !(authentication.getPrincipal() instanceof InventoryUserDetails principal)
+                    || !principal.id().equals(user.getId())) {
+                throw new InvalidAuthenticationException();
+            }
+            if (!user.isEnabled() || user.isLocked()
+                    || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+                throw new InvalidAuthenticationException();
+            }
             return issuePair(InventoryUserDetails.from(user), refreshTokens.issue(user));
         } catch (AuthenticationException exception) {
             throw new InvalidAuthenticationException();
@@ -69,7 +82,7 @@ public class AuthService {
 
     @Transactional
     public void changePassword(String subject, ChangePasswordRequest request) {
-        UserAccount user = requireActiveUser(subject);
+        UserAccount user = requireActiveUserForUpdate(subject);
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             throw new BadRequestException("Current password is invalid");
         }
@@ -89,13 +102,21 @@ public class AuthService {
     }
 
     private UserAccount requireActiveUser(String subject) {
+        return requireActiveUser(subject, false);
+    }
+
+    private UserAccount requireActiveUserForUpdate(String subject) {
+        return requireActiveUser(subject, true);
+    }
+
+    private UserAccount requireActiveUser(String subject, boolean forUpdate) {
         UUID userId;
         try {
             userId = UUID.fromString(subject);
         } catch (IllegalArgumentException exception) {
             throw new InvalidAuthenticationException();
         }
-        return users.findByIdWithRoles(userId)
+        return (forUpdate ? users.findByIdForUpdate(userId) : users.findByIdWithRoles(userId))
                 .filter(UserAccount::isEnabled)
                 .filter(account -> !account.isLocked())
                 .orElseThrow(InvalidAuthenticationException::new);

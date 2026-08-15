@@ -166,8 +166,8 @@ public class PurchaseOrderService {
             PurchaseReceipt receipt = existing.get();
             List<PurchaseReceiptItem> existingItems =
                     receiptItems.findByReceiptId(receipt.getId());
-            ensureIdempotentRetry(existingItems, requestedItems,
-                    externalReference);
+            ensureIdempotentRetry(receipt, existingItems, requestedItems,
+                    request.updateSupplierProductLastCost(), externalReference);
             return new PurchaseReceiptResult(
                     PurchaseReceiptResponse.from(receipt, existingItems), false);
         }
@@ -191,7 +191,8 @@ public class PurchaseOrderService {
         String folio = "PR-%010d".formatted(receipts.nextFolioSequence());
         PurchaseReceipt receipt = new PurchaseReceipt(
                 folio, id, purchaseOrder.getDestinationWarehouseId(),
-                externalReference, actor);
+                externalReference,
+                request.updateSupplierProductLastCost(), actor);
         receipts.saveAndFlush(receipt);
 
         List<PurchaseReceiptItem> persistedItems = lines.stream()
@@ -333,14 +334,18 @@ public class PurchaseOrderService {
     }
 
     private void ensureIdempotentRetry(
+            PurchaseReceipt existingReceipt,
             List<PurchaseReceiptItem> existingItems,
             List<CreatePurchaseReceiptItemRequest> requestedItems,
+            boolean updateSupplierProductLastCost,
             String externalReference) {
         Map<UUID, PurchaseReceiptItem> existingByOrderItem = existingItems.stream()
                 .collect(Collectors.toMap(
                         PurchaseReceiptItem::getPurchaseOrderItemId,
                         Function.identity()));
-        boolean matches = existingByOrderItem.size() == requestedItems.size()
+        boolean matches = Boolean.valueOf(updateSupplierProductLastCost)
+                .equals(existingReceipt.getUpdateSupplierProductLastCost())
+                && existingByOrderItem.size() == requestedItems.size()
                 && requestedItems.stream().allMatch(requested -> {
                     PurchaseReceiptItem existing = existingByOrderItem.get(
                             requested.purchaseOrderItemId());

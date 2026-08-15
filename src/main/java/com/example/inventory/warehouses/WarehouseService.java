@@ -30,6 +30,7 @@ public class WarehouseService implements WarehouseDirectory {
 
     @Transactional
     WarehouseResponse create(WarehouseRequest request) {
+        lockCatalogRegistration();
         String code = normalizeCode(request.code());
         ensureCodeAvailable(code, null);
         Warehouse warehouse = repository.saveAndFlush(new Warehouse(
@@ -60,6 +61,7 @@ public class WarehouseService implements WarehouseDirectory {
 
     @Override public void requireWarehouse(UUID warehouseId) { findEntity(warehouseId); }
     @Override public void lockWarehouse(UUID warehouseId) { findForUpdate(warehouseId); }
+    @Override public void lockCatalogRegistration() { findForUpdate(MAIN_WAREHOUSE_ID); }
 
     @Override
     public void lockActiveWarehouse(UUID warehouseId) {
@@ -74,6 +76,19 @@ public class WarehouseService implements WarehouseDirectory {
         if (!repository.isProductActive(warehouseId, productId)) {
             throw new ConflictException("Product %s is inactive in warehouse %s"
                     .formatted(productId, warehouseId));
+        }
+    }
+
+    @Override
+    public void ensureProductCanBeDeleted(UUID productId) {
+        if (repository.hasStockForProduct(productId)) {
+            throw new ConflictException("A product with physical inventory cannot be deleted");
+        }
+        if (repository.hasReservationsForProduct(productId)) {
+            throw new ConflictException("A product with inventory reservations cannot be deleted");
+        }
+        if (repository.hasPendingOperationsForProduct(productId)) {
+            throw new ConflictException("A product used by pending operations cannot be deleted");
         }
     }
 
@@ -93,9 +108,15 @@ public class WarehouseService implements WarehouseDirectory {
     }
 
     @Override
-    public List<UUID> productIdsForPhysicalCount(UUID warehouseId) {
+    public List<UUID> productIdsForPhysicalCount(UUID warehouseId,
+                                                 int maximumResults) {
+        if (maximumResults <= 0) {
+            throw new IllegalArgumentException(
+                    "The maximum number of physical count products must be positive");
+        }
         requireWarehouse(warehouseId);
-        return List.copyOf(repository.findProductIdsForPhysicalCount(warehouseId));
+        return List.copyOf(repository.findProductIdsForPhysicalCount(
+                warehouseId, maximumResults));
     }
 
     private void ensureProductCanBeDeactivated(UUID warehouseId, UUID productId) {

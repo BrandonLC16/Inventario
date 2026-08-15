@@ -3,6 +3,7 @@ package com.example.inventory.auth;
 import com.example.inventory.security.SecurityProperties;
 import com.example.inventory.security.SessionRevoker;
 import com.example.inventory.users.UserAccount;
+import com.example.inventory.users.UserAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,41 +21,51 @@ public class RefreshTokenService implements SessionRevoker {
     private static final int TOKEN_BYTES = 32;
 
     private final RefreshTokenRepository repository;
+    private final UserAccountRepository users;
     private final SecurityProperties properties;
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public RefreshTokenService(RefreshTokenRepository repository,
+                               UserAccountRepository users,
                                SecurityProperties properties,
                                Clock clock) {
         this.repository = repository;
+        this.users = users;
         this.properties = properties;
         this.clock = clock;
     }
 
     @Transactional
     public IssuedRefreshToken issue(UserAccount user) {
+        UserAccount lockedUser = lockUser(user.getId());
+        if (!lockedUser.isEnabled() || lockedUser.isLocked()) {
+            throw new InvalidAuthenticationException();
+        }
         Instant now = clock.instant();
-        return create(user, UUID.randomUUID(), now);
+        return create(lockedUser, UUID.randomUUID(), now);
     }
 
     @Transactional(noRollbackFor = InvalidAuthenticationException.class)
     public RotatedRefreshToken rotate(String presentedToken) {
         Instant now = clock.instant();
-        RefreshToken current = repository.findByTokenHashForUpdate(hash(presentedToken))
+        byte[] tokenHash = hash(presentedToken);
+        UUID userId = repository.findUserIdByTokenHash(tokenHash)
+                .orElseThrow(InvalidAuthenticationException::new);
+        UserAccount user = lockUserWithRoles(userId);
+        RefreshToken current = repository.findByTokenHashForUpdate(tokenHash)
                 .orElseThrow(InvalidAuthenticationException::new);
 
         if (current.isRevoked()) {
-            revokeFamilyAndAccessTokens(current, now);
+            revokeFamilyAndAccessTokens(current, user, now);
             throw new InvalidAuthenticationException();
         }
         if (current.isExpiredAt(now)) {
             current.revoke(now, null);
             throw new InvalidAuthenticationException();
         }
-        UserAccount user = current.getUser();
         if (!user.isEnabled() || user.isLocked()) {
-            revokeFamilyAndAccessTokens(current, now);
+            revokeFamilyAndAccessTokens(current, user, now);
             throw new InvalidAuthenticationException();
         }
 
@@ -67,21 +78,39 @@ public class RefreshTokenService implements SessionRevoker {
 
     @Transactional
     public void logout(String presentedToken) {
-        repository.findByTokenHashForUpdate(hash(presentedToken))
-                .ifPresent(token -> revokeFamilyAndAccessTokens(token, clock.instant()));
+        byte[] tokenHash = hash(presentedToken);
+        repository.findUserIdByTokenHash(tokenHash).ifPresent(userId -> {
+            UserAccount user = lockUser(userId);
+            repository.findByTokenHashForUpdate(tokenHash)
+                    .ifPresent(token -> revokeFamilyAndAccessTokens(
+                            token, user, clock.instant()));
+        });
     }
 
     @Override
     @Transactional
     public void revokeAll(UserAccount user) {
-        repository.revokeAllActiveByUserId(user.getId(), clock.instant());
-        user.revokeAccessTokens();
+        UserAccount lockedUser = lockUser(user.getId());
+        repository.revokeAllActiveByUserId(lockedUser.getId(), clock.instant());
+        lockedUser.revokeAccessTokens();
     }
 
-    private void revokeFamilyAndAccessTokens(RefreshToken token, Instant revokedAt) {
+    private void revokeFamilyAndAccessTokens(RefreshToken token, UserAccount user,
+                                             Instant revokedAt) {
         if (repository.revokeActiveFamily(token.getFamilyId(), revokedAt) > 0) {
-            token.getUser().revokeAccessTokens();
+            user.revokeAccessTokens();
         }
+    }
+
+    private UserAccount lockUser(UUID userId) {
+        return users.findByIdForUpdate(userId)
+                .orElseThrow(InvalidAuthenticationException::new);
+    }
+
+    private UserAccount lockUserWithRoles(UUID userId) {
+        lockUser(userId);
+        return users.findByIdWithRoles(userId)
+                .orElseThrow(InvalidAuthenticationException::new);
     }
 
     private IssuedRefreshToken create(UserAccount user, UUID familyId, Instant now) {

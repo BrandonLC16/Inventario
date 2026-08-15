@@ -9,9 +9,12 @@ public interface WarehouseDirectory {
 
     void requireWarehouse(UUID warehouseId);
     void lockWarehouse(UUID warehouseId);
+    /** Serializes product and warehouse registration before either catalog row is inserted. */
+    void lockCatalogRegistration();
     void lockActiveWarehouse(UUID warehouseId);
     void requireActiveProduct(UUID warehouseId, UUID productId);
+    void ensureProductCanBeDeleted(UUID productId);
     void registerProduct(UUID productId);
     void configureProduct(UUID warehouseId, UUID productId, int minimumStock, boolean active);
-    List<UUID> productIdsForPhysicalCount(UUID warehouseId);
+    List<UUID> productIdsForPhysicalCount(UUID warehouseId, int maximumResults);
 }

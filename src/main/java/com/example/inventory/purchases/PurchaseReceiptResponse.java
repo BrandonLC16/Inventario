@@ -11,6 +11,7 @@ public record PurchaseReceiptResponse(
         UUID purchaseOrderId,
         UUID warehouseId,
         String externalReference,
+        Boolean updateSupplierProductLastCost,
         List<PurchaseReceiptItemResponse> items,
         Instant receivedAt,
         String receivedBy) {
@@ -27,7 +28,8 @@ public record PurchaseReceiptResponse(
                 .toList();
         return new PurchaseReceiptResponse(
                 receipt.getId(), receipt.getFolio(), receipt.getPurchaseOrderId(),
-                receipt.getWarehouseId(), receipt.getExternalReference(), items,
+                receipt.getWarehouseId(), receipt.getExternalReference(),
+                receipt.getUpdateSupplierProductLastCost(), items,
                 receipt.getReceivedAt(), receipt.getReceivedBy());
     }
 }

@@ -61,7 +61,7 @@ class InventoryServiceTest {
         assertEquals(7, response.quantity());
         assertEquals(2, response.reservedQuantity());
         assertEquals(5, response.availableQuantity());
-        verify(productCatalog).requireProduct(productId);
+        verify(productCatalog).requireVisibleProduct(productId);
     }
 
     @Test
@@ -78,7 +78,8 @@ class InventoryServiceTest {
     @Test
     void findByProductIdStopsWhenProductDoesNotExist() {
         UUID productId = UUID.randomUUID();
-        doThrow(new NotFoundException("missing")).when(productCatalog).requireProduct(productId);
+        doThrow(new NotFoundException("missing"))
+                .when(productCatalog).requireVisibleProduct(productId);
 
         assertThrows(NotFoundException.class, () -> service().findByProductId(WAREHOUSE_ID, productId));
 
@@ -239,7 +240,7 @@ class InventoryServiceTest {
     void consumeReservationRejectsMissingProductWithoutMovement() {
         UUID productId = UUID.randomUUID();
         doThrow(new NotFoundException("missing"))
-                .when(productCatalog).requireStoredProduct(productId);
+                .when(productCatalog).lockStoredProduct(productId);
 
         assertThrows(NotFoundException.class, () -> service().consumeReservation(
                 WAREHOUSE_ID, productId, 1, UUID.randomUUID(), "operator"));
@@ -277,7 +278,7 @@ class InventoryServiceTest {
         assertEquals(10, item.getQuantity());
         assertMovement(StockMovementType.ORDER_CANCELLED, 4, 6, 10,
                 orderId.toString(), "operator@example.com");
-        verify(productCatalog).requireStoredProduct(productId);
+        verify(productCatalog).lockStoredProduct(productId);
     }
 
     @ParameterizedTest

@@ -27,6 +27,9 @@ class PurchaseReceipt {
     @Column(name = "external_reference", nullable = false, length = 128)
     private String externalReference;
 
+    @Column(name = "update_supplier_product_last_cost")
+    private Boolean updateSupplierProductLastCost;
+
     @Column(name = "received_at", nullable = false)
     private Instant receivedAt;
 
@@ -37,12 +40,15 @@ class PurchaseReceipt {
     }
 
     PurchaseReceipt(String folio, UUID purchaseOrderId, UUID warehouseId,
-                    String externalReference, String receivedBy) {
+                    String externalReference,
+                    boolean updateSupplierProductLastCost,
+                    String receivedBy) {
         id = UUID.randomUUID();
         this.folio = folio;
         this.purchaseOrderId = purchaseOrderId;
         this.warehouseId = warehouseId;
         this.externalReference = externalReference;
+        this.updateSupplierProductLastCost = updateSupplierProductLastCost;
         receivedAt = Instant.now();
         this.receivedBy = receivedBy;
     }
@@ -52,6 +58,9 @@ class PurchaseReceipt {
     UUID getPurchaseOrderId() { return purchaseOrderId; }
     UUID getWarehouseId() { return warehouseId; }
     String getExternalReference() { return externalReference; }
+    Boolean getUpdateSupplierProductLastCost() {
+        return updateSupplierProductLastCost;
+    }
     Instant getReceivedAt() { return receivedAt; }
     String getReceivedBy() { return receivedBy; }
 }

@@ -12,6 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,7 +62,8 @@ class AuthServiceTest {
         Authentication authenticated = mock(Authentication.class);
         when(authenticated.getPrincipal()).thenReturn(principal);
         when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authenticated);
-        when(users.findByIdWithRoles(user.getId())).thenReturn(Optional.of(user));
+        when(users.findByIdentifierForUpdate("admin")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("correct password", user.getPasswordHash())).thenReturn(true);
         when(refreshTokens.issue(user)).thenReturn(
                 new RefreshTokenService.IssuedRefreshToken("refresh-value", NOW.plusSeconds(600)));
         when(jwtService.issue(any(InventoryUserDetails.class), any(Instant.class))).thenReturn(
@@ -73,6 +76,10 @@ class AuthServiceTest {
         assertEquals("refresh-value", response.refreshToken());
         verify(authenticationManager).authenticate(any(Authentication.class));
         verify(jwtService).issue(any(InventoryUserDetails.class), any(Instant.class));
+        var order = inOrder(users, authenticationManager, refreshTokens);
+        order.verify(users).findByIdentifierForUpdate("admin");
+        order.verify(authenticationManager).authenticate(any(Authentication.class));
+        order.verify(refreshTokens).issue(user);
     }
 
     @ParameterizedTest
@@ -93,19 +100,35 @@ class AuthServiceTest {
     }
 
     @Test
-    void authenticatedPrincipalMissingFromDatabaseUsesGenericFailure() {
-        UserAccount user = UserTestFixtures.user("gone", "gone@example.com", "{noop}hidden",
-                true, false, RoleName.SALES);
-        Authentication authenticated = mock(Authentication.class);
-        when(authenticated.getPrincipal()).thenReturn(InventoryUserDetails.from(user));
-        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authenticated);
-        when(users.findByIdWithRoles(user.getId())).thenReturn(Optional.empty());
+    void unknownIdentifierUsesGenericFailureThroughThePasswordVerifier() {
+        when(users.findByIdentifierForUpdate("gone")).thenReturn(Optional.empty());
+        when(authenticationManager.authenticate(any(Authentication.class)))
+                .thenThrow(new BadCredentialsException("invalid"));
 
         InvalidAuthenticationException exception = assertThrows(InvalidAuthenticationException.class,
                 () -> service.login(new LoginRequest("gone", "correct password")));
 
         assertEquals("Authentication failed", exception.getMessage());
+        verify(authenticationManager).authenticate(any());
         verify(refreshTokens, never()).issue(any());
+    }
+
+    @Test
+    void passwordChangedAfterAuthenticationCannotIssueANewSession() {
+        UserAccount user = UserTestFixtures.user("racing", "racing@example.com", "old-hash",
+                true, false, RoleName.SALES);
+        Authentication authenticated = mock(Authentication.class);
+        when(authenticated.getPrincipal()).thenReturn(InventoryUserDetails.from(user));
+        when(authenticationManager.authenticate(any(Authentication.class))).thenReturn(authenticated);
+        user.replacePasswordHash("new-hash");
+        when(users.findByIdentifierForUpdate("racing")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old-password", "new-hash")).thenReturn(false);
+
+        assertThrows(InvalidAuthenticationException.class,
+                () -> service.login(new LoginRequest("racing", "old-password")));
+
+        verify(refreshTokens, never()).issue(any());
+        verify(jwtService, never()).issue(any(), any());
     }
 
     @Test

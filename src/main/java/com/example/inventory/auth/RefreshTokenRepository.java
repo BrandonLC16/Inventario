@@ -13,12 +13,11 @@ import java.util.UUID;
 
 interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
 
+    @Query("select token.user.id from RefreshToken token where token.tokenHash = :tokenHash")
+    Optional<UUID> findUserIdByTokenHash(@Param("tokenHash") byte[] tokenHash);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-            select distinct token from RefreshToken token
-            join fetch token.user user left join fetch user.roles
-            where token.tokenHash = :tokenHash
-            """)
+    @Query("select token from RefreshToken token where token.tokenHash = :tokenHash")
     Optional<RefreshToken> findByTokenHashForUpdate(@Param("tokenHash") byte[] tokenHash);
 
     @Modifying(flushAutomatically = true)

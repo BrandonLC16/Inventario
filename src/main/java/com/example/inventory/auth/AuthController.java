@@ -25,20 +25,24 @@ public class AuthController {
 
     private final AuthService service;
     private final AuthenticationRateLimiter rateLimiter;
+    private final ClientAddressResolver clientAddresses;
 
-    public AuthController(AuthService service, AuthenticationRateLimiter rateLimiter) {
+    public AuthController(AuthService service,
+                          AuthenticationRateLimiter rateLimiter,
+                          ClientAddressResolver clientAddresses) {
         this.service = service;
         this.rateLimiter = rateLimiter;
+        this.clientAddresses = clientAddresses;
     }
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate with username or email")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request,
                                                HttpServletRequest servletRequest) {
-        String remoteAddress = servletRequest.getRemoteAddr();
-        rateLimiter.checkLogin(remoteAddress, request.identifier());
+        String clientAddress = clientAddresses.resolve(servletRequest);
+        rateLimiter.checkLogin(clientAddress, request.identifier());
         TokenResponse response = service.login(request);
-        rateLimiter.loginSucceeded(remoteAddress, request.identifier());
+        rateLimiter.loginSucceeded(request.identifier());
         return tokenResponse(response);
     }
 
@@ -46,17 +50,20 @@ public class AuthController {
     @Operation(summary = "Rotate a refresh token")
     public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request,
                                                  HttpServletRequest servletRequest) {
-        String remoteAddress = servletRequest.getRemoteAddr();
-        rateLimiter.checkRefresh(remoteAddress, request.refreshToken());
+        String clientAddress = clientAddresses.resolve(servletRequest);
+        rateLimiter.checkRefresh(clientAddress, request.refreshToken());
         TokenResponse response = service.refresh(request);
-        rateLimiter.refreshSucceeded(remoteAddress, request.refreshToken());
+        rateLimiter.refreshSucceeded(request.refreshToken());
         return tokenResponse(response);
     }
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Revoke a refresh token family")
-    public void logout(@Valid @RequestBody RefreshRequest request) {
+    public void logout(@Valid @RequestBody RefreshRequest request,
+                       HttpServletRequest servletRequest) {
+        rateLimiter.checkLogout(clientAddresses.resolve(servletRequest),
+                request.refreshToken());
         service.logout(request);
     }
 
