@@ -35,7 +35,7 @@ El proyecto implementa:
 
 ## Tecnologías
 
-- Java 24
+- Java 25 LTS
 - Spring Boot 4.0.7
 - Spring Web MVC, Spring Data JPA y Spring Security
 - OAuth2 Resource Server y Nimbus JOSE/JWT
@@ -49,7 +49,7 @@ El proyecto implementa:
 
 ## Requisitos
 
-- JDK 24 disponible en `PATH`.
+- JDK 25 LTS disponible en `PATH`.
 - Docker con el plugin de Compose.
 - OpenSSL u otra herramienta capaz de generar claves RSA en formato PKCS#8 y X.509.
 
@@ -592,4 +592,4 @@ Comprueba que ambas rutas existan, incluyan el prefijo `file:` y tengan permiso 
 
 ### No se encuentra Java
 
-Verifica que el JDK 24 esté instalado, que `JAVA_HOME` apunte al JDK y que su carpeta `bin` esté en `PATH`.
+Verifica que el JDK 25 LTS esté instalado, que `JAVA_HOME` apunte al JDK y que su carpeta `bin` esté en `PATH`.
