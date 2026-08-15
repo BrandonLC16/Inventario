@@ -145,6 +145,14 @@ public class SupplierService implements SupplierDirectory {
         }
     }
 
+    @Override
+    @Transactional
+    public void updateLastUnitCostIfAssociated(UUID supplierId, UUID productId,
+                                               java.math.BigDecimal unitCost) {
+        supplierProducts.findByIdForUpdate(supplierId, productId)
+                .ifPresent(product -> product.updateLastUnitCost(unitCost));
+    }
+
     private Supplier requireSupplier(UUID id) {
         return suppliers.findById(id)
                 .orElseThrow(() -> supplierNotFound(id));

@@ -18,6 +18,8 @@ El proyecto implementa:
 - Edición o eliminación de pedidos reservados con liberación atómica.
 - Confirmación transaccional: consume la reserva y descuenta físicamente una sola vez.
 - Cancelación transaccional: restaura existencias exactamente una vez.
+- Órdenes de compra con emisión, recepciones parciales, costos históricos e idempotencia por referencia externa.
+- Recepción transaccional de compras con incremento de existencia y movimiento `PURCHASE_RECEIVED`.
 - Autenticación por nombre de usuario o correo electrónico.
 - Access tokens JWT firmados con RS256.
 - Refresh tokens opacos, almacenados como hash, con rotación, revocación por familia y detección de reutilización.
@@ -142,6 +144,7 @@ Para cambiar la contraseña propia envía `{"currentPassword":"<ACTUAL>","newPas
 | Crear, actualizar o desactivar almacenes y cambiar su configuración | Sí | Sí | No |
 | Crear, consultar, actualizar o desactivar clientes | Sí | No | Sí |
 | Crear, consultar, reservar, liberar, confirmar o cancelar pedidos | Sí | No | Sí |
+| Crear, emitir, recibir o cancelar órdenes de compra | Sí | Sí | No |
 | Administrar usuarios y roles | Sí | No | No |
 | Acceder a OpenAPI/Swagger habilitado | Sí | No | No |
 
@@ -217,7 +220,7 @@ Cada ajuste exitoso genera un movimiento con saldo anterior y posterior, tipo, r
 |---|---|---|
 | `page` | `0` | Índice de página, desde cero |
 | `size` | `20` | Elementos por página, entre 1 y 100 |
-| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_RESERVED`, `ORDER_RESERVATION_RELEASED`, `ORDER_CONFIRMED` u `ORDER_CANCELLED` |
+| `type` | Sin filtro | `INITIAL_STOCK`, `MANUAL_IN`, `MANUAL_OUT`, `ORDER_RESERVED`, `ORDER_RESERVATION_RELEASED`, `ORDER_CONFIRMED`, `ORDER_CANCELLED` o `PURCHASE_RECEIVED` |
 | `from` | Sin filtro | Fecha inicial inclusiva en ISO-8601 |
 | `to` | Sin filtro | Fecha final inclusiva en ISO-8601 |
 | `reference` | Sin filtro | Coincidencia exacta con la referencia de negocio |
@@ -282,6 +285,60 @@ La reserva crea una fila por pedido y producto, conserva intacta la existencia f
 Editar un `RESERVED` libera todos sus artículos y lo devuelve a `PENDING` antes de reemplazarlos y recapturar precios; cualquier fallo posterior revierte también la liberación. Eliminar un reservado aplica la misma liberación transaccional.
 
 La confirmación elimina cada reserva y registra en un único `ORDER_CONFIRMED` tanto el descenso físico como el descenso reservado, por lo que no descuenta dos veces. La cancelación restaura existencia física una sola vez mediante `ORDER_CANCELLED`. `ORDER_RESERVED` y `ORDER_RESERVATION_RELEASED` auditan reservas/liberaciones con referencia al pedido y UUID del actor. La cancelación sigue funcionando aunque un producto haya sido eliminado lógicamente.
+
+## Compras y recepciones
+
+Estas rutas requieren `ADMIN` o `INVENTORY_MANAGER`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/purchase-orders` | Lista órdenes paginadas y filtrables |
+| `POST` | `/api/v1/purchase-orders` | Crea una orden `DRAFT` |
+| `GET` | `/api/v1/purchase-orders/{id}` | Consulta la orden y sus cantidades pendientes |
+| `PUT` | `/api/v1/purchase-orders/{id}/items` | Reemplaza artículos o destino de un borrador |
+| `POST` | `/api/v1/purchase-orders/{id}/issue` | Emite una orden de compra |
+| `POST` | `/api/v1/purchase-orders/{id}/receipts` | Registra una recepción parcial o total |
+| `POST` | `/api/v1/purchase-orders/{id}/cancel` | Cancela una orden sin recepciones |
+| `GET` | `/api/v1/purchase-orders/{id}/receipts` | Lista el historial de recepciones |
+
+Ejemplo de creación:
+
+```json
+{
+  "supplierId": "<SUPPLIER_ID>",
+  "destinationWarehouseId": "<WAREHOUSE_ID>",
+  "currency": "MXN",
+  "supplierReference": "PO-PROVEEDOR-42",
+  "items": [{
+    "productId": "<PRODUCT_ID>",
+    "supplierSku": "SKU-PROVEEDOR",
+    "orderedQuantity": 10,
+    "unitCost": 125.5000
+  }]
+}
+```
+
+La orden sigue `DRAFT → ISSUED → PARTIALLY_RECEIVED → RECEIVED`; un borrador o una orden emitida sin recepciones puede pasar a `CANCELLED`. Solo `DRAFT` permite cambiar artículos o almacén. Cada artículo conserva el costo y SKU capturados, y cada recepción conserva su propio costo sin modificar el precio de venta del producto.
+
+Para recibir se envía una referencia externa obligatoria y artículos identificados por `purchaseOrderItemId`:
+
+```json
+{
+  "externalReference": "REMISION-9001",
+  "updateSupplierProductLastCost": true,
+  "items": [{
+    "purchaseOrderItemId": "<PURCHASE_ORDER_ITEM_ID>",
+    "quantity": 4,
+    "unitCost": 127.2500
+  }]
+}
+```
+
+La primera recepción responde `201`; repetir la misma referencia y contenido devuelve la recepción existente con `200`, sin duplicar existencia ni movimientos. Reutilizar la referencia con otro contenido responde `409`. No se puede recibir más de lo pendiente ni cancelar una orden que ya tenga recepciones.
+
+La recepción bloquea la orden, sus artículos y los inventarios en orden de UUID de producto. En una sola transacción crea la recepción, incrementa el almacén destino, registra `PURCHASE_RECEIVED`, actualiza cantidades y estado y, cuando se solicita, actualiza `lastUnitCost` de una asociación proveedor-producto existente. Un fallo revierte todos esos efectos.
+
+`GET /api/v1/purchase-orders` admite `page`, `size`, `status`, `supplierId`, `destinationWarehouseId`, coincidencia parcial de `folio` y rango inclusivo `from`/`to` sobre `createdAt`.
 
 ## Administración de usuarios
 
@@ -384,9 +441,9 @@ macOS o Linux:
 ./mvnw verify
 ```
 
-Actualmente hay 126 pruebas: 67 unitarias y 59 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
+Actualmente hay 136 pruebas: 70 unitarias y 66 de integración. Cubren productos, inventario, configuración por almacén, reservas, kardex, clientes, pedidos, compras, recepciones, usuarios, autenticación, límites de intentos, refresh tokens, JWT y autorización HTTP.
 
-Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
+Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; recepciones parciales e idempotentes; competencia concurrente por cantidades pendientes; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios y costos históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 
 El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta pruebas, SpotBugs con severidad media, escaneo de vulnerabilidades de las dependencias de producción y detección de secretos en cada `push` y `pull_request`. La acción de Trivy está fijada por SHA para evitar cambios de código no revisados en la cadena de suministro.
 
@@ -411,8 +468,10 @@ src/main/java/com/example/inventory/
 ├── inventory/     Existencias, reservas, ajustes, kardex y alertas
 ├── orders/        Pedidos, precios históricos y ciclo transaccional
 ├── products/      Catálogo, stock mínimo y borrado lógico
+├── purchases/     Órdenes de compra, recepciones parciales e idempotencia
 ├── security/      JWT, CORS y autorización
 ├── shared/        Excepciones, errores y paginación
+├── suppliers/     Proveedores y asociaciones de abastecimiento
 └── users/         Cuentas, roles y bootstrap
 
 src/main/resources/
@@ -425,7 +484,6 @@ src/test/java/com/example/inventory/
 
 ## Alcance pendiente
 
-- Proveedores y órdenes de compra.
 - Estrategia concreta de métricas, salud y observabilidad operativa.
 - Operación de rotación, respaldo y monitoreo de claves.
 

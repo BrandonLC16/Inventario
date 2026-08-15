@@ -240,6 +240,29 @@ class InventoryService implements InventoryOperations {
                 businessReference, responsibleUser));
     }
 
+    @Override
+    @Transactional
+    public void receivePurchase(UUID warehouseId, UUID productId, int quantity,
+                                UUID receiptId, String responsibleUser) {
+        String actor = requireResponsibleUser(responsibleUser);
+        requirePositive(quantity);
+        if (receiptId == null) {
+            throw new IllegalArgumentException("The purchase receipt is required");
+        }
+        lockStoredWarehouseProduct(warehouseId, productId);
+        repository.ensureExists(warehouseId, productId);
+        InventoryItem item = lockInventory(warehouseId, productId);
+        int balanceBefore = item.getQuantity();
+        int reserved = reservedQuantity(warehouseId, productId);
+        try {
+            item.changeQuantity(quantity);
+        } catch (IllegalArgumentException exception) {
+            throw new ConflictException(exception.getMessage());
+        }
+        recordMovement(item, StockMovementType.PURCHASE_RECEIVED, quantity,
+                balanceBefore, 0, reserved, reserved, receiptId.toString(), actor);
+    }
+
     private void requirePositive(int quantity) {
         if (quantity <= 0) throw new BadRequestException("Quantity must be greater than zero");
     }

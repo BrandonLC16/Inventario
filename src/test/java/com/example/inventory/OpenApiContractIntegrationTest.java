@@ -55,6 +55,12 @@ class OpenApiContractIntegrationTest extends AbstractIntegrationTest {
         assertTrue(paths.contains("/api/v1/suppliers/{id}/products"));
         assertTrue(paths.contains(
                 "/api/v1/suppliers/{id}/products/{productId}"));
+        assertTrue(paths.contains("/api/v1/purchase-orders"));
+        assertTrue(paths.contains("/api/v1/purchase-orders/{id}"));
+        assertTrue(paths.contains("/api/v1/purchase-orders/{id}/items"));
+        assertTrue(paths.contains("/api/v1/purchase-orders/{id}/issue"));
+        assertTrue(paths.contains("/api/v1/purchase-orders/{id}/receipts"));
+        assertTrue(paths.contains("/api/v1/purchase-orders/{id}/cancel"));
         assertTrue(paths.contains("/api/v1/warehouses/{warehouseId}/inventory"));
         assertTrue(paths.contains(
                 "/api/v1/warehouses/{warehouseId}/inventory/{productId}/adjustments"));

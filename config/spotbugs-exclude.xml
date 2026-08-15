@@ -3,11 +3,11 @@
     <!-- DTO collections are defensively copied; SpotBugs does not infer JDK immutable collections. -->
     <Match>
         <Bug pattern="EI_EXPOSE_REP"/>
-        <Class name="~com\.example\.inventory\.(auth\.CurrentUserResponse|auth\.RefreshTokenService\$RotatedRefreshToken|inventory\.StockMovementPageResponse|orders\.CreateOrderRequest|orders\.OrderResponse|orders\.UpdateOrderItemsRequest|security\.InventoryUserDetails|security\.SecurityProperties\$Cors|shared\.ApiError|shared\.PageResponse|users\.CreateUserRequest|users\.UpdateUserRolesRequest|users\.UserResponse)"/>
+        <Class name="~com\.example\.inventory\.(auth\.CurrentUserResponse|auth\.RefreshTokenService\$RotatedRefreshToken|inventory\.StockMovementPageResponse|orders\.CreateOrderRequest|orders\.OrderResponse|orders\.UpdateOrderItemsRequest|purchases\.CreatePurchaseOrderRequest|purchases\.CreatePurchaseReceiptRequest|purchases\.PurchaseOrderResponse|purchases\.PurchaseReceiptResponse|purchases\.UpdatePurchaseOrderItemsRequest|security\.InventoryUserDetails|security\.SecurityProperties\$Cors|shared\.ApiError|shared\.PageResponse|users\.CreateUserRequest|users\.UpdateUserRolesRequest|users\.UserResponse)"/>
     </Match>
     <!-- Constructor injection intentionally retains Spring-managed collaborators. -->
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
-        <Class name="~com\.example\.inventory\.(auth\.AuthController|auth\.RefreshTokenService\$RotatedRefreshToken|orders\.OrderController|security\.SecurityErrorHandler|users\.UserController)"/>
+        <Class name="~com\.example\.inventory\.(auth\.AuthController|auth\.RefreshTokenService\$RotatedRefreshToken|orders\.OrderController|purchases\.PurchaseOrderController|security\.SecurityErrorHandler|users\.UserController)"/>
     </Match>
 </FindBugsFilter>

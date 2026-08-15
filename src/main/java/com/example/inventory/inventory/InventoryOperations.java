@@ -12,4 +12,6 @@ public interface InventoryOperations {
                             UUID orderId, String responsibleUser);
     void restoreForOrder(UUID warehouseId, UUID productId, int quantity,
                          UUID orderId, String responsibleUser);
+    void receivePurchase(UUID warehouseId, UUID productId, int quantity,
+                         UUID receiptId, String responsibleUser);
 }

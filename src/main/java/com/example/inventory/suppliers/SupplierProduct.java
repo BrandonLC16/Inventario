@@ -63,6 +63,10 @@ class SupplierProduct {
         preferred = false;
     }
 
+    void updateLastUnitCost(BigDecimal unitCost) {
+        lastUnitCost = unitCost;
+    }
+
     UUID getSupplierId() { return supplierId; }
     UUID getProductId() { return productId; }
     String getSupplierSku() { return supplierSku; }
