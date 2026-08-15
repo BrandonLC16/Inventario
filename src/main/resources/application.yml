@@ -5,6 +5,13 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/inventory}
     username: ${DB_USERNAME:inventory}
     password: ${DB_PASSWORD:inventory}
+    hikari:
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS:5000}
+      connection-init-sql: >-
+        SET lock_timeout TO '${DB_LOCK_TIMEOUT:5s}';
+        SET statement_timeout TO '${DB_STATEMENT_TIMEOUT:30s}'
+  transaction:
+    default-timeout: ${DB_TRANSACTION_TIMEOUT:30s}
   jpa:
     open-in-view: false
     hibernate:

@@ -272,10 +272,15 @@ public class PurchaseOrderService {
         List<PurchaseOrderLine> lines = new ArrayList<>();
         for (CreatePurchaseOrderItemRequest item : requestedItems) {
             if (item == null || item.productId() == null
-                    || item.orderedQuantity() <= 0 || item.unitCost() == null
+                    || item.orderedQuantity() <= 0
+                    || item.orderedQuantity()
+                    > CreatePurchaseOrderItemRequest.MAX_QUANTITY
+                    || item.unitCost() == null
                     || item.unitCost().signum() < 0) {
                 throw new BadRequestException(
-                        "Every purchase order item requires a product, a positive quantity and a non-negative unit cost");
+                        "Every purchase order item requires a product, a quantity between 1 and "
+                                + CreatePurchaseOrderItemRequest.MAX_QUANTITY
+                                + " and a non-negative unit cost");
             }
             if (!productIds.add(item.productId())) {
                 throw new BadRequestException(
@@ -303,10 +308,15 @@ public class PurchaseOrderService {
         Set<UUID> itemIds = new HashSet<>();
         for (CreatePurchaseReceiptItemRequest item : items) {
             if (item == null || item.purchaseOrderItemId() == null
-                    || item.quantity() <= 0 || item.unitCost() == null
+                    || item.quantity() <= 0
+                    || item.quantity()
+                    > CreatePurchaseOrderItemRequest.MAX_QUANTITY
+                    || item.unitCost() == null
                     || item.unitCost().signum() < 0) {
                 throw new BadRequestException(
-                        "Every receipt item requires an order item, a positive quantity and a non-negative unit cost");
+                        "Every receipt item requires an order item, a quantity between 1 and "
+                                + CreatePurchaseOrderItemRequest.MAX_QUANTITY
+                                + " and a non-negative unit cost");
             }
             if (!itemIds.add(item.purchaseOrderItemId())) {
                 throw new BadRequestException(

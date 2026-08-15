@@ -204,6 +204,27 @@ class PurchaseOrderIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void creationRejectsQuantityAboveThePurchaseTotalLimitAsBadRequest()
+            throws Exception {
+        UUID supplierId = createSupplier("PURCHASE-LIMIT-SUP");
+        UUID productId = createProduct("PURCHASE-LIMIT-PRODUCT", "1.00");
+
+        performManager(post("/api/v1/purchase-orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(purchaseOrderJson(supplierId,
+                                new RequestedLine(productId, null, 10_001,
+                                        "1.0000"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath(
+                        "$.validationErrors['items[0].orderedQuantity']")
+                        .value("must be less than or equal to 10000"));
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM purchase_orders", Integer.class));
+    }
+
+    @Test
     void draftAndUnreceivedIssuedOrdersCanBeCancelledAndSalesCannotAccessPurchases()
             throws Exception {
         UUID supplierId = createSupplier("PURCHASE-SUP-3");

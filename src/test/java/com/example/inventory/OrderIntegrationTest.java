@@ -155,6 +155,25 @@ class OrderIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void creationRejectsQuantityAboveTheMonetaryLimitAsBadRequest()
+            throws Exception {
+        UUID productId = createProduct("ORDER-QUANTITY-LIMIT", 0);
+
+        performSales(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":"%s","quantity":1000001}]}
+                                """.formatted(productId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.validationErrors['items[0].quantity']")
+                        .value("must be less than or equal to 1000000"));
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM orders", Integer.class));
+    }
+
+    @Test
     void cancellationRollsBackEveryRestorationWhenOneBalanceOverflows() throws Exception {
         UUID firstProduct = createProduct("CANCEL-ROLLBACK-1", 10);
         UUID secondProduct = createProduct("CANCEL-ROLLBACK-2", 10);

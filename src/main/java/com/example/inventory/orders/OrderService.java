@@ -203,8 +203,11 @@ public class OrderService {
         }
         Set<UUID> productIds = new HashSet<>();
         for (CreateOrderItemRequest item : request.items()) {
-            if (item == null || item.productId() == null || item.quantity() <= 0) {
-                throw new BadRequestException("Every order item requires a product and a positive quantity");
+            if (item == null || item.productId() == null || item.quantity() <= 0
+                    || item.quantity() > CreateOrderItemRequest.MAX_QUANTITY) {
+                throw new BadRequestException(
+                        "Every order item requires a product and a quantity between 1 and "
+                                + CreateOrderItemRequest.MAX_QUANTITY);
             }
             if (!productIds.add(item.productId())) {
                 throw new BadRequestException("An order must not contain duplicate products");

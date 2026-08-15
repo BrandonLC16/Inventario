@@ -77,7 +77,7 @@ docker compose up -d
 docker compose ps
 ```
 
-El entorno local publica PostgreSQL en `localhost:5432` y usa `inventory` como nombre de base, usuario y contraseña. Estas credenciales son únicamente para desarrollo local.
+`compose.yaml` es exclusivamente para desarrollo individual: publica PostgreSQL sólo en `127.0.0.1:5432` y usa `inventory` como nombre de base, usuario y contraseña. No debe desplegarse en ambientes compartidos, staging ni producción.
 
 ### 3. Generar las claves JWT
 
@@ -286,7 +286,7 @@ Ejemplo de creación:
 {"customerId":"<CUSTOMER_ID>","items":[{"productId":"<PRODUCT_ID>","quantity":2}]}
 ```
 
-Un pedido admite de 1 a 100 productos distintos y cada cantidad debe ser positiva. `customerId` es opcional. Los productos repetidos se rechazan con `400`.
+Un pedido admite de 1 a 100 productos distintos y cada cantidad debe estar entre 1 y 1,000,000. Este máximo garantiza que subtotales y total siempre caben en los campos monetarios aun usando los precios máximos admitidos. `customerId` es opcional. Los productos repetidos se rechazan con `400`.
 
 Al crear el pedido se captura el precio unitario vigente y se calculan el subtotal de cada artículo y el total. Esos importes no cambian aunque después se modifique el producto. La moneda actual es fija, `MXN`; el diseño persiste el código para permitir una futura estrategia multimoneda. También se genera un folio `ORD-##########` y se registra el UUID de quien creó, confirmó o canceló, junto con las fechas correspondientes.
 
@@ -332,7 +332,7 @@ Ejemplo de creación:
 }
 ```
 
-La orden sigue `DRAFT → ISSUED → PARTIALLY_RECEIVED → RECEIVED`; un borrador o una orden emitida sin recepciones puede pasar a `CANCELLED`. Solo `DRAFT` permite cambiar artículos o almacén. Cada artículo conserva el costo y SKU capturados, y cada recepción conserva su propio costo sin modificar el precio de venta del producto.
+La orden sigue `DRAFT → ISSUED → PARTIALLY_RECEIVED → RECEIVED`; un borrador o una orden emitida sin recepciones puede pasar a `CANCELLED`. Solo `DRAFT` permite cambiar artículos o almacén. Admite hasta 100 artículos y cada cantidad debe estar entre 1 y 10,000 para mantener subtotales y total dentro de `NUMERIC(20,4)` con cualquier costo válido. Cada artículo conserva el costo y SKU capturados, y cada recepción conserva su propio costo sin modificar el precio de venta del producto.
 
 Para recibir se envía una referencia externa obligatoria y artículos identificados por `purchaseOrderItemId`:
 
@@ -481,6 +481,10 @@ El contrato se genera de forma reproducible desde los controllers durante `verif
 | `DB_URL` | `jdbc:postgresql://localhost:5432/inventory` | URL JDBC |
 | `DB_USERNAME` | `inventory` | Usuario de PostgreSQL |
 | `DB_PASSWORD` | `inventory` | Contraseña de PostgreSQL |
+| `DB_LOCK_TIMEOUT` | `5s` | Espera máxima de PostgreSQL para adquirir un bloqueo |
+| `DB_STATEMENT_TIMEOUT` | `30s` | Duración máxima de una sentencia PostgreSQL |
+| `DB_TRANSACTION_TIMEOUT` | `30s` | Duración máxima predeterminada de una transacción Spring |
+| `DB_POOL_CONNECTION_TIMEOUT_MS` | `5000` | Espera máxima en milisegundos para obtener una conexión del pool |
 | `JWT_PUBLIC_KEY_LOCATION` | Requerida | Clave pública X.509 |
 | `JWT_PRIVATE_KEY_LOCATION` | Requerida | Clave privada PKCS#8 |
 | `JWT_ISSUER` | `inventory-api` | Claim `iss` |
@@ -529,7 +533,7 @@ La suite combina pruebas unitarias y de integración sobre PostgreSQL. Cubre pro
 
 Las pruebas PostgreSQL validan entradas simultáneas sin actualizaciones perdidas ni más de un `INITIAL_STOCK`; salidas simultáneas sin saldo negativo; reservas competitivas sin sobreventa; rollback multiartículo; edición, liberación y eliminación reservada; confirmación sin doble descuento; cancelación idempotente; recepciones parciales e idempotentes; transferencias competitivas y contra stock reservado; conservación origen-tránsito-destino; conteos físicos concurrentes, no bloqueantes, idempotentes y compatibles con reservas; kardex físico/reservado consecutivo; upgrade V9→V10 con backfill histórico multi-almacén; precios y costos históricos; filtros; alertas; permisos; y revocación inmediata de access/refresh tokens.
 
-El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta pruebas, SpotBugs con severidad media, escaneo de vulnerabilidades de las dependencias de producción y detección de secretos en cada `push` y `pull_request`. La acción de Trivy está fijada por SHA para evitar cambios de código no revisados en la cadena de suministro.
+El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta pruebas, SpotBugs con severidad media, escaneo de vulnerabilidades de las dependencias de producción y detección de secretos en cada `push` y `pull_request`. Todas las acciones de terceros están fijadas por SHA y el Maven Wrapper verifica el SHA-256 de la distribución antes de ejecutarla.
 
 ## Construcción
 
@@ -597,7 +601,7 @@ Inicia Docker Desktop o el servicio Docker. `docker version` debe mostrar tanto 
 
 ### El puerto 5432 está ocupado
 
-Cambia el puerto de `compose.yaml`, por ejemplo a `5433:5432`, y configura `DB_URL=jdbc:postgresql://localhost:5433/inventory`.
+Cambia el puerto de `compose.yaml`, por ejemplo a `127.0.0.1:5433:5432`, y configura `DB_URL=jdbc:postgresql://localhost:5433/inventory`.
 
 ### No se encuentran las claves JWT
 
