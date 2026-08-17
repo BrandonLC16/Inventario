@@ -1,0 +1,105 @@
+<a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+
+<div class="shell">
+  <header class="shell__header">
+    <button
+      #menuButton
+      class="menu-button"
+      type="button"
+      aria-label="Abrir o cerrar navegación"
+      aria-controls="primary-navigation"
+      [attr.aria-expanded]="menuOpen()"
+      (click)="toggleMenu()"
+    >
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </button>
+
+    <a class="brand" routerLink="/dashboard" aria-label="Ir al resumen de Inventario">
+      <span class="brand__mark" aria-hidden="true">IV</span>
+      <span>
+        <strong>Inventario</strong>
+        <small>Centro de operaciones</small>
+      </span>
+    </a>
+
+    <div class="demo-session" aria-label="Sesión de demostración">
+      <div class="demo-session__identity">
+        <span class="demo-session__avatar" aria-hidden="true">{{
+          session.identity().displayName.charAt(0)
+        }}</span>
+        <span>
+          <small>Sesión de prueba</small>
+          <strong>{{ session.identity().displayName }}</strong>
+        </span>
+      </div>
+
+      <label for="demo-role">Vista de rol</label>
+      <select id="demo-role" [value]="session.role()" (change)="changeRole($event)">
+        @for (role of roles; track role) {
+          <option [value]="role">{{ roleLabels[role] }}</option>
+        }
+      </select>
+    </div>
+  </header>
+
+  @if (menuOpen()) {
+    <button
+      class="shell__scrim"
+      type="button"
+      aria-label="Cerrar navegación"
+      (click)="closeMenu()"
+    ></button>
+  }
+
+  <aside id="primary-navigation" class="shell__sidebar" [class.shell__sidebar--open]="menuOpen()">
+    <nav aria-label="Navegación principal">
+      @for (group of visibleGroups(); track group.id) {
+        <section class="navigation-group" [attr.aria-labelledby]="'nav-group-' + group.id">
+          <h2 [id]="'nav-group-' + group.id">{{ group.label }}</h2>
+          <ul>
+            @for (section of group.sections; track section.id) {
+              <li>
+                <a
+                  [attr.data-nav-id]="section.id"
+                  [routerLink]="'/' + section.path"
+                  routerLinkActive="navigation-link--active"
+                  ariaCurrentWhenActive="page"
+                  (click)="closeMenu()"
+                  #firstNavigationLink
+                >
+                  {{ section.label }}
+                </a>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </nav>
+
+    <p class="authority-note">
+      <strong>La API decide.</strong>
+      Este menú y sus guards mejoran la experiencia; no sustituyen la autorización del servidor.
+    </p>
+  </aside>
+
+  <main #mainContent id="main-content" class="shell__main" tabindex="-1">
+    <nav class="breadcrumbs" aria-label="Ruta de navegación">
+      <ol>
+        <li><a routerLink="/dashboard">Inicio</a></li>
+        @for (breadcrumb of breadcrumbs(); track breadcrumb.url; let last = $last) {
+          <li>
+            @if (last) {
+              <span aria-current="page">{{ breadcrumb.label }}</span>
+            } @else {
+              <a [routerLink]="breadcrumb.url">{{ breadcrumb.label }}</a>
+            }
+          </li>
+        }
+      </ol>
+    </nav>
+
+    <router-outlet />
+  </main>
+</div>

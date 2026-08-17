@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto y `F2-02` añadió comprobaciones estrictas, lint, formato y límites de bundle reproducibles. Todavía no incorpora autenticación, acceso a la API ni módulos de negocio.
+Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad y `F2-03` incorpora el shell, la navegación por rol y las páginas de estado. Todavía no incluye autenticación real, acceso a la API ni módulos de negocio.
 
 ## Versiones fijadas
 
@@ -46,6 +46,25 @@ npm start
 ```
 
 La aplicación queda disponible en `http://localhost:4200/` y recarga al detectar cambios.
+
+## Shell y navegación de demostración
+
+El shell común vive en `src/app/layout/` e incluye encabezado, menú lateral adaptable, breadcrumbs derivados de metadata de rutas, enlace para saltar al contenido y páginas específicas para acceso no permitido y rutas desconocidas. En anchos menores de `60rem`, la navegación se convierte en un panel temporal; por debajo de `42rem`, el encabezado reduce la información secundaria.
+
+El selector **Vista de rol** permite comprobar en memoria las tres identidades de prueba. Cambiar el rol vuelve al resumen y actualiza el menú con esta política:
+
+| Área                                               | `ADMIN` | `INVENTORY_MANAGER` | `SALES` |
+| -------------------------------------------------- | :-----: | :-----------------: | :-----: |
+| Resumen, productos, almacenes, inventario y perfil |   Sí    |         Sí          |   Sí    |
+| Proveedores, compras, transferencias y conteos     |   Sí    |         Sí          |   No    |
+| Clientes y pedidos                                 |   Sí    |         No          |   Sí    |
+| Usuarios                                           |   Sí    |         No          |   No    |
+
+La identidad de demostración usa únicamente un Signal del servicio de sesión. No escribe en `localStorage`, `sessionStorage`, cookies ni otro almacenamiento, y una recarga restaura el rol inicial. No contiene tokens ni representa una autenticación real.
+
+La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alimenta tanto las rutas como el menú y el guard de demostración. Ocultar una opción o redirigir a `/forbidden` sólo mejora la experiencia: **la API siempre es la autoridad y debe volver a autorizar cada petición**.
+
+Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 
 ## Pruebas
 

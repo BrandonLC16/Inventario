@@ -18,7 +18,7 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render the lazy welcome route', async () => {
+  it('should redirect the root route to the dashboard shell', async () => {
     const fixture = TestBed.createComponent(App);
     const router = TestBed.inject(Router);
 
@@ -27,6 +27,8 @@ describe('App', () => {
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Inventario');
+    expect(router.url).toBe('/dashboard');
+    expect(compiled.querySelector('header')).not.toBeNull();
+    expect(compiled.querySelector('h1')?.textContent).toContain('Resumen');
   });
 });

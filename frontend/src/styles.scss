@@ -16,8 +16,36 @@ html {
     sans-serif;
 }
 
+html,
+body {
+  min-block-size: 100%;
+}
+
 body {
   margin: 0;
   background: #f7f8fc;
   color: #1b1b1f;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a,
+button,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid #d17713;
+  outline-offset: 3px;
+}
+
+::selection {
+  background: #cbe8df;
+  color: #102b25;
 }

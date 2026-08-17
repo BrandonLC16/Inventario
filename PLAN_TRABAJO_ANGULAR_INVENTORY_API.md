@@ -5,7 +5,7 @@
 **Copia de trabajo:** `C:\Users\brand\OneDrive\Documentos\Inventario`  
 **Rama:** `master`  
 **Commit verificado:** `15de61f8085c55c01c61f0a18f8afe405378be76`  
-**Estado:** API sincronizada y funcional; FrontEnd en Fase 2, con `F2-01` y `F2-02` completadas.
+**Estado:** API sincronizada y funcional; FrontEnd en Fase 2, con `F2-01` y `F2-02` completadas y `F2-03` implementada a falta de validación visual en un navegador conectado.
 
 ## 1. Resultado ejecutivo
 
@@ -511,7 +511,7 @@ Alcanzado: no quedan hallazgos P0 abiertos y existe un contrato de sesión que A
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 17 de agosto de 2026 se comprobó inicialmente que `frontend/` no existía y el trabajo comenzó por **F2-01**, sin adelantar autenticación, diseño final ni módulos de negocio. `F2-01` y `F2-02` ya están completadas; las siguientes entregas habilitadas son **F2-03** y **F2-04**. Conviene pedir a Codex una entrega a la vez: un pedido útil identifica el comportamiento deseado, los archivos o documentos que debe consultar, las restricciones que debe conservar y las verificaciones que debe ejecutar.
+El 17 de agosto de 2026 se comprobó inicialmente que `frontend/` no existía y el trabajo comenzó por **F2-01**, sin adelantar autenticación, diseño final ni módulos de negocio. `F2-01` y `F2-02` ya están completadas; `F2-03` tiene código y comprobaciones automatizadas aprobadas, pero conserva estado **En curso** hasta validar visualmente los anchos representativos en un navegador conectado. `F2-04` también está habilitada. Conviene pedir a Codex una entrega a la vez: un pedido útil identifica el comportamiento deseado, los archivos o documentos que debe consultar, las restricciones que debe conservar y las verificaciones que debe ejecutar.
 
 Antes de cada entrega, Codex debe leer `AGENTS.md`, revisar el estado de Git y confirmar que la dependencia indicada está completa. Al terminar debe presentar los archivos modificados, las decisiones tomadas, los comandos ejecutados y cualquier verificación pendiente. No se marca una entrega como completada sólo porque el código exista: también debe contar con la evidencia mínima de la tabla.
 
@@ -528,7 +528,7 @@ F2-03 y F2-04 pueden desarrollarse como cambios independientes después de F2-02
 |---|---|---|---|---|
 | `F2-01` | Proyecto Angular base | Fase 1 | Completado | `npm ci`; 2 archivos de prueba y 3 pruebas aprobadas; build de producción de 189.46 kB |
 | `F2-02` | Calidad y límites técnicos | `F2-01` | Completado | `npm ci`; formato y lint aprobados; 2 archivos/3 pruebas; builds de 1.31 MB (desarrollo) y 189.46 kB (producción) dentro de budgets |
-| `F2-03` | Layout y navegación por rol | `F2-02` | Pendiente | shell responsive y pruebas de navegación/visibilidad |
+| `F2-03` | Layout y navegación por rol | `F2-02` | En curso | shell y política central implementados; `npm ci` y `npm run check` aprobados; 4 archivos/17 pruebas; builds de 1.32 MB y 228.97 kB; validación visual pendiente por falta de navegador conectado |
 | `F2-04` | Sistema visual compartido | `F2-02` | Pendiente | tema, tokens y estados comunes accesibles demostrables |
 | `F2-05` | OpenAPI y ambientes | `F2-03`, `F2-04` | Pendiente | cliente regenerable y URL de API configurable sin secretos |
 | `F2-06` | Sesión y autorización de UI | `F2-05` | Pendiente | login completo y pruebas de memoria/refresh/guards/interceptor |
@@ -811,7 +811,7 @@ La solución está desplegada, monitoreada y respaldada; los responsables aprueb
 
 ```text
 Fase 0 ✓ → Fase 1 ✓
-                    └─→ Fase 2 (en curso: F2-03/F2-04 siguientes)
+                    └─→ Fase 2 (en curso: F2-03 pendiente de revisión visual; F2-04 siguiente)
                          ├─→ Fase 3 ─┬→ Fase 4
                          │           ├→ Fase 5
                          │           └→ Fase 6
@@ -832,7 +832,7 @@ Todas convergen en Fase 8 → Fase 9 → Fase 10.
 - exclusiones preventivas de secretos.
 - OpenAPI reproducible y CI verde.
 
-La generación reproducible del cliente TypeScript está programada para `F2-05`, después del layout y el sistema visual. `F2-01` y `F2-02` se completaron el 17 de agosto de 2026. La tabla README de proveedores se completó el mismo día.
+La generación reproducible del cliente TypeScript está programada para `F2-05`, después del layout y el sistema visual. `F2-01` y `F2-02` se completaron el 17 de agosto de 2026. `F2-03` quedó implementada y con verificaciones automatizadas aprobadas ese día; falta su revisión visual en un navegador conectado antes de marcarla completada. La tabla README de proveedores se completó el mismo día.
 
 ### P1 — MVP FrontEnd
 
