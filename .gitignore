@@ -72,3 +72,6 @@ build/
 **/id_ed25519
 **/secrets/
 **/.secrets/
+
+ AGENTS.md
+PLAN_TRABAJO_INVENTORI_API.md
