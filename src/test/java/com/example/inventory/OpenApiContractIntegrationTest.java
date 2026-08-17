@@ -44,7 +44,7 @@ class OpenApiContractIntegrationTest extends AbstractIntegrationTest {
 
         JsonNode contract = objectMapper.readTree(response);
         Collection<String> paths = contract.path("paths").propertyNames();
-        assertEquals("v1", contract.path("info").path("version").asText());
+        assertEquals("v1", contract.path("info").path("version").asString());
         assertFalse(paths.isEmpty());
         assertTrue(paths.stream().allMatch(path -> path.startsWith("/api/v1/")));
         assertTrue(paths.contains("/api/v1/inventory"));

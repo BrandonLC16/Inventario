@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -65,17 +64,46 @@ final class ClientAddressResolver {
     private static Optional<InetAddress> parseAddress(String rawValue) {
         if (rawValue == null) return Optional.empty();
         String value = rawValue.trim();
-        if (value.startsWith("[") && value.endsWith("]")) {
+        boolean bracketed = value.startsWith("[") && value.endsWith("]");
+        if (bracketed) {
             value = value.substring(1, value.length() - 1);
         }
-        if (value.isEmpty() || !value.matches("[0-9A-Fa-f:.]+")) {
+        if (value.isEmpty() || value.indexOf('%') >= 0
+                || bracketed && value.indexOf(':') < 0) {
+            return Optional.empty();
+        }
+        int lastColon = value.lastIndexOf(':');
+        if (lastColon < 0 && !isStrictIpv4Literal(value)) {
+            return Optional.empty();
+        }
+        if (lastColon >= 0 && value.indexOf('.') >= 0
+                && !isStrictIpv4Literal(value.substring(lastColon + 1))) {
             return Optional.empty();
         }
         try {
-            return Optional.of(InetAddress.getByName(value));
-        } catch (UnknownHostException exception) {
+            return Optional.of(InetAddress.ofLiteral(value));
+        } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
+    }
+
+    private static boolean isStrictIpv4Literal(String value) {
+        String[] octets = value.split("\\.", -1);
+        if (octets.length != 4) return false;
+        for (String octet : octets) {
+            if (octet.isEmpty() || octet.length() > 3
+                    || octet.length() > 1 && octet.charAt(0) == '0') {
+                return false;
+            }
+            int number = 0;
+            for (int index = 0; index < octet.length(); index++) {
+                char digit = octet.charAt(index);
+                if (digit < '0' || digit > '9') return false;
+                number = number * 10 + digit - '0';
+            }
+            if (number > 255) return false;
+        }
+        return true;
     }
 
     private static String format(InetAddress address) {

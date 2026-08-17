@@ -83,7 +83,8 @@ class RefreshTokenServiceTest {
         RefreshToken replacement = new RefreshToken(user, familyId, new byte[32], NOW.plus(TTL));
         tokenBelongsTo(user);
         when(repository.findByTokenHashForUpdate(any(byte[].class)))
-                .thenReturn(Optional.of(current), Optional.of(replacement));
+                .thenReturn(Optional.of(current))
+                .thenReturn(Optional.of(replacement));
 
         RefreshTokenService.RotatedRefreshToken rotated = service.rotate("old-refresh");
 
@@ -107,7 +108,7 @@ class RefreshTokenServiceTest {
         assertTrue(expired.isRevoked());
         assertEquals(NOW, expired.getRevokedAt());
         assertNull(expired.getReplacedBy());
-        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).saveAndFlush(any(RefreshToken.class));
     }
 
     @Test
@@ -122,7 +123,7 @@ class RefreshTokenServiceTest {
         assertThrows(InvalidAuthenticationException.class, () -> service.rotate("used"));
 
         verify(repository).revokeActiveFamily(familyId, NOW);
-        verify(repository, never()).saveAndFlush(any());
+        verify(repository, never()).saveAndFlush(any(RefreshToken.class));
     }
 
     @Test
@@ -146,7 +147,8 @@ class RefreshTokenServiceTest {
         RefreshToken token = new RefreshToken(user, familyId,
                 RefreshTokenService.hash("logout-token"), NOW.plusSeconds(600));
         when(repository.findUserIdByTokenHash(any(byte[].class)))
-                .thenReturn(Optional.of(user.getId()), Optional.empty());
+                .thenReturn(Optional.of(user.getId()))
+                .thenReturn(Optional.empty());
         when(repository.findByTokenHashForUpdate(any(byte[].class))).thenReturn(Optional.of(token));
         when(repository.revokeActiveFamily(familyId, NOW)).thenReturn(1);
 

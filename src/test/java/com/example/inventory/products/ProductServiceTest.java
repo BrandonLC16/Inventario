@@ -45,7 +45,9 @@ class ProductServiceTest {
     void findAllRequestsProductsSortedByName() {
         Product keyboard = product("KEY-1", "Keyboard");
         Product mouse = product("MOU-1", "Mouse");
-        when(repository.findAll(any(Specification.class), any(Pageable.class)))
+        when(repository.findAll(
+                org.mockito.ArgumentMatchers.<Specification<Product>>any(),
+                any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(keyboard, mouse)));
 
         var responses = service().findAll(0, 20, null, null, null);
@@ -53,7 +55,9 @@ class ProductServiceTest {
         assertEquals(List.of("Keyboard", "Mouse"),
                 responses.content().stream().map(ProductResponse::name).toList());
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(repository).findAll(any(Specification.class), pageable.capture());
+        verify(repository).findAll(
+                org.mockito.ArgumentMatchers.<Specification<Product>>any(),
+                pageable.capture());
         assertEquals("name: ASC,id: ASC", pageable.getValue().getSort().toString());
     }
 

@@ -30,4 +30,45 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
+.vscode/*
+!.vscode/settings.json
+
+### Local secrets and private key material ###
+**/.env
+**/.env.*
+!**/.env.example
+**/*.env
+**/*.env.*
+!**/*.env.example
+
+**/*.pem
+**/*.pem.*
+!**/*.pem.example
+**/*.key
+**/*.key.*
+!**/*.key.example
+**/*.p8
+**/*.p8.*
+!**/*.p8.example
+**/*.der
+**/*.der.*
+!**/*.der.example
+**/*.p12
+**/*.p12.*
+!**/*.p12.example
+**/*.pfx
+**/*.pfx.*
+!**/*.pfx.example
+**/*.jks
+**/*.jks.*
+!**/*.jks.example
+**/*.keystore
+**/*.keystore.*
+!**/*.keystore.example
+
+**/id_rsa
+**/id_dsa
+**/id_ecdsa
+**/id_ed25519
+**/secrets/
+**/.secrets/

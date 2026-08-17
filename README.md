@@ -49,11 +49,21 @@ El proyecto implementa:
 
 ## Requisitos
 
-- JDK 25 LTS disponible en `PATH`.
+- JDK 25 LTS. En Windows, el workspace usa `C:\Program Files\Eclipse Adoptium\jdk-25.0.3.9-hotspot`.
 - Docker con el plugin de Compose.
 - OpenSSL u otra herramienta capaz de generar claves RSA en formato PKCS#8 y X.509.
 
 No es necesario instalar Maven: el repositorio incluye `mvnw` y `mvnw.cmd`.
+
+En PowerShell, verifica y ejecuta Maven mediante el script del proyecto:
+
+```powershell
+.\scripts\mvnw-jdk25.ps1 --version
+```
+
+El script configura `JAVA_HOME` y `PATH` con el JDK indicado, ejecuta `java -version`, exige que sea Java 25 y sólo entonces inicia Maven. Sin argumentos ejecuta `verify`; los argumentos adicionales se transfieren al Maven Wrapper. VS Code aplica el mismo JDK al proyecto y a sus terminales nuevas.
+
+Para una comprobación manual, `java -version` debe mostrar `25.0.3` antes de cualquier comando Maven:
 
 ```text
 java -version
@@ -90,6 +100,8 @@ openssl pkey -in inventory-private.pem -pubout -out inventory-public.pem
 
 La clave privada debe estar en formato PKCS#8 y la pública en formato X.509. No agregues estos archivos a Git.
 
+`.gitignore` excluye `.env`, material de claves y almacenes locales; sólo deben versionarse plantillas `.example` sin valores reales, como [`.env.example`](.env.example). Antes de producción, ensaya y aprueba el [runbook de rotación de claves JWT](docs/runbooks/jwt-key-rotation.md). La implementación actual usa un único par sin `kid`/JWKS, por lo que su rotación requiere un corte coordinado y vuelve inválidos los access tokens anteriores.
+
 ### 4. Crear el primer administrador
 
 En una base de datos sin usuarios, habilita el bootstrap una sola vez. En PowerShell:
@@ -101,7 +113,7 @@ $env:BOOTSTRAP_ADMIN_EMAIL = "admin@example.test"
 $env:BOOTSTRAP_ADMIN_PASSWORD = "<mínimo-12-caracteres>"
 $env:JWT_PUBLIC_KEY_LOCATION = "file:C:/ruta-segura/inventory-public.pem"
 $env:JWT_PRIVATE_KEY_LOCATION = "file:C:/ruta-segura/inventory-private.pem"
-./mvnw.cmd spring-boot:run
+.\scripts\mvnw-jdk25.ps1 spring-boot:run
 ```
 
 En macOS o Linux usa `export`, rutas con el formato `file:/ruta/...` y `./mvnw`.
@@ -124,13 +136,13 @@ La API queda disponible en `http://localhost:8080`. Flyway aplica las migracione
 
 Envía el access token como `Authorization: Bearer <ACCESS_TOKEN>`. Para renovar o cerrar la sesión, envía `{"refreshToken":"<REFRESH_TOKEN>"}` como JSON a la ruta correspondiente. Las respuestas de login y renovación incluyen `Cache-Control: no-store` y `Pragma: no-cache`.
 
-El servidor persiste únicamente el hash SHA-256 del refresh token aleatorio, nunca su valor, y lo rota en cada renovación bajo bloqueo transaccional. El cliente debe mantener el access token en memoria. Una aplicación nativa debe guardar el refresh token en Keychain/Keystore; una aplicación web debe delegarlo a un BFF que use una cookie `HttpOnly`, `Secure` y `SameSite`, porque esta API recibe el refresh como JSON y no debe guardarse en `localStorage` ni `sessionStorage`. El cliente reemplaza el refresh anterior sólo después de recibir el nuevo par, serializa renovaciones concurrentes y, ante un `401`, elimina la sesión local y vuelve a autenticar.
+El servidor persiste únicamente el hash SHA-256 del refresh token aleatorio, nunca su valor, y lo rota en cada renovación bajo bloqueo transaccional. Para el MVP Angular se adoptó una sesión no persistente: tanto el access token como el refresh token permanecen sólo en memoria y recargar o cerrar la pestaña exige iniciar sesión otra vez. No se permite guardar ninguno de los tokens en `localStorage`, `sessionStorage`, IndexedDB ni otro almacenamiento persistente del navegador. El cliente reemplaza el par anterior sólo después de renovar correctamente, serializa renovaciones concurrentes y, ante un `401` de refresh, elimina la sesión en memoria y vuelve a autenticar. Una aplicación nativa puede custodiar el refresh token en Keychain/Keystore. Si posteriormente se requiere sesión web persistente, primero debe introducirse un BFF o una cookie `HttpOnly`, `Secure` y `SameSite` junto con protección CSRF y una configuración CORS con credenciales controlada; no basta con cambiar el interceptor. La decisión completa está documentada en [`docs/decisions/SEC-02-browser-refresh-token.md`](docs/decisions/SEC-02-browser-refresh-token.md).
 
 Los fallos de login, los usuarios inexistentes, deshabilitados o bloqueados y los refresh tokens inválidos al renovar usan la misma respuesta genérica `401`. Un refresh token rotado o revocado no puede reutilizarse. El logout revoca toda su familia y es idempotente: un token desconocido también recibe `204`.
 
 `login`, `refresh` y `logout` limitan intentos por cliente y por huella SHA-256 de la credencial, sin conservar identificadores ni tokens en claro. La huella de credencial es global y no incluye la IP, por lo que cambiar de origen no reinicia su contador. El valor predeterminado permite 5 intentos por credencial y 100 por cliente en una ventana de un minuto; al excederlo responde `429`, código `RATE_LIMIT_EXCEEDED` y cabecera `Retry-After`. Los contadores y ventanas se actualizan atómicamente en PostgreSQL y se comparten entre réplicas; las ventanas vencidas dejan de contar inmediatamente y sus filas se limpian periódicamente.
 
-Sin proxies confiables configurados se usa exclusivamente la dirección TCP del peer y se ignora `X-Forwarded-For`. Detrás de un gateway, `AUTH_TRUSTED_PROXIES` debe contener sus IP o redes CIDR; sólo entonces se recorre la cadena de derecha a izquierda hasta encontrar el cliente no confiable más cercano. El gateway debe anexar o reemplazar correctamente esa cabecera y mantener su propio límite perimetral como defensa adicional.
+Sin proxies confiables configurados se usa exclusivamente la dirección TCP del peer y se ignora `X-Forwarded-For`; mantén `AUTH_TRUSTED_PROXIES` vacío cuando la API no esté detrás de un reverse proxy. Detrás de un gateway, `AUTH_TRUSTED_PROXIES` debe contener únicamente sus IP o redes CIDR; sólo entonces se recorre la cadena de derecha a izquierda hasta encontrar el cliente no confiable más cercano. El reverse proxy expuesto al exterior debe sobrescribir, no conservar, el `X-Forwarded-For` recibido del cliente antes de construir la cadena confiable, y debe mantener su propio límite perimetral como defensa adicional.
 
 Cada access token incluye una versión de seguridad que se contrasta con PostgreSQL en todas las peticiones autenticadas. El logout revoca su familia refresh e invalida inmediatamente los access tokens anteriores; repetirlo no invalida tokens nuevos. Bloquear, deshabilitar, cambiar roles o cambiar/restablecer la contraseña incrementa esa versión y revoca todas las familias refresh activas del usuario dentro de la misma transacción. La revocación administrativa de sesiones aplica la misma regla sin cambiar la contraseña.
 
@@ -471,7 +483,7 @@ Ambas rutas siguen protegidas y requieren un access token con rol `ADMIN`.
 El contrato se genera de forma reproducible desde los controllers durante `verify` en `target/openapi/inventory-api-v1.json`. La prueba falla si aparece una ruta fuera de `/api/v1` o si faltan los listados globales. Para regenerarlo de forma aislada, con Docker iniciado:
 
 ```powershell
-./mvnw.cmd "-Dtest=OpenApiContractIntegrationTest" test
+.\scripts\mvnw-jdk25.ps1 "-Dtest=OpenApiContractIntegrationTest" test
 ```
 
 ## Configuración
@@ -495,7 +507,7 @@ El contrato se genera de forma reproducible desde los controllers durante `verif
 | `AUTH_RATE_LIMIT_PER_CLIENT` | `100` | Intentos totales de autenticación por cliente y ventana |
 | `AUTH_RATE_LIMIT_WINDOW` | `1m` | Ventana entre 1 segundo y 1 hora |
 | `AUTH_RATE_LIMIT_MAX_TRACKED_KEYS` | `10000` | Máximo de contadores activos compartidos; al agotarse se rechazan claves nuevas |
-| `AUTH_TRUSTED_PROXIES` | Lista vacía | IP o CIDR de proxies confiables, separados por comas, autorizados a aportar `X-Forwarded-For` |
+| `AUTH_TRUSTED_PROXIES` | Lista vacía | IP o CIDR de proxies confiables, separados por comas, autorizados a aportar `X-Forwarded-For`; debe permanecer vacío sin reverse proxy |
 | `CORS_ALLOWED_ORIGINS` | Lista vacía | Orígenes separados por comas |
 | `SWAGGER_ENABLED` | `false` | Habilita Swagger para `ADMIN` |
 | `BOOTSTRAP_ADMIN_ENABLED` | `false` | Habilita el administrador inicial |
@@ -518,8 +530,8 @@ Docker debe estar iniciado. Testcontainers crea PostgreSQL temporal; no es neces
 Windows:
 
 ```powershell
-./mvnw.cmd clean test
-./mvnw.cmd verify
+.\scripts\mvnw-jdk25.ps1 clean test
+.\scripts\mvnw-jdk25.ps1 verify
 ```
 
 macOS o Linux:
@@ -540,7 +552,7 @@ El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) ejecuta prueb
 Windows:
 
 ```powershell
-./mvnw.cmd clean package
+.\scripts\mvnw-jdk25.ps1 clean package
 java -jar target/inventory-api-0.0.1-SNAPSHOT.jar
 ```
 
@@ -575,7 +587,7 @@ src/test/java/com/example/inventory/
 ## Alcance pendiente
 
 - Estrategia concreta de métricas, salud y observabilidad operativa.
-- Operación de rotación, respaldo y monitoreo de claves.
+- Rotación JWT sin interrupciones mediante convivencia temporal de claves con `kid`/JWKS; hasta implementarla aplica el runbook de corte coordinado.
 
 ## Detener el entorno local
 
