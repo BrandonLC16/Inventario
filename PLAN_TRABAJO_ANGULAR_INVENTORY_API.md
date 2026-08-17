@@ -485,7 +485,7 @@ Las duraciones son días-persona y se recalibrarán con el equipo. Backend y Fro
 4. `.gitignore` para claves, ambientes y almacenes: completado.
 5. OpenAPI regenerado y validado: completado.
 6. Maven, SpotBugs, Trivy de dependencias y Trivy de secretos: aprobados.
-7. Tabla README de proveedores y automatización del cliente TypeScript: trasladadas a la Fase 2; no bloquean el inicio.
+7. Tabla README de proveedores: completada el 17 de agosto de 2026. La automatización del cliente TypeScript se trasladó a la Fase 2 y no bloquea el inicio.
 
 **Criterio de salida**
 
@@ -708,7 +708,7 @@ Todas convergen en Fase 8 → Fase 9 → Fase 10.
 - exclusiones preventivas de secretos.
 - OpenAPI reproducible y CI verde.
 
-La generación reproducible del cliente TypeScript y la tabla README de proveedores quedan como primeras tareas de la Fase 2.
+La generación reproducible del cliente TypeScript queda como primera tarea de la Fase 2. La tabla README de proveedores se completó el 17 de agosto de 2026.
 
 ### P1 — MVP FrontEnd
 

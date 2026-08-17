@@ -312,6 +312,21 @@ Editar un `RESERVED` libera todos sus artículos y lo devuelve a `PENDING` antes
 
 La confirmación elimina cada reserva y registra en un único `ORDER_CONFIRMED` tanto el descenso físico como el descenso reservado, por lo que no descuenta dos veces. La cancelación restaura existencia física una sola vez mediante `ORDER_CANCELLED`. `ORDER_RESERVED` y `ORDER_RESERVATION_RELEASED` auditan reservas/liberaciones con referencia al pedido y UUID del actor. La cancelación sigue funcionando si el producto fue desactivado; el producto no puede eliminarse mientras exista un pedido confirmado pendiente de esa compensación.
 
+## Proveedores
+
+Estas rutas requieren `ADMIN` o `INVENTORY_MANAGER`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/suppliers` | Busca proveedores con paginación y filtros |
+| `POST` | `/api/v1/suppliers` | Crea un proveedor |
+| `GET` | `/api/v1/suppliers/{id}` | Consulta un proveedor |
+| `PUT` | `/api/v1/suppliers/{id}` | Reemplaza sus datos editables |
+| `DELETE` | `/api/v1/suppliers/{id}` | Lo desactiva lógicamente; responde `204` |
+| `GET` | `/api/v1/suppliers/{id}/products` | Lista con paginación los productos asociados |
+| `PUT` | `/api/v1/suppliers/{id}/products/{productId}` | Crea o reemplaza una asociación proveedor-producto |
+| `DELETE` | `/api/v1/suppliers/{id}/products/{productId}` | Desactiva una asociación proveedor-producto; responde `204` |
+
 ## Compras y recepciones
 
 Estas rutas requieren `ADMIN` o `INVENTORY_MANAGER`.
