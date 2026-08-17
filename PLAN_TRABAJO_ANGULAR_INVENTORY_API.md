@@ -509,6 +509,130 @@ Alcanzado: no quedan hallazgos P0 abiertos y existe un contrato de sesión que A
 7. Implementar errores 401/403/404/409/429 y correlation ID visible para soporte.
 8. Añadir pruebas unitarias y E2E de sesión.
 
+#### Cómo empezar y dar seguimiento con Codex
+
+El 17 de agosto de 2026 se comprobó inicialmente que `frontend/` no existía y el trabajo comenzó por **F2-01**, sin adelantar autenticación, diseño final ni módulos de negocio. Tras completar esa entrega, la siguiente es **F2-02**. Conviene pedir a Codex una entrega a la vez: un pedido útil identifica el comportamiento deseado, los archivos o documentos que debe consultar, las restricciones que debe conservar y las verificaciones que debe ejecutar.
+
+Antes de cada entrega, Codex debe leer `AGENTS.md`, revisar el estado de Git y confirmar que la dependencia indicada está completa. Al terminar debe presentar los archivos modificados, las decisiones tomadas, los comandos ejecutados y cualquier verificación pendiente. No se marca una entrega como completada sólo porque el código exista: también debe contar con la evidencia mínima de la tabla.
+
+Secuencia recomendada:
+
+```text
+F2-01 → F2-02 ─┬→ F2-03 ─┐
+               └→ F2-04 ─┴→ F2-05 → F2-06 → F2-07 → F2-08
+```
+
+F2-03 y F2-04 pueden desarrollarse como cambios independientes después de F2-02. F2-08 cierra la fase, pero las pruebas unitarias correspondientes se escriben dentro de cada entrega y no se posponen hasta el final.
+
+| ID | Entrega | Dependencia | Estado | Evidencia mínima para completar |
+|---|---|---|---|---|
+| `F2-01` | Proyecto Angular base | Fase 1 | Completado | `npm ci`; 2 archivos de prueba y 3 pruebas aprobadas; build de producción de 189.46 kB |
+| `F2-02` | Calidad y límites técnicos | `F2-01` | Pendiente | TypeScript/templates estrictos, lint, formato y budgets aprobados |
+| `F2-03` | Layout y navegación por rol | `F2-02` | Pendiente | shell responsive y pruebas de navegación/visibilidad |
+| `F2-04` | Sistema visual compartido | `F2-02` | Pendiente | tema, tokens y estados comunes accesibles demostrables |
+| `F2-05` | OpenAPI y ambientes | `F2-03`, `F2-04` | Pendiente | cliente regenerable y URL de API configurable sin secretos |
+| `F2-06` | Sesión y autorización de UI | `F2-05` | Pendiente | login completo y pruebas de memoria/refresh/guards/interceptor |
+| `F2-07` | Manejo común de errores | `F2-06` | Pendiente | comportamiento probado para 401/403/404/409/429 y correlación |
+| `F2-08` | Pruebas E2E y cierre | `F2-01`–`F2-07` | Pendiente | flujos críticos E2E y todas las comprobaciones de la fase en verde |
+
+Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` conforme avance el trabajo y añade una nota breve de evidencia al cerrar cada punto. Si una comprobación no puede ejecutarse, el punto permanece `Bloqueado` o `En curso` hasta registrar la causa y completar la verificación.
+
+##### F2-01 — Crear `frontend/` con Angular, routing, estilos y pruebas
+
+**Qué resuelve.** Establece una base reproducible sobre la que se construirán las demás entregas. Aquí se fijan las versiones compatibles de Angular 22.x, Node.js, TypeScript y npm; se crea el proyecto standalone en `frontend/`; se habilita routing; se añaden estilos globales mínimos y queda operativo el ejecutor de pruebas. No incluye todavía autenticación real ni pantallas de los módulos de negocio.
+
+**Trabajo esperado.** Codex debe comprobar primero las versiones disponibles y la matriz oficial de compatibilidad, inicializar el proyecto sin crear otro repositorio Git, versionar `package-lock.json`, documentar los comandos locales y dejar rutas placeholder lazy sólo cuando ayuden a probar el shell futuro. Los archivos generados, cachés y dependencias deben quedar correctamente excluidos de Git.
+
+**Seguimiento.** Se completa cuando una instalación limpia con el lockfile puede ejecutar las pruebas base, iniciar la aplicación y producir un build optimizado. Registra las versiones elegidas y los comandos exactos en el README del FrontEnd.
+
+**Pedido sugerido a Codex:**
+
+> Trabaja únicamente `F2-01` del plan. Lee `AGENTS.md` y la Fase 2, verifica la compatibilidad oficial de Angular 22.x con Node.js y TypeScript, y crea `frontend/` con componentes standalone, routing, estilos y pruebas. No implementes autenticación ni features de negocio. Fija versiones y lockfile, documenta cómo instalar, probar, ejecutar y compilar, y termina ejecutando instalación limpia, pruebas y build de producción. Reporta archivos y resultados.
+
+##### F2-02 — Activar TypeScript estricto, lint, formato y budgets
+
+**Qué resuelve.** Convierte la base creada en F2-01 en un proyecto que falla temprano ante tipos inseguros, templates incorrectos, estilo inconsistente o crecimiento accidental del bundle. Las reglas deben ser reproducibles en local y CI, no depender de extensiones personales del editor.
+
+**Trabajo esperado.** Codex debe activar las opciones estrictas compatibles de TypeScript y Angular templates; configurar lint y formato sin reglas contradictorias; exponer scripts estables como `lint`, comprobación de formato, `test`, `build`, `e2e` y `generate:api` cuando exista; y definir budgets iniciales medidos, suficientemente exigentes para detectar regresiones pero realistas para Angular Material. El workflow CI debe utilizar `npm ci` y el lockfile cuando se incorpore la verificación del FrontEnd.
+
+**Seguimiento.** Se completa cuando una infracción intencional de tipo/lint sería detectada y, con el código válido, todas las comprobaciones y el build cumplen los budgets. Documenta cualquier excepción; no desactives reglas globalmente para silenciar un solo caso.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F2-02` sobre el proyecto Angular existente. Activa TypeScript y templates estrictos, configura lint, formato, scripts reproducibles y budgets medidos para desarrollo/producción. Integra las comprobaciones del FrontEnd en CI con `npm ci`, sin alterar la verificación del backend. Añade o ajusta pruebas mínimas y ejecuta formato, lint, test y build. Explica los umbrales elegidos y cualquier excepción.
+
+##### F2-03 — Implementar layout responsive, menú por rol, encabezado y breadcrumbs
+
+**Qué resuelve.** Proporciona el shell común de navegación antes de construir pantallas de dominio. Debe funcionar con escritorio, tablet, móvil y teclado, y representar las capacidades de `ADMIN`, `INVENTORY_MANAGER` y `SALES` sin duplicar reglas de roles en múltiples templates.
+
+**Trabajo esperado.** Codex debe crear `layout/` con router outlet, encabezado, navegación adaptable y breadcrumbs derivados de metadata de rutas. La definición de rutas/roles debe ser central y reutilizable por menú y guards. En esta entrega se pueden usar identidades de sesión de prueba; ocultar enlaces no se presenta como seguridad, porque la API sigue siendo la autoridad. Incluye `/forbidden` y página de ruta desconocida o deja claramente preparado su punto de integración.
+
+**Seguimiento.** Se completa cuando cada rol de prueba ve sólo sus áreas, la ruta activa y breadcrumbs son correctos, el menú puede operarse con teclado y el layout no produce desbordamientos en anchos representativos. Añade pruebas de navegación y filtrado por rol.
+
+**Pedido sugerido a Codex:**
+
+> Implementa únicamente `F2-03`. Crea el shell responsive en `layout/`, encabezado, menú por rol y breadcrumbs basados en metadata de rutas. Centraliza la matriz de roles, usa datos de sesión de prueba sin persistencia y deja claro que los guards no sustituyen al backend. Cubre escritorio/móvil, teclado, foco y rutas forbidden/not-found. Añade pruebas de navegación y visibilidad por los tres roles y ejecuta las comprobaciones del FrontEnd.
+
+##### F2-04 — Definir tema, tipografía, contraste y componentes compartidos
+
+**Qué resuelve.** Evita que cada feature invente colores, espaciado, estados y patrones de interacción. Define un lenguaje visual accesible y reutilizable antes de comenzar productos, inventario, compras o ventas.
+
+**Trabajo esperado.** Codex debe configurar Angular Material y un tema basado en tokens; elegir escalas coherentes de color, tipografía, espaciado y elevación; comprobar contraste; y crear únicamente componentes compartidos que ya exige el plan: carga, contenido vacío, error recuperable, confirmación y feedback de operación. `shared/` no contiene reglas globales de negocio. Los componentes deben aceptar contenido y etiquetas accesibles, responder al tamaño disponible y conservar foco correctamente.
+
+**Seguimiento.** Se completa con una página o catálogo interno de demostración que permita revisar visualmente todos los estados en escritorio y móvil, más pruebas básicas de renderizado y accesibilidad. No se considera terminado si sólo existe un archivo de variables sin uso demostrable.
+
+**Pedido sugerido a Codex:**
+
+> Trabaja sólo `F2-04`. Define el sistema visual con Angular Material, tokens de tema, tipografía, espaciado y contraste WCAG 2.2 AA. Crea componentes shared para loading, empty state, error recuperable, confirmación y feedback, sin introducir reglas de negocio. Añade una vista de demostración y verifica teclado, foco, tamaños responsive y pruebas básicas. Ejecuta lint, tests y build y resume las decisiones visuales.
+
+##### F2-05 — Integrar cliente OpenAPI y configuración de ambientes
+
+**Qué resuelve.** Hace que Angular consuma el contrato real de la API sin mantener DTOs duplicados a mano y sin fijar hosts o secretos en el código. Es la frontera controlada entre backend y FrontEnd.
+
+**Trabajo esperado.** Codex debe regenerar primero `target/openapi/inventory-api-v1.json`, seleccionar y fijar una versión del generador TypeScript compatible, crear `generate:api` y separar el código generado de adaptadores escritos a mano. El resultado generado no se edita. La URL base se obtiene de configuración de ambiente o runtime; local debe poder apuntar a la API sin introducir un origen de producción. CI debe poder detectar que el cliente quedó desactualizado cuando cambió OpenAPI.
+
+**Seguimiento.** Se completa cuando, desde una instalación limpia, un comando regenera el mismo cliente; Angular compila utilizándolo; una prueba consume al menos una operación segura del cliente; y no existen DTOs duplicados, secretos ni hosts rígidos. Cualquier deficiencia del contrato se corrige en backend y se regenera, no se parchea en el archivo generado.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F2-05`. Regenera el OpenAPI del backend, configura un generador TypeScript con versión fija y crea `generate:api`. Mantén separado e inmutable el código generado, usa configuración de runtime/ambiente para la URL base y no incluyas secretos ni host de producción. Integra el cliente con `HttpClient`, añade una prueba de integración del adaptador y una comprobación de sincronización en CI. Ejecuta verificaciones de backend relacionadas, generación, tests y build Angular.
+
+##### F2-06 — Implementar sesión en memoria, login, refresh, logout, `/me`, guards e interceptor
+
+**Qué resuelve.** Implementa la decisión SEC-02 y constituye el núcleo de seguridad del MVP. Es el punto de mayor riesgo de la fase: una solución que autentica pero persiste tokens o duplica refresh no es aceptable.
+
+**Trabajo esperado.** Codex debe crear un único servicio propietario del access y refresh token, exclusivamente en memoria; formulario de login; carga de `/me`; logout que limpia siempre; interceptor que adjunta Bearer sólo al origen exacto configurado; coordinador single-flight para que varios `401` produzcan un solo refresh; reemplazo atómico del par; exclusión de login/refresh/logout; y guards basados en la matriz central de roles. Un `401` del refresh limpia sesión y vuelve al login sin ciclos. No se usa Web Storage, IndexedDB, Cache API, cookies, service workers, estado persistido ni `withCredentials`.
+
+**Seguimiento.** Se completa con pruebas que inspeccionan tanto el comportamiento positivo como la ausencia de persistencia. Recargar la página debe exigir login; varias solicitudes fallidas deben compartir una renovación; un refresh fallido debe liberar las solicitudes pendientes y limpiar la sesión; y el token nunca debe enviarse a otro origen. Revisa explícitamente búsquedas de APIs de almacenamiento y apariciones de tokens en logs/errores.
+
+**Pedido sugerido a Codex:**
+
+> Implementa exclusivamente `F2-06` siguiendo `docs/decisions/SEC-02-browser-refresh-token.md`. Crea sesión sólo en memoria, login, `/me`, refresh single-flight, reemplazo atómico, logout, guards por rol e interceptor limitado al origen exacto de la API. Prohíbe toda persistencia y evita ciclos en endpoints de auth. Añade pruebas para concurrencia, fallo de refresh, limpieza, recarga, destino externo y roles. Ejecuta una búsqueda explícita de almacenamiento/logs inseguros, además de lint, tests y build.
+
+##### F2-07 — Implementar errores HTTP y correlation ID visible
+
+**Qué resuelve.** Unifica cómo el usuario entiende y recupera fallos de autenticación, autorización, navegación, conflictos de negocio y rate limiting. También entrega a soporte el identificador necesario para investigar sin exponer información sensible.
+
+**Trabajo esperado.** Codex debe mapear `ApiError.code` y `validationErrors`, sin depender del texto variable de `message`; diferenciar `401`, `403`, `404` de API y ruta Angular desconocida; mostrar conflictos `409` de forma accionable; respetar `Retry-After` en `429`; y presentar `X-Correlation-ID`/`correlationId` en el estado de error copiable. Las notificaciones deben ser accesibles y no incluir tokens, cuerpos sensibles o detalles internos. No se reintentan mutaciones automáticamente salvo idempotencia documentada.
+
+**Seguimiento.** Se completa cuando cada estado tiene prueba de transformación y presentación, el `429` bloquea temporalmente la acción por el tiempo indicado, los errores de campo se asocian al control correcto y el correlation ID coincide con la respuesta. Prueba además respuestas incompletas o no JSON para garantizar un fallback seguro.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F2-07`. Crea el manejo común de `ApiError` para 401/403/404/409/429, validaciones por campo, `Retry-After` y correlation ID visible/copiable para soporte. No analices textos variables ni muestres datos sensibles; diferencia errores API de rutas Angular y evita reintentos inseguros. Añade pruebas para cada estado, respuestas incompletas y accesibilidad de los mensajes. Ejecuta todas las comprobaciones del FrontEnd.
+
+##### F2-08 — Añadir pruebas unitarias y E2E de sesión
+
+**Qué resuelve.** Demuestra que las siete entregas anteriores funcionan juntas y protege los controles de sesión ante regresiones. No reemplaza las pruebas escritas durante cada punto; completa la cobertura transversal y los escenarios reales en navegador.
+
+**Trabajo esperado.** Codex debe consolidar pruebas unitarias/de componente y configurar una herramienta E2E con versión fija y scripts reproducibles. Los escenarios mínimos son: visitante redirigido a login; login válido; menú y rutas por cada rol; recarga que exige autenticar de nuevo; una sola renovación ante varios `401`; refresh rechazado; logout con fallo de red que aun así limpia memoria; `403`; `409`; `429` con espera; correlation ID; navegación por teclado y viewport móvil. Los datos y credenciales usados son exclusivos de prueba y nunca se versionan como secretos.
+
+**Seguimiento.** Se completa cuando una instalación limpia ejecuta formato, lint, unit/component tests, E2E y build de producción; no hay pruebas inestables aceptadas; y el resultado se registra en la tabla. Si E2E necesita una API real, documenta el arranque y los datos reproducibles; si usa interceptación de red para casos difíciles, conserva al menos una prueba controlada de integración con la API real.
+
+**Pedido sugerido a Codex:**
+
+> Cierra la Fase 2 con `F2-08`. Audita primero la evidencia de `F2-01` a `F2-07`, completa pruebas unitarias/de componente y configura E2E reproducible. Cubre login, roles, recarga sin persistencia, refresh concurrente y fallido, logout degradado, 403/409/429, correlation ID, teclado y móvil. Ejecuta instalación limpia, formato, lint, todas las pruebas y build de producción. No marques la fase completa si queda una verificación pendiente; entrega una matriz de escenarios y resultados.
+
 **Criterio de salida**
 
 La aplicación compila en producción, autentica de forma segura y protege navegación/acciones por rol.
@@ -789,6 +913,8 @@ Una funcionalidad se considera terminada cuando:
 - [Seguridad en Angular](https://angular.dev/best-practices/security)
 - [Interceptors de HttpClient](https://angular.dev/guide/http/interceptors)
 - [Routing en Angular](https://angular.dev/guide/routing)
+- [Instrucciones de proyecto para Codex con AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
+- [Cómo formular y verificar tareas con Codex](https://learn.chatgpt.com/docs/prompting#prompting-codex)
 - [Decisión SEC-02: sesión del navegador](docs/decisions/SEC-02-browser-refresh-token.md)
 - [Runbook de rotación JWT](docs/runbooks/jwt-key-rotation.md)
 - [CI #20 del commit auditado](https://github.com/BrandonLC16/Inventario/actions/runs/32044666247)
