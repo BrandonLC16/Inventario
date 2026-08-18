@@ -1,0 +1,10 @@
+{
+  "disallowAdditionalPropertiesIfNotPresent": false,
+  "fileNaming": "kebab-case",
+  "ngVersion": "22.0.6",
+  "providedIn": "root",
+  "rxjsVersion": "7.8.2",
+  "supportsES6": true,
+  "tsVersion": "6.0.2",
+  "useSingleRequestParameter": true
+}

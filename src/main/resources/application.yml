@@ -24,6 +24,7 @@ spring:
     enabled: true
 
 springdoc:
+  default-produces-media-type: application/json
   api-docs:
     enabled: ${SWAGGER_ENABLED:false}
     path: /v3/api-docs

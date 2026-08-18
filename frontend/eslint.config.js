@@ -4,7 +4,9 @@ const angular = require('angular-eslint');
 
 module.exports = tseslint.config(
   {
-    ignores: ['.angular/**', 'coverage/**', 'dist/**'],
+    ignores: ['.angular/**', 'coverage/**', 'dist/**', '**/core/api/generated/**'],
+  },
+  {
     linterOptions: {
       reportUnusedDisableDirectives: 'error',
     },

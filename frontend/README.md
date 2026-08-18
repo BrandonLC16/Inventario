@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, y `F2-04` define el sistema visual y los estados compartidos. Todavía no incluye autenticación real, acceso a la API ni módulos de negocio.
+Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual y `F2-05` integró el cliente generado y la configuración runtime de la API. Todavía no incluye autenticación real ni módulos de negocio.
 
 ## Versiones fijadas
 
@@ -9,6 +9,8 @@ Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el pro
 | Angular y Angular CLI |  `22.0.6` |
 | Angular Material/CDK  |  `22.0.6` |
 | Angular build tools   |  `22.1.4` |
+| OpenAPI Generator CLI |  `7.24.0` |
+| Wrapper npm OpenAPI   |  `2.40.1` |
 | Node.js               | `24.18.0` |
 | npm                   | `11.16.0` |
 | TypeScript            |   `6.0.2` |
@@ -85,6 +87,36 @@ Los pares principales cumplen contraste WCAG 2.2 AA: texto general `#17233b` sob
 
 Todos reciben textos y emiten eventos; ninguna decisión de inventario, autorización o reintento vive en `shared/`.
 
+## Cliente OpenAPI y configuración runtime
+
+El contrato canónico se genera desde el backend en `target/openapi/inventory-api-v1.json`. El cliente TypeScript Angular vive en `src/app/core/api/generated/` y se reemplaza por completo en cada generación; sus archivos no se editan manualmente. Adaptadores, providers y pruebas escritas a mano permanecen en `src/app/core/api/`, fuera del árbol generado.
+
+Con Docker activo, regenera primero el contrato desde la raíz del repositorio:
+
+```powershell
+.\scripts\mvnw-jdk25.ps1 "-Dtest=OpenApiContractIntegrationTest" test
+```
+
+Después, desde `frontend/`, regenera el cliente con las versiones fijadas:
+
+```powershell
+npm run generate:api
+```
+
+La configuración usa OpenAPI Generator `7.24.0`, el generador estable `typescript-angular` y versiones explícitas de Angular, RxJS y TypeScript. `npm run generate:api:check` toma hashes del árbol generado, vuelve a generarlo y falla si aparece cualquier archivo nuevo, eliminado o modificado.
+
+La aplicación carga `public/config/runtime-config.json` antes de crear servicios API. `apiBaseUrl` debe ser exclusivamente un origen HTTP(S), sin credenciales, ruta, query ni fragmento. El archivo versionado apunta al backend local:
+
+```json
+{
+  "apiBaseUrl": "http://localhost:8080"
+}
+```
+
+En un despliegue, reemplaza este archivo estático por la configuración del entorno; no recompiles el cliente ni introduzcas secretos. El provider crea la configuración generada con `withCredentials: false`. Los tokens de sesión se incorporarán únicamente en memoria durante `F2-06`.
+
+CI regenera el OpenAPI con PostgreSQL/Testcontainers después del checkout y ejecuta `npm run generate:api:check` antes de lint, pruebas y builds. Así detecta tanto cambios del contrato como ediciones manuales o archivos generados obsoletos.
+
 ## Pruebas
 
 Ejecuta una sola vez las pruebas unitarias y de componentes:
@@ -138,14 +170,14 @@ npm run build
 
 Los artefactos se escriben en `dist/inventory-frontend/` y no se versionan.
 
-Los límites parten de los bundles medidos en `F2-01`/`F2-02` y dejan margen para el shell y Angular Material sin permitir que una incorporación accidental pase inadvertida:
+Los límites se fijaron en `F2-02` y se siguen comparando con la medición más reciente para dejar margen al crecimiento deliberado sin permitir que una incorporación accidental pase inadvertida:
 
 | Configuración | Bundle inicial medido | Aviso inicial | Error inicial | Aviso por estilo | Error por estilo |
 | ------------- | --------------------: | ------------: | ------------: | ---------------: | ---------------: |
-| Desarrollo    |             `1.31 MB` |     `1.75 MB` |        `2 MB` |           `6 kB` |          `10 kB` |
-| Producción    |           `189.46 kB` |      `350 kB` |      `450 kB` |           `6 kB` |          `10 kB` |
+| Desarrollo    |             `1.46 MB` |     `1.75 MB` |        `2 MB` |           `6 kB` |          `10 kB` |
+| Producción    |           `280.09 kB` |      `350 kB` |      `450 kB` |           `6 kB` |          `10 kB` |
 
-El umbral de desarrollo es mayor porque conserva código sin optimizar y source maps. El de producción permite aproximadamente `160 kB` antes del aviso y `260 kB` antes del error sobre la base actual. Los estilos por componente se limitan de forma independiente para impedir que una sola vista concentre CSS excesivo. Todo error de budget hace fallar el build y CI ejecuta ambas configuraciones.
+El umbral de desarrollo es mayor porque conserva código sin optimizar y source maps. El de producción permite aproximadamente `70 kB` antes del aviso y `170 kB` antes del error sobre la medición actual. Los estilos por componente se limitan de forma independiente para impedir que una sola vista concentre CSS excesivo. Todo error de budget hace fallar el build y CI ejecuta ambas configuraciones.
 
 ## Strictness y excepciones
 
@@ -153,4 +185,4 @@ TypeScript usa `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess
 
 La única excepción deliberada es `skipLibCheck: true`: evita volver a comprobar declaraciones de tipos de dependencias externas, pero no relaja el código ni los templates de la aplicación. No se deshabilitó ninguna regla estricta para resolver un caso local.
 
-Los scripts `e2e` y `generate:api` se añadirán en `F2-08` y `F2-05`, respectivamente, cuando existan sus herramientas y artefactos; esta entrega no incorpora placeholders que aparenten verificaciones inexistentes.
+El script `e2e` se añadirá en `F2-08` cuando exista su herramienta y sus escenarios; no se mantiene un placeholder que aparente una verificación inexistente.

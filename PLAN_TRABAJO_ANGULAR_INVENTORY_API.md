@@ -1,11 +1,11 @@
 # Plan de trabajo actualizado: FrontEnd Angular para Inventory API
 
-**Fecha de revisión:** 17 de agosto de 2026  
+**Fecha de revisión:** 18 de agosto de 2026\
 **Proyecto fuente:** `C:\Proyectos\Inventario`  
 **Copia de trabajo:** `C:\Users\brand\OneDrive\Documentos\Inventario`  
 **Rama:** `master`  
 **Commit verificado:** `15de61f8085c55c01c61f0a18f8afe405378be76`  
-**Estado:** API sincronizada y funcional; FrontEnd en Fase 2, con `F2-01`, `F2-02` y `F2-03` completadas; `F2-04` es la siguiente entrega.
+**Estado:** API sincronizada y funcional; FrontEnd en Fase 2, con `F2-01`–`F2-05` completadas y `F2-06` como siguiente entrega.
 
 ## 1. Resultado ejecutivo
 
@@ -511,7 +511,7 @@ Alcanzado: no quedan hallazgos P0 abiertos y existe un contrato de sesión que A
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 17 de agosto de 2026 se comprobó inicialmente que `frontend/` no existía y el trabajo comenzó por **F2-01**, sin adelantar autenticación, diseño final ni módulos de negocio. `F2-01`, `F2-02` y `F2-03` ya están completadas; `F2-04` es la siguiente entrega habilitada. Conviene pedir a Codex una entrega a la vez: un pedido útil identifica el comportamiento deseado, los archivos o documentos que debe consultar, las restricciones que debe conservar y las verificaciones que debe ejecutar.
+El 17 de agosto de 2026 se comprobó inicialmente que `frontend/` no existía y el trabajo comenzó por **F2-01**, sin adelantar autenticación, diseño final ni módulos de negocio. `F2-01`–`F2-05` ya están completadas y la siguiente entrega habilitada es `F2-06`. Conviene pedir a Codex una entrega a la vez: un pedido útil identifica el comportamiento deseado, los archivos o documentos que debe consultar, las restricciones que debe conservar y las verificaciones que debe ejecutar.
 
 Antes de cada entrega, Codex debe leer `AGENTS.md`, revisar el estado de Git y confirmar que la dependencia indicada está completa. Al terminar debe presentar los archivos modificados, las decisiones tomadas, los comandos ejecutados y cualquier verificación pendiente. No se marca una entrega como completada sólo porque el código exista: también debe contar con la evidencia mínima de la tabla.
 
@@ -529,8 +529,8 @@ F2-03 y F2-04 pueden desarrollarse como cambios independientes después de F2-02
 | `F2-01` | Proyecto Angular base | Fase 1 | Completado | `npm ci`; 2 archivos de prueba y 3 pruebas aprobadas; build de producción de 189.46 kB |
 | `F2-02` | Calidad y límites técnicos | `F2-01` | Completado | `npm ci`; formato y lint aprobados; 2 archivos/3 pruebas; builds de 1.31 MB (desarrollo) y 189.46 kB (producción) dentro de budgets |
 | `F2-03` | Layout y navegación por rol | `F2-02` | Completado | shell y política central implementados; `npm ci` y `npm run check` aprobados; 4 archivos/17 pruebas; builds de 1.32 MB y 228.97 kB; validación visual aprobada en 1440×900, 390×844 y 320 px, incluidos roles, menú móvil, foco y consola |
-| `F2-04` | Sistema visual compartido | `F2-02` | Pendiente | tema, tokens y estados comunes accesibles demostrables |
-| `F2-05` | OpenAPI y ambientes | `F2-03`, `F2-04` | Pendiente | cliente regenerable y URL de API configurable sin secretos |
+| `F2-04` | Sistema visual compartido | `F2-02` | Completado | Angular Material/CDK 22.0.6, tema Material 3, tokens y cinco estados shared; catálogo lazy `/design-system`; 6 archivos/24 pruebas, builds dentro de budget, contrastes AA calculados y QA visual aprobada por el usuario el 18 de agosto de 2026 |
+| `F2-05` | OpenAPI y ambientes | `F2-03`, `F2-04` | Completado | OpenAPI regenerado; generador reproducible (`2.40.1`/`7.24.0`), cliente separado e inmutable, URL base runtime, adaptador probado y sincronización en CI; backend `verify`/SpotBugs y FrontEnd `npm ci`/`npm run check` aprobados con 8 archivos/27 pruebas y builds de 1.46 MB y 280.09 kB |
 | `F2-06` | Sesión y autorización de UI | `F2-05` | Pendiente | login completo y pruebas de memoria/refresh/guards/interceptor |
 | `F2-07` | Manejo común de errores | `F2-06` | Pendiente | comportamiento probado para 401/403/404/409/429 y correlación |
 | `F2-08` | Pruebas E2E y cierre | `F2-01`–`F2-07` | Pendiente | flujos críticos E2E y todas las comprobaciones de la fase en verde |
@@ -581,6 +581,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` conforme avance el t
 
 **Seguimiento.** Se completa con una página o catálogo interno de demostración que permita revisar visualmente todos los estados en escritorio y móvil, más pruebas básicas de renderizado y accesibilidad. No se considera terminado si sólo existe un archivo de variables sin uso demostrable.
 
+**Estado al 18 de agosto de 2026.** La implementación está disponible en `/design-system` con Angular Material/CDK `22.0.6`, tema Material 3, tokens semánticos de color, tipografía, espaciado, foco, radios y elevación, y componentes standalone para carga, contenido vacío, error recuperable, confirmación y feedback. Los pares principales de color obtuvieron contrastes entre `6.36:1` y `15.67:1`; las pruebas cubren renderizado semántico, eventos, `Escape`, trampa y restauración de foco. `npm run check` aprobó formato, lint, 6 archivos/24 pruebas y builds de desarrollo (`1.36 MB`) y producción (`258.56 kB` inicial; catálogo lazy de `146.91 kB`). El usuario aprobó la QA visual de `F2-04` el 18 de agosto de 2026, por lo que la entrega queda completada.
+
 **Pedido sugerido a Codex:**
 
 > Trabaja sólo `F2-04`. Define el sistema visual con Angular Material, tokens de tema, tipografía, espaciado y contraste WCAG 2.2 AA. Crea componentes shared para loading, empty state, error recuperable, confirmación y feedback, sin introducir reglas de negocio. Añade una vista de demostración y verifica teclado, foco, tamaños responsive y pruebas básicas. Ejecuta lint, tests y build y resume las decisiones visuales.
@@ -592,6 +594,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` conforme avance el t
 **Trabajo esperado.** Codex debe regenerar primero `target/openapi/inventory-api-v1.json`, seleccionar y fijar una versión del generador TypeScript compatible, crear `generate:api` y separar el código generado de adaptadores escritos a mano. El resultado generado no se edita. La URL base se obtiene de configuración de ambiente o runtime; local debe poder apuntar a la API sin introducir un origen de producción. CI debe poder detectar que el cliente quedó desactualizado cuando cambió OpenAPI.
 
 **Seguimiento.** Se completa cuando, desde una instalación limpia, un comando regenera el mismo cliente; Angular compila utilizándolo; una prueba consume al menos una operación segura del cliente; y no existen DTOs duplicados, secretos ni hosts rígidos. Cualquier deficiencia del contrato se corrige en backend y se regenera, no se parchea en el archivo generado.
+
+**Estado al 18 de agosto de 2026.** El contrato se regeneró mediante `OpenApiContractIntegrationTest` y se corrigió su media type JSON en la configuración SpringDoc, con una aserción de regresión. `@openapitools/openapi-generator-cli` `2.40.1` fija OpenAPI Generator `7.24.0`; `generate:api` recrea exclusivamente `core/api/generated/` y `generate:api:check` comprueba hashes antes y después de regenerar. La URL base se carga desde `public/config/runtime-config.json`, se valida como origen HTTP(S) sin credenciales ni ruta y configura el cliente generado con `withCredentials: false`. El adaptador manual reutiliza tipos generados y su integración con `HttpClient` está probada. CI regenera el contrato y rechaza desincronizaciones. Aprobaron la prueba OpenAPI, `mvn verify`, SpotBugs, `npm ci`, la regeneración, la comprobación de sincronización y `npm run check` con 8 archivos/27 pruebas y builds de desarrollo (`1.46 MB`) y producción (`280.09 kB`).
 
 **Pedido sugerido a Codex:**
 
@@ -811,7 +815,7 @@ La solución está desplegada, monitoreada y respaldada; los responsables aprueb
 
 ```text
 Fase 0 ✓ → Fase 1 ✓
-                    └─→ Fase 2 (en curso: F2-01–F2-03 completadas; F2-04 siguiente)
+                    └─→ Fase 2 (en curso: F2-01–F2-05 completadas; F2-06 siguiente)
                          ├─→ Fase 3 ─┬→ Fase 4
                          │           ├→ Fase 5
                          │           └→ Fase 6
@@ -832,7 +836,7 @@ Todas convergen en Fase 8 → Fase 9 → Fase 10.
 - exclusiones preventivas de secretos.
 - OpenAPI reproducible y CI verde.
 
-La generación reproducible del cliente TypeScript está programada para `F2-05`, después del layout y el sistema visual. `F2-01`, `F2-02` y `F2-03` se completaron el 17 de agosto de 2026. El cierre de `F2-03` incluyó 17 pruebas, builds sin advertencias de budget y revisión visual en escritorio y móvil; el único solapamiento detectado a 320 px se corrigió preservando el nombre visible y accesible de la aplicación. La tabla README de proveedores se completó el mismo día.
+`F2-01`–`F2-05` están completadas. El cierre de `F2-03` incluyó 17 pruebas, builds sin advertencias de budget y revisión visual en escritorio y móvil; el único solapamiento detectado a 320 px se corrigió preservando el nombre visible y accesible de la aplicación. La tabla README de proveedores se completó el mismo día. `F2-04` obtuvo aprobación de QA visual el 18 de agosto de 2026. `F2-05` dejó el contrato y el cliente TypeScript regenerables y sincronizados en CI, configuración runtime sin secretos, 27 pruebas de FrontEnd aprobadas y verificaciones completas de backend; la siguiente entrega es `F2-06`.
 
 ### P1 — MVP FrontEnd
 
