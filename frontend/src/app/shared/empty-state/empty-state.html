@@ -1,0 +1,8 @@
+<section class="empty-state" [attr.aria-label]="title()">
+  <span class="empty-state__illustration" aria-hidden="true"><span></span></span>
+  <h2>{{ title() }}</h2>
+  <p>{{ description() }}</p>
+  @if (actionLabel(); as label) {
+    <button mat-flat-button type="button" (click)="action.emit()">{{ label }}</button>
+  }
+</section>

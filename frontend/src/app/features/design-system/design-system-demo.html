@@ -1,0 +1,117 @@
+<article class="design-system">
+  <header class="design-system__header">
+    <p class="design-system__eyebrow">F2-04 · Catálogo interno</p>
+    <h1 tabindex="-1">Sistema visual compartido</h1>
+    <p>
+      Tokens y estados reutilizables para mantener una interfaz legible, predecible y accesible en
+      cualquier dominio.
+    </p>
+  </header>
+
+  <section class="demo-section" aria-labelledby="foundations-title">
+    <div class="demo-section__heading">
+      <p>Fundamentos</p>
+      <h2 id="foundations-title">Color, tipo y ritmo</h2>
+    </div>
+
+    <div class="foundations-grid">
+      <div class="demo-card">
+        <h3>Colores semánticos</h3>
+        <div class="swatches" aria-label="Muestras de color">
+          <span class="swatch swatch--primary">Primario</span>
+          <span class="swatch swatch--accent">Éxito</span>
+          <span class="swatch swatch--warning">Atención</span>
+          <span class="swatch swatch--danger">Error</span>
+        </div>
+      </div>
+
+      <div class="demo-card type-sample">
+        <h3>Tipografía adaptable</h3>
+        <p class="type-sample__display">Inventario claro</p>
+        <p>Texto base a 16 px, altura de línea 1.55 y jerarquía compacta.</p>
+      </div>
+
+      <div class="demo-card spacing-sample">
+        <h3>Espaciado base 4 px</h3>
+        <div aria-label="Escala de espaciado de 4, 8, 16 y 32 píxeles">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="demo-section" aria-labelledby="states-title">
+    <div class="demo-section__heading">
+      <p>Estados comunes</p>
+      <h2 id="states-title">Carga, vacío y recuperación</h2>
+    </div>
+
+    <div class="states-grid">
+      <div class="demo-card">
+        <h3>Carga</h3>
+        <app-loading-state label="Cargando resultados" />
+      </div>
+
+      <div class="demo-card demo-card--wide">
+        <h3 class="visually-hidden">Contenido vacío</h3>
+        <app-empty-state
+          title="Todavía no hay resultados"
+          description="Ajusta los filtros o inicia una acción cuando el flujo lo permita."
+          actionLabel="Acción opcional"
+        />
+      </div>
+
+      <div class="demo-card demo-card--full">
+        <h3 class="visually-hidden">Error recuperable</h3>
+        <app-recoverable-error
+          message="La solicitud no respondió. Puedes intentarlo de nuevo de forma segura."
+          correlationId="demo-7F3A"
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="demo-section" aria-labelledby="interaction-title">
+    <div class="demo-section__heading">
+      <p>Interacción</p>
+      <h2 id="interaction-title">Confirmación y feedback</h2>
+    </div>
+
+    <div class="interaction-grid">
+      <div class="demo-card confirmation-sample">
+        <h3>Confirmación modal</h3>
+        <p>El diálogo atrapa el foco, admite Escape y lo devuelve al disparador al cerrar.</p>
+        <button mat-flat-button type="button" (click)="openConfirmation()">
+          Abrir confirmación
+        </button>
+        @if (confirmationMessage(); as message) {
+          <p class="confirmation-sample__result" role="status">{{ message }}</p>
+        }
+      </div>
+
+      <div class="feedback-list" aria-label="Variantes de feedback">
+        <app-operation-feedback
+          tone="success"
+          message="Los cambios se guardaron y los datos visibles están actualizados."
+        />
+        <app-operation-feedback
+          tone="info"
+          message="Hay información adicional disponible para esta operación."
+        />
+        <app-operation-feedback tone="warning" message="Revisa los datos antes de continuar." />
+        <app-operation-feedback tone="error" message="No fue posible completar la operación." />
+        @if (feedbackVisible()) {
+          <app-operation-feedback
+            message="Este mensaje se puede cerrar con teclado."
+            [dismissible]="true"
+            (dismiss)="feedbackVisible.set(false)"
+          />
+        } @else {
+          <button mat-stroked-button type="button" (click)="showFeedback()">
+            Mostrar mensaje descartable
+          </button>
+        }
+      </div>
+    </div>
+  </section>
+</article>

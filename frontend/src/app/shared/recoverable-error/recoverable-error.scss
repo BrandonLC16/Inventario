@@ -1,0 +1,50 @@
+:host {
+  display: block;
+}
+
+.recoverable-error {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--inv-space-4);
+  padding: clamp(var(--inv-space-5), 5vw, var(--inv-space-8));
+  border: 1px solid #e0abab;
+  border-radius: var(--inv-radius-lg);
+  background: var(--inv-color-danger-soft);
+  color: var(--inv-color-text);
+}
+
+.recoverable-error__mark {
+  display: grid;
+  place-items: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border-radius: 50%;
+  background: var(--inv-color-danger);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+h2 {
+  margin: 0 0 var(--inv-space-2);
+  font-size: var(--inv-font-size-lg);
+}
+
+p {
+  margin: 0 0 var(--inv-space-4);
+}
+
+.recoverable-error__support {
+  color: #6e3030;
+  font-size: var(--inv-font-size-sm);
+}
+
+code {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+@media (width < 30rem) {
+  .recoverable-error {
+    grid-template-columns: 1fr;
+  }
+}

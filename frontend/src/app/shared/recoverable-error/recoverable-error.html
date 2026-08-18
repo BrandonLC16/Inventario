@@ -1,0 +1,15 @@
+<section class="recoverable-error" role="alert" [attr.aria-label]="title()">
+  <span class="recoverable-error__mark" aria-hidden="true">!</span>
+  <div>
+    <h2>{{ title() }}</h2>
+    <p>{{ message() }}</p>
+    @if (correlationId(); as id) {
+      <p class="recoverable-error__support">
+        Referencia para soporte: <code>{{ id }}</code>
+      </p>
+    }
+    <button mat-stroked-button type="button" (click)="retry.emit()">
+      {{ retryLabel() }}
+    </button>
+  </div>
+</section>

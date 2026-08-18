@@ -1,12 +1,13 @@
 # FrontEnd de Inventario
 
-Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad y `F2-03` incorpora el shell, la navegación por rol y las páginas de estado. Todavía no incluye autenticación real, acceso a la API ni módulos de negocio.
+Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, y `F2-04` define el sistema visual y los estados compartidos. Todavía no incluye autenticación real, acceso a la API ni módulos de negocio.
 
 ## Versiones fijadas
 
 | Herramienta           |   Versión |
 | --------------------- | --------: |
 | Angular y Angular CLI |  `22.0.6` |
+| Angular Material/CDK  |  `22.0.6` |
 | Angular build tools   |  `22.1.4` |
 | Node.js               | `24.18.0` |
 | npm                   | `11.16.0` |
@@ -65,6 +66,24 @@ La identidad de demostración usa únicamente un Signal del servicio de sesión.
 La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alimenta tanto las rutas como el menú y el guard de demostración. Ocultar una opción o redirigir a `/forbidden` sólo mejora la experiencia: **la API siempre es la autoridad y debe volver a autorizar cada petición**.
 
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
+
+## Sistema visual compartido
+
+La ruta interna `/design-system` muestra los fundamentos y los componentes de `F2-04` en una sola vista adaptable. No forma parte de un dominio ni introduce reglas de negocio.
+
+Los tokens SCSS de `src/styles/` definen colores semánticos, tipografía del sistema sin descargar fuentes externas, una escala de espaciado basada en `4 px`, radios y elevaciones. El tema Material 3 usa las paletas Azure y Spring Green; los tokens propios conservan nombres semánticos para que una feature no dependa de un tono concreto.
+
+Los pares principales cumplen contraste WCAG 2.2 AA: texto general `#17233b` sobre blanco, texto secundario `#526078` sobre blanco, primario `#244f9e` sobre blanco y estados con texto oscuro sobre fondos suaves. El foco visible combina un contorno azul `#005fcc` con un halo blanco para distinguirse tanto en superficies claras como oscuras. Los controles Material mantienen un objetivo táctil mínimo de `44 px` y la vista cambia de 12 columnas a una o dos columnas según el espacio disponible.
+
+`src/app/shared/` ofrece componentes standalone y presentacionales para:
+
+- carga anunciada con `role="status"` y `aria-busy`;
+- contenido vacío con acción opcional;
+- error recuperable con reintento y referencia de soporte opcional;
+- confirmación modal con trampa de foco, cierre con `Escape` y restauración al disparador;
+- feedback semántico de éxito, información, atención y error, con cierre opcional.
+
+Todos reciben textos y emiten eventos; ninguna decisión de inventario, autorización o reintento vive en `shared/`.
 
 ## Pruebas
 

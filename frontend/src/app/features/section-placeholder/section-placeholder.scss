@@ -47,8 +47,9 @@ h1 {
 
 h1:focus-visible {
   border-radius: 0.2rem;
-  outline: 3px solid #d17713;
+  outline: 3px solid var(--inv-color-focus);
   outline-offset: 0.3rem;
+  box-shadow: 0 0 0 2px var(--inv-color-surface);
 }
 
 .section-card__description {

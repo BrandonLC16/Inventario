@@ -1,0 +1,16 @@
+<div
+  class="feedback"
+  [class]="'feedback feedback--' + tone()"
+  [attr.role]="tone() === 'error' ? 'alert' : 'status'"
+  [attr.aria-live]="tone() === 'error' ? 'assertive' : 'polite'"
+>
+  <span class="feedback__mark" aria-hidden="true">{{ mark() }}</span>
+  <p>
+    <strong>{{ label() }}.</strong> {{ message() }}
+  </p>
+  @if (dismissible()) {
+    <button mat-button type="button" aria-label="Cerrar mensaje" (click)="dismiss.emit()">
+      Cerrar
+    </button>
+  }
+</div>

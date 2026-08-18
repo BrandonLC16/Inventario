@@ -1,0 +1,205 @@
+:host {
+  display: block;
+}
+
+.design-system {
+  max-inline-size: var(--inv-content-max);
+  margin-inline: auto;
+}
+
+.design-system__header {
+  padding: clamp(var(--inv-space-6), 5vw, var(--inv-space-10));
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-lg);
+  background: linear-gradient(135deg, var(--inv-color-surface), var(--inv-color-primary-soft));
+  box-shadow: var(--inv-elevation-1);
+}
+
+.design-system__eyebrow,
+.demo-section__heading > p {
+  margin: 0;
+  color: var(--inv-color-primary);
+  font-size: var(--inv-font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: var(--inv-space-2) 0 var(--inv-space-3);
+  color: var(--inv-color-text);
+  font-size: var(--inv-font-size-display);
+  line-height: var(--inv-line-height-tight);
+  letter-spacing: -0.04em;
+  outline: none;
+}
+
+.design-system__header > p:last-child {
+  max-inline-size: 48rem;
+  margin: 0;
+  color: var(--inv-color-text-muted);
+  font-size: var(--inv-font-size-lg);
+}
+
+.demo-section {
+  margin-block-start: var(--inv-space-12);
+}
+
+.demo-section__heading {
+  margin-block-end: var(--inv-space-5);
+}
+
+h2 {
+  margin: var(--inv-space-1) 0 0;
+  font-size: var(--inv-font-size-xl);
+  line-height: var(--inv-line-height-tight);
+}
+
+h3 {
+  margin: 0 0 var(--inv-space-4);
+  font-size: var(--inv-font-size-md);
+}
+
+.foundations-grid,
+.states-grid,
+.interaction-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--inv-space-4);
+}
+
+.demo-card {
+  grid-column: span 4;
+  min-inline-size: 0;
+  padding: var(--inv-space-5);
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-lg);
+  background: var(--inv-color-surface);
+  box-shadow: var(--inv-elevation-1);
+}
+
+.demo-card--wide {
+  grid-column: span 8;
+}
+
+.demo-card--full {
+  grid-column: 1 / -1;
+}
+
+.swatches {
+  display: grid;
+  gap: var(--inv-space-2);
+}
+
+.swatch {
+  padding: var(--inv-space-3);
+  border-radius: var(--inv-radius-sm);
+  font-size: var(--inv-font-size-sm);
+  font-weight: 700;
+}
+
+.swatch--primary {
+  background: var(--inv-color-primary);
+  color: #ffffff;
+}
+
+.swatch--accent {
+  background: var(--inv-color-accent-soft);
+  color: #084f3d;
+}
+
+.swatch--warning {
+  background: var(--inv-color-warning-soft);
+  color: var(--inv-color-warning);
+}
+
+.swatch--danger {
+  background: var(--inv-color-danger-soft);
+  color: #7e2020;
+}
+
+.type-sample__display {
+  margin: 0;
+  color: var(--inv-color-text);
+  font-size: var(--inv-font-size-xl);
+  font-weight: 700;
+  line-height: var(--inv-line-height-tight);
+}
+
+.type-sample p:last-child,
+.confirmation-sample > p {
+  color: var(--inv-color-text-muted);
+}
+
+.spacing-sample > div {
+  display: flex;
+  align-items: end;
+  gap: var(--inv-space-3);
+  min-block-size: 5rem;
+}
+
+.spacing-sample span {
+  inline-size: var(--inv-space-4);
+  block-size: var(--inv-space-1);
+  background: var(--inv-color-primary);
+}
+
+.spacing-sample span:nth-child(2) {
+  block-size: var(--inv-space-2);
+}
+
+.spacing-sample span:nth-child(3) {
+  block-size: var(--inv-space-4);
+}
+
+.spacing-sample span:nth-child(4) {
+  block-size: var(--inv-space-8);
+}
+
+.interaction-grid > .demo-card {
+  grid-column: span 4;
+}
+
+.feedback-list {
+  display: grid;
+  grid-column: span 8;
+  align-content: start;
+  gap: var(--inv-space-3);
+}
+
+.confirmation-sample__result {
+  color: var(--inv-color-accent) !important;
+  font-weight: 700;
+}
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (width < 60rem) {
+  .foundations-grid .demo-card {
+    grid-column: span 6;
+  }
+
+  .states-grid .demo-card,
+  .interaction-grid > .demo-card,
+  .feedback-list {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (width < 38rem) {
+  .foundations-grid .demo-card,
+  .states-grid .demo-card {
+    grid-column: 1 / -1;
+  }
+
+  .demo-card {
+    padding: var(--inv-space-4);
+  }
+}

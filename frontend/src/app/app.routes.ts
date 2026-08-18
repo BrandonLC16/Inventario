@@ -32,6 +32,15 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       ...sectionRoutes,
       {
+        path: 'design-system',
+        title: 'Sistema visual | Inventario',
+        data: { [BREADCRUMB_DATA_KEY]: 'Sistema visual' },
+        loadComponent: () =>
+          import('./features/design-system/design-system-demo').then(
+            ({ DesignSystemDemo }) => DesignSystemDemo,
+          ),
+      },
+      {
         path: 'forbidden',
         title: 'Acceso no disponible | Inventario',
         data: { [BREADCRUMB_DATA_KEY]: 'Acceso no disponible' },

@@ -1,0 +1,10 @@
+<section
+  class="loading-state"
+  [class.loading-state--compact]="compact()"
+  role="status"
+  aria-live="polite"
+  aria-busy="true"
+>
+  <mat-spinner [diameter]="compact() ? 24 : 40" aria-hidden="true" />
+  <span>{{ label() }}</span>
+</section>

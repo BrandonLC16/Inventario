@@ -1,0 +1,22 @@
+:host {
+  display: block;
+}
+
+.loading-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--inv-space-4);
+  min-block-size: 10rem;
+  padding: var(--inv-space-8);
+  color: var(--inv-color-text-muted);
+  text-align: center;
+}
+
+.loading-state--compact {
+  grid-template-columns: auto 1fr;
+  justify-items: start;
+  align-items: center;
+  min-block-size: auto;
+  padding: var(--inv-space-3);
+  text-align: start;
+}

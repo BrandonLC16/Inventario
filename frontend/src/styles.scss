@@ -1,3 +1,5 @@
+@use 'styles/theme';
+
 *,
 *::before,
 *::after {
@@ -6,14 +8,7 @@
 
 html {
   color-scheme: light;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    sans-serif;
+  font-family: var(--inv-font-family);
 }
 
 html,
@@ -23,8 +18,10 @@ body {
 
 body {
   margin: 0;
-  background: #f7f8fc;
-  color: #1b1b1f;
+  background: var(--inv-color-surface-subtle);
+  color: var(--inv-color-text);
+  font-size: var(--inv-font-size-md);
+  line-height: var(--inv-line-height-body);
 }
 
 button,
@@ -41,11 +38,29 @@ select {
 }
 
 :focus-visible {
-  outline: 3px solid #d17713;
+  outline: 3px solid var(--inv-color-focus);
   outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--inv-color-surface);
 }
 
 ::selection {
-  background: #cbe8df;
-  color: #102b25;
+  background: var(--inv-color-accent-soft);
+  color: var(--inv-color-text);
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
