@@ -102,6 +102,9 @@ jobs:
       - name: Install FrontEnd dependencies
         run: npm ci
 
+      - name: Install pinned Playwright browser
+        run: npx playwright install --with-deps chromium
+
       - name: Verify generated API client synchronization
         run: npm run generate:api:check
 
@@ -113,6 +116,9 @@ jobs:
 
       - name: Test FrontEnd
         run: npm test
+
+      - name: Test FrontEnd end to end
+        run: npm run e2e
 
       - name: Build FrontEnd for development
         run: npm run build:development

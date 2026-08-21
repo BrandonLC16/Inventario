@@ -2,4 +2,6 @@
 coverage/
 dist/
 node_modules/
+playwright-report/
 src/app/core/api/generated/
+test-results/

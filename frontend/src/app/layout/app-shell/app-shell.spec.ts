@@ -147,6 +147,7 @@ describe('AppShell', () => {
     button?.click();
     fixture.detectChanges();
     await fixture.whenStable();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
     expect(button?.getAttribute('aria-expanded')).toBe('true');
     expect((document.activeElement as HTMLElement | null)?.dataset['navId']).toBe('dashboard');

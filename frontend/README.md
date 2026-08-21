@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual, `F2-05` integró el cliente generado y la configuración runtime de la API, `F2-06` añadió la sesión real no persistente y `F2-07` unificó los errores HTTP. Todavía no incluye módulos de negocio.
+Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual, `F2-05` integró el cliente generado y la configuración runtime de la API, `F2-06` añadió la sesión real no persistente, `F2-07` unificó los errores HTTP y `F2-08` cerró la fase con pruebas E2E reproducibles. Todavía no incluye módulos de negocio.
 
 ## Versiones fijadas
 
@@ -18,6 +18,7 @@ Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el pro
 | angular-eslint        |  `22.1.0` |
 | ESLint                |  `10.8.1` |
 | typescript-eslint     |  `8.67.0` |
+| Playwright Test       |  `1.62.1` |
 
 Angular `22.0.x` admite oficialmente Node.js `^22.22.3 || ^24.15.0 || ^26.0.0` y TypeScript `>=6.0.0 <6.1.0`; por tanto, las versiones elegidas pertenecen a la matriz compatible. Consulta la [tabla oficial de compatibilidad](https://angular.dev/reference/versions).
 
@@ -40,7 +41,10 @@ npm --version
 ```powershell
 cd frontend
 npm ci
+npm run e2e:install
 ```
+
+El segundo comando descarga únicamente el Chromium asociado a la versión fijada de Playwright. En CI se usa `playwright install --with-deps chromium` para instalar también sus bibliotecas del sistema.
 
 ## Ejecución local
 
@@ -144,6 +148,16 @@ Durante el desarrollo puedes mantenerlas observando cambios:
 npm run test:watch
 ```
 
+Las 66 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
+
+```powershell
+npm run e2e
+```
+
+Los 14 escenarios E2E cubren visitante, login y `/me`, menú y rutas de los tres roles, ausencia de persistencia y recarga, refresh rechazado, logout degradado, `403`, `409`, `429` con reloj controlado, correlation ID copiable, navegación por teclado y viewport móvil de `390×844`. Las respuestas difíciles se interceptan con datos inequívocamente sintéticos y nunca contienen secretos reales.
+
+La integración controlada con la Inventory API real se conserva en las pruebas de backend basadas en PostgreSQL/Testcontainers, incluida `SecuritySessionIntegrationTest`, y el mismo workflow de CI las ejecuta junto con la comprobación del cliente OpenAPI. Los E2E no necesitan una base compartida ni credenciales versionadas, por lo que son deterministas y reproducibles localmente.
+
 ## Calidad
 
 Formatea los archivos versionados del FrontEnd:
@@ -159,7 +173,7 @@ npm run format:check
 npm run lint
 ```
 
-Ejecuta en secuencia todas las comprobaciones de `F2-02`:
+Ejecuta en secuencia formato, lint, pruebas unitarias/de componente, E2E y ambos builds:
 
 ```powershell
 npm run check
@@ -187,15 +201,13 @@ Los límites se fijaron en `F2-02` y se siguen comparando con la medición más 
 
 | Configuración | Bundle inicial medido | Aviso inicial | Error inicial | Aviso por estilo | Error por estilo |
 | ------------- | --------------------: | ------------: | ------------: | ---------------: | ---------------: |
-| Desarrollo    |             `1.46 MB` |     `1.75 MB` |        `2 MB` |           `6 kB` |          `10 kB` |
-| Producción    |           `280.09 kB` |      `350 kB` |      `450 kB` |           `6 kB` |          `10 kB` |
+| Desarrollo    |             `1.49 MB` |     `1.75 MB` |        `2 MB` |           `6 kB` |          `10 kB` |
+| Producción    |           `297.57 kB` |      `350 kB` |      `450 kB` |           `6 kB` |          `10 kB` |
 
-El umbral de desarrollo es mayor porque conserva código sin optimizar y source maps. El de producción permite aproximadamente `70 kB` antes del aviso y `170 kB` antes del error sobre la medición actual. Los estilos por componente se limitan de forma independiente para impedir que una sola vista concentre CSS excesivo. Todo error de budget hace fallar el build y CI ejecuta ambas configuraciones.
+El umbral de desarrollo es mayor porque conserva código sin optimizar y source maps. El de producción permite aproximadamente `52 kB` antes del aviso y `152 kB` antes del error sobre la medición actual. Los estilos por componente se limitan de forma independiente para impedir que una sola vista concentre CSS excesivo. Todo error de budget hace fallar el build y CI ejecuta ambas configuraciones.
 
 ## Strictness y excepciones
 
 TypeScript usa `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess` y comprobación consistente de mayúsculas/minúsculas. Angular activa `strictTemplates` además de las comprobaciones estrictas de inyección e inputs.
 
 La única excepción deliberada es `skipLibCheck: true`: evita volver a comprobar declaraciones de tipos de dependencias externas, pero no relaja el código ni los templates de la aplicación. No se deshabilitó ninguna regla estricta para resolver un caso local.
-
-El script `e2e` se añadirá en `F2-08` cuando exista su herramienta y sus escenarios; no se mantiene un placeholder que aparente una verificación inexistente.

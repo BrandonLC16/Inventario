@@ -281,6 +281,9 @@
   .shell__sidebar--open {
     visibility: visible;
     transform: translateX(0);
+    transition:
+      transform 180ms ease,
+      visibility 0s;
   }
 
   .shell__scrim {

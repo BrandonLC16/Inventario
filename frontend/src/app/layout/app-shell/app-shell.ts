@@ -2,6 +2,8 @@ import {
   Component,
   ElementRef,
   HostListener,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -42,6 +44,7 @@ interface Breadcrumb {
 })
 export class AppShell {
   private readonly activatedRoute = inject(ActivatedRoute);
+  private readonly injector = inject(Injector);
   private readonly router = inject(Router);
 
   protected readonly session = inject(SessionService);
@@ -97,7 +100,12 @@ export class AppShell {
     this.menuOpen.set(willOpen);
 
     if (willOpen) {
-      queueMicrotask(() => this.firstNavigationLink()?.nativeElement.focus());
+      afterNextRender(
+        () => {
+          requestAnimationFrame(() => this.firstNavigationLink()?.nativeElement.focus());
+        },
+        { injector: this.injector },
+      );
     }
   }
 
