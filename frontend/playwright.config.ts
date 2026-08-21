@@ -8,8 +8,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,
+  workers: process.env['CI'] ? 1 : 2,
   expect: { timeout: 15_000 },
-  ...(process.env['CI'] ? { workers: 1 } : {}),
   reporter: [['list'], ['html', { open: 'never' }]],
   outputDir: 'test-results',
   use: {

@@ -659,6 +659,133 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 - Manejo de baja de producto bloqueada por documentos/saldos.
 - Pruebas de permisos, concurrencia y doble envío.
 
+#### Cómo empezar y dar seguimiento con Codex
+
+El 21 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01 está completada** con la feature lazy de productos, CRUD feliz, filtros y paginación remotos, permisos, pruebas unitarias/de componente y E2E; `warehouses` e `inventory` continúan usando el placeholder común. El siguiente corte independiente disponible es F3-02; F3-03 depende de F3-01 y F3-02.
+
+Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
+
+Secuencia recomendada:
+
+```text
+Fase 2 ✓ ─┬→ F3-01 ✓┐
+          └→ F3-02 ─┴→ F3-03 ─┬→ F3-04 ─┐
+                               ├→ F3-05 ─┼→ F3-08
+                               └→ F3-06 ─┤
+F3-01 + F3-03 ─────────────────→ F3-07 ─┘
+```
+
+F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 parten de la vista multi-almacén de F3-03. Las pruebas se escriben durante cada entrega; F3-08 agrega los escenarios transversales y decide el cierre de la fase.
+
+| ID | Entrega | Dependencia | Estado | Evidencia mínima para completar |
+|---|---|---|---|---|
+| `F3-01` | CRUD y búsqueda de productos | Fase 2 | Completado | rutas lazy y adaptador CRUD; filtros/paginación remotos; `minimumStock` sólo en alta; roles probados; 83 unit/component y 18 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
+| `F3-02` | Catálogo de almacenes | Fase 2 | Pendiente | catálogo y mantenimiento por rol, desactivación segura y pruebas aprobadas |
+| `F3-03` | Existencias globales/por almacén | `F3-01`, `F3-02` | Pendiente | saldos conciliados por almacén, paginación remota y estados completos |
+| `F3-04` | Mínimos y activación por almacén | `F3-03` | Pendiente | lectura/edición diferenciada del catálogo y conflictos probados |
+| `F3-05` | Ajustes manuales | `F3-03` | Pendiente | confirmación, una sola petición, reconciliación y rechazos probados |
+| `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Pendiente | filtros remotos, trazabilidad completa, permisos y pruebas aprobadas |
+| `F3-07` | Baja de producto protegida | `F3-01`, `F3-03`, `F3-05` | Pendiente | baja exitosa y bloqueos por saldo/reserva/documento representados sin perder estado |
+| `F3-08` | Permisos, concurrencia y doble envío | `F3-01`–`F3-07` | Pendiente | matriz transversal unit/component/E2E y `npm run check` en verde |
+
+Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evidencia mínima por los resultados reales al cerrar cada entrega. Si falta una comprobación, existe una prueba inestable o el contrato no alcanza para implementar el comportamiento sin llamadas por fila, la entrega no está completa: documenta el bloqueo antes de proponer un cambio de API.
+
+##### F3-01 — CRUD y búsqueda de productos
+
+**Qué resuelve.** Sustituye el placeholder de `/products` por la primera feature de negocio completa y establece el patrón que reutilizarán los demás catálogos. Debe cubrir listado, detalle, alta, edición y baja exitosa, dejando para F3-07 la experiencia reforzada de bloqueos. Todos los roles consultan; sólo `ADMIN` e `INVENTORY_MANAGER` modifican.
+
+**Trabajo esperado.** Codex debe crear `features/products/` con rutas lazy para `/products`, `/products/new`, `/products/:id` y `/products/:id/edit`; ampliar el adaptador manual sin tocar `generated/`; e implementar paginación del servidor y filtros combinables `sku`, `name` y `active`. Los filtros deben cancelar respuestas obsoletas, conservar un estado navegable y no descargar todo el catálogo. El formulario usa los tipos generados y refleja las validaciones reales: SKU 64, nombre 160, descripción 1000, precio no negativo con dos decimales y `minimumStock` sólo al crear para inicializar `MAIN`; editar el producto nunca cambia settings de almacén. Incluye carga, vacío, error, validación, `409`, éxito y prevención de doble envío.
+
+**Seguimiento.** Se completa cuando los tres roles pueden consultar y los gestores completan el flujo feliz de crear, editar y dar de baja un producto sin saldo; `SALES` no ve ni alcanza acciones de escritura; volver desde detalle conserva filtros/página; y pruebas de adaptador, componentes, rutas y E2E cubren búsqueda, paginación, validación, SKU duplicado y doble envío. La baja bloqueada se registra como escenario pendiente de F3-07.
+
+**Pedido sugerido a Codex:**
+
+> Implementa únicamente `F3-01`. Lee `AGENTS.md`, la Fase 3 y el contrato real de productos. Sustituye el placeholder por una feature lazy con listado, detalle, alta, edición y baja feliz; amplía el adaptador manual usando sólo tipos generados. Implementa filtros `sku`/`name`/`active`, paginación remota, estados completos y acciones sólo para `ADMIN`/`INVENTORY_MANAGER`. Respeta que `minimumStock` sólo se envía al crear para `MAIN`. No cambies backend ni dependencias. Añade pruebas unitarias/de componente y E2E, ejecuta `npm run generate:api:check` y `npm run check`, y reporta evidencia.
+
+##### F3-02 — Catálogo de almacenes
+
+**Qué resuelve.** Introduce el selector y directorio de ubicaciones del que dependen las vistas multi-almacén. La API sólo ofrece paginación para este catálogo; no debe simularse una búsqueda descargando páginas completas.
+
+**Trabajo esperado.** Codex debe crear `features/warehouses/`, reemplazar `/warehouses` y añadir el detalle o panel necesario para crear, editar y desactivar. Reutiliza `WarehousesService` mediante un adaptador manual, con `page` y `size` del servidor. El formulario refleja código máximo 32, nombre 160, descripción 1000 y estado activo; el servidor normaliza el código. Todos los roles consultan, mientras que sólo gestores modifican. La desactivación exige confirmación y puede recibir `409` si hay stock, reservas u órdenes abiertas; un almacén inactivo permanece identificable y no admite nuevas operaciones.
+
+**Seguimiento.** Se completa cuando la lista y el detalle manejan carga, vacío, error, paginación y estado activo; los gestores pueden crear/editar/desactivar sin doble envío; `SALES` queda en lectura; y las pruebas cubren código duplicado, `404`, conflicto de desactivación, permisos y navegación responsive. No agregues filtros que el endpoint no soporta.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F3-02`. Construye el catálogo lazy de almacenes sobre el cliente generado, con adaptador manual, lista paginada, detalle, alta, edición y desactivación confirmada. No simules búsqueda porque el contrato sólo admite `page` y `size`. Aplica lectura para todos y escritura sólo para gestores; cubre estados completos, `404`, código duplicado, `409`, doble envío y accesibilidad. No cambies la API. Ejecuta sincronización del cliente, pruebas y `npm run check` y entrega resultados.
+
+##### F3-03 — Existencias físicas, reservadas y disponibles globales/por almacén
+
+**Qué resuelve.** Hace visible el saldo que gobierna ventas y operación. Debe evitar una ambigüedad del plan histórico: `/api/v1/inventory/**` es un alias compatible hacia el almacén determinista `MAIN`, no una suma de todos los almacenes. La vista multi-almacén usa `/api/v1/warehouses/{warehouseId}/inventory/**`.
+
+**Trabajo esperado.** Codex debe crear `features/inventory/`, adaptadores manuales y rutas para la vista de `MAIN` y `/warehouses/:id/inventory`. Muestra `quantity`, `reservedQuantity`, `availableQuantity` y `updatedAt`; conserva `available = physical - reserved` y representa `updatedAt=null` como producto aún sin movimientos. Los nombres/SKU deben componerse por `productId` sin una petición por fila y sin suponer que dos páginas tienen el mismo orden; si el contrato actual no permite una composición correcta y eficiente, detén la entrega y documenta la brecha. Todos los roles pueden consultar. Usa paginación remota, selector de almacén y enlaces a producto/configuración según permisos.
+
+**Seguimiento.** Se completa cuando cambiar de almacén nunca conserva saldos de la ubicación anterior, `MAIN` se etiqueta como alias de compatibilidad y no como total global, los tres tipos de existencia son comprensibles y la UI cubre cero, carga, vacío, error, recarga y paginación. Las pruebas deben demostrar aislamiento por almacén, unión por ID, cancelación de respuestas obsoletas y acceso de los tres roles.
+
+**Pedido sugerido a Codex:**
+
+> Implementa exclusivamente `F3-03`. Inspecciona los DTOs y endpoints de inventario antes de diseñar la vista. Sustituye los placeholders de inventario por saldos físicos, reservados y disponibles para `MAIN` y por almacén, con selector, paginación remota y composición de producto por ID sin N+1. Deja explícito que `/api/v1/inventory` apunta a `MAIN`, no al total multi-almacén. Si falta contrato para una unión correcta, documenta el bloqueo antes de cambiar backend. Añade pruebas de aislamiento, cero/null, respuestas obsoletas, roles y estados; ejecuta las comprobaciones completas.
+
+##### F3-04 — Configuración de mínimos y activación por almacén
+
+**Qué resuelve.** Permite decidir qué productos operan en cada almacén y cuándo generan alerta. La activación del catálogo de producto y la activación dentro de un almacén son conceptos diferentes y nunca deben fusionarse en un solo control.
+
+**Trabajo esperado.** Codex debe implementar `/warehouses/:id/settings` usando las rutas `settings` del almacén. Todos los roles leen `sku`, `name`, `minimumStock` y estado por almacén; sólo gestores actualizan `minimumStock >= 0` y `active`. La respuesta de escritura es `204`, por lo que la fila se vuelve a consultar antes de mostrar el dato como reconciliado. Desactivar una configuración puede responder `409` si conserva stock o reservas. Cambiar el catálogo con `PUT /products/{id}` no modifica settings y la UI no debe insinuar lo contrario.
+
+**Seguimiento.** Se completa cuando se distingue visual y semánticamente producto global inactivo de producto inactivo en un almacén, los gestores actualizan una fila sin afectar otras ubicaciones, `SALES` sólo consulta y un conflicto conserva el formulario con una explicación accionable y correlation ID. Prueba mínimo negativo/cero, `204`, recarga, permisos, doble envío y aislamiento entre almacenes.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F3-04` en `/warehouses/:id/settings`. Usa el cliente generado mediante adaptador manual, separa estado global del producto y activación por almacén, valida mínimo no negativo y permite escritura únicamente a gestores. Tras el `204`, vuelve a consultar y reconcilia; maneja `409` por stock/reservas sin perder el formulario. Cubre carga, vacío, error, permisos, doble envío, aislamiento y accesibilidad. No edites generado ni cambies backend. Ejecuta pruebas y `npm run check`.
+
+##### F3-05 — Ajustes manuales con referencia y confirmación
+
+**Qué resuelve.** Permite entradas o salidas extraordinarias manteniendo trazabilidad y evitando que una interacción duplicada altere dos veces el inventario. Es una mutación no idempotente: nunca se reintenta automáticamente.
+
+**Trabajo esperado.** Codex debe añadir la acción a la vista del almacén y preferir la ruta explícita `/warehouses/{warehouseId}/inventory/{productId}/adjustments`; el alias `/inventory/{productId}/adjustments` se reserva para `MAIN`. Sólo gestores acceden. El formulario puede presentar Entrada/Salida, pero serializa un `quantityDelta` entero distinto de cero y una `reference` opcional de hasta 128 caracteres. Antes de enviar muestra producto, almacén, saldo físico/reservado/disponible, delta y resultado previsto; bloquea el botón mientras hay petición. La respuesta del servidor, no el cálculo optimista, sustituye el saldo visible. Un `400` por stock reservado o saldo negativo conserva contexto y no deja cambios parciales.
+
+**Seguimiento.** Se completa cuando una confirmación produce exactamente una petición, cancelar no produce ninguna, cambiar de almacén invalida el diálogo abierto y la respuesta reconciliada actualiza saldo y vistas dependientes. Prueba entradas, salidas, cero, referencia límite, saldo insuficiente/reservado, `401`/`403`/`429`, doble clic, fallo de red incierto y ausencia de reintento automático.
+
+**Pedido sugerido a Codex:**
+
+> Implementa únicamente `F3-05`. Añade ajustes manuales por almacén para gestores, con entrada/salida traducida a delta firmado no cero, referencia opcional, resumen de confirmación y prevención estricta de doble envío. Usa la ruta del almacén, salvo `MAIN` cuando corresponda, y reconcilia sólo con la respuesta API. No reintentes la mutación. Cubre stock insuficiente o reservado, cambio de almacén, fallo de red, 401/403/429 y accesibilidad. Añade pruebas unitarias/de componente y E2E y ejecuta `npm run check`.
+
+##### F3-06 — Alertas y Kardex con filtros
+
+**Qué resuelve.** Entrega dos vistas operativas para gestores: alertas accionables de reposición y trazabilidad histórica de todos los cambios físicos y reservados. `SALES` no puede consultar estos endpoints.
+
+**Trabajo esperado.** Codex debe implementar alertas para `MAIN` y por almacén con `search`, `outOfStockOnly`, `page` y `size`, mostrando mínimo, disponible, reposición sugerida y `LOW_STOCK`/`OUT_OF_STOCK`. El Kardex usa filtros remotos combinables `productId`, `type`, fechas ISO inclusivas y referencia exacta; valida que `from <= to`; mantiene paginación estable y representa por separado `quantityDelta`/saldos físicos y `reservationDelta`/saldos reservados. No inventa nombres para productos eliminados: si ya no pueden consultarse, muestra un identificador seguro y conserva el historial. Evita N+1 y respuestas obsoletas.
+
+**Seguimiento.** Se completa cuando filtros, URL y paginación son reproducibles; cambiar almacén limpia resultados incompatibles; las alertas coinciden con el mínimo configurado; y cada movimiento muestra tipo, antes/después, referencia, fecha, actor y almacén. Prueba todos los filtros, rango inválido, producto eliminado, vacíos, permisos, teclado y viewport móvil.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F3-06`. Crea alertas y Kardex lazy para `MAIN` y cada almacén usando filtros/paginación del servidor. Restringe ambos a `ADMIN` e `INVENTORY_MANAGER`; representa alertas, reposición y efectos físicos/reservados sin N+1. Valida fechas, conserva filtros en URL, cancela respuestas obsoletas y admite historial de productos eliminados con fallback por ID. Añade pruebas de filtros, permisos, vacío/error, responsive y accesibilidad y ejecuta sincronización del cliente y `npm run check`.
+
+##### F3-07 — Manejo de baja de producto bloqueada por documentos o saldos
+
+**Qué resuelve.** Completa el ciclo de vida iniciado en F3-01 y evita confundir suspensión reversible (`active=false`) con baja lógica terminal. Una baja sólo es válida sin stock físico, reservas ni documentos pendientes; el SKU continúa reservado y el Kardex histórico permanece.
+
+**Trabajo esperado.** Codex debe mostrar una confirmación reforzada que explique que la baja es terminal para la operación, identificar el producto y no sugerir que libera el SKU. Antes de confirmar puede mostrar los saldos ya cargados, pero no decide localmente si la baja es válida: la API conserva la autoridad. En éxito `204`, refresca catálogo y navegación. En `409`, mantiene el producto visible, muestra los posibles bloqueos conocidos —saldo, reserva u operación pendiente— sin afirmar cuál fue si el código no lo distingue, conserva correlation ID y ofrece rutas seguras para revisar inventario/Kardex. Nunca analiza el texto variable del backend para tomar decisiones.
+
+**Seguimiento.** Se completa con baja exitosa de producto sin dependencias y conflictos representados para existencia, reserva y documento pendiente. Las pruebas verifican que `active=false` sigue visible/editable según rol, que una baja exitosa desaparece de vistas operativas sin perder el acceso histórico permitido, que un conflicto no elimina la fila y que clics repetidos producen una sola petición.
+
+**Pedido sugerido a Codex:**
+
+> Implementa exclusivamente `F3-07`. Refuerza la baja lógica de productos sin confundirla con `active=false`. La API decide si hay stock, reservas o documentos pendientes; en `409` no analices mensajes ni afirmes un bloqueo específico, conserva el producto y muestra correlation ID y enlaces de revisión. En `204`, reconcilia catálogo sin perder trazabilidad. Prueba éxito, los tres tipos de bloqueo, producto suspendido, permisos y doble clic. No cambies el contrato salvo brecha demostrada y ejecuta todas las comprobaciones.
+
+##### F3-08 — Pruebas de permisos, concurrencia y doble envío
+
+**Qué resuelve.** Verifica en conjunto que los siete puntos anteriores respetan roles, aislamiento por almacén e integridad ante respuestas concurrentes. La UI reduce errores de operación, pero no reemplaza los locks y transacciones ya probados en PostgreSQL.
+
+**Trabajo esperado.** Codex debe consolidar una matriz unit/component/E2E: los tres roles consultan catálogo y saldos; `SALES` no puede mutar ni abrir alertas/Kardex; los gestores sí; respuestas antiguas de filtros o almacenes no sobrescriben las nuevas; crear, editar, configurar, ajustar y dar de baja bloquean doble envío; un fallo o timeout no se convierte en reintento silencioso; y cada mutación vuelve a conciliar con API. Incluye navegación por teclado, foco tras diálogos, móvil y los estados comunes. Para concurrencia de inventario real, conserva y ejecuta las pruebas backend/Testcontainers relevantes en vez de simular garantías transaccionales sólo en el navegador.
+
+**Seguimiento.** Se completa cuando la matriz de aceptación registra cada rol y operación, no hay pruebas omitidas o inestables, el cliente generado permanece sincronizado y pasan `npm ci`, `npm run generate:api:check`, `npm run check`, las pruebas backend de productos/inventario/almacenes y SpotBugs. Registra conteos, builds, budgets y cualquier QA visual manual; sólo entonces marca la Fase 3 completa.
+
+**Pedido sugerido a Codex:**
+
+> Cierra la Fase 3 con `F3-08`. Audita primero la evidencia de `F3-01` a `F3-07` y crea una matriz transversal de roles, aislamiento por almacén, respuestas concurrentes, doble envío y reconciliación. Completa unit/component/E2E y ejecuta instalación limpia, sincronización OpenAPI, `npm run check`, pruebas backend relevantes con Testcontainers y SpotBugs. Incluye teclado, móvil y QA visual. No declares la fase completa si queda una prueba omitida, inestable o una verificación pendiente; reporta comandos, resultados, conteos y budgets.
+
 **Criterio de salida**
 
 Un responsable administra productos y existencias multi-almacén sin utilizar Swagger.

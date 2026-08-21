@@ -2,13 +2,16 @@ import { Route, Routes } from '@angular/router';
 
 import {
   APP_SECTION_DATA_KEY,
+  APP_SECTIONS,
   AppSection,
   BREADCRUMB_DATA_KEY,
   NAVIGATION_SECTIONS,
 } from './core/navigation/app-navigation';
 import { authenticatedGuard, roleGuard } from './core/navigation/session.guards';
 
-const sectionRoutes: Routes = NAVIGATION_SECTIONS.map(
+const sectionRoutes: Routes = NAVIGATION_SECTIONS.filter(
+  (section) => section.id !== 'products',
+).map(
   (section): Route => ({
     path: section.path,
     title: `${section.label} | Inventario`,
@@ -36,6 +39,18 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/app-shell/app-shell').then(({ AppShell }) => AppShell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: APP_SECTIONS.products.path,
+        canActivate: [roleGuard],
+        data: {
+          [APP_SECTION_DATA_KEY]: APP_SECTIONS.products,
+          [BREADCRUMB_DATA_KEY]: APP_SECTIONS.products.label,
+        },
+        loadChildren: () =>
+          import('./features/products/products.routes').then(
+            ({ PRODUCT_ROUTES }) => PRODUCT_ROUTES,
+          ),
+      },
       ...sectionRoutes,
       {
         path: 'design-system',

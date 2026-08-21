@@ -1,0 +1,120 @@
+<section class="products-page" aria-labelledby="product-form-title">
+  <header class="products-header">
+    <div>
+      <p class="products-eyebrow">Catálogo</p>
+      <h1 id="product-form-title" tabindex="-1">{{ title }}</h1>
+      <p>
+        {{
+          editing
+            ? 'Actualiza los datos generales del producto.'
+            : 'Registra un producto y su mínimo inicial para el almacén MAIN.'
+        }}
+      </p>
+    </div>
+  </header>
+
+  @if (localError(); as message) {
+    <app-operation-feedback tone="error" [message]="message" />
+  }
+  @if (success(); as message) {
+    <app-operation-feedback tone="success" [message]="message" />
+  }
+  @if (problem(); as currentProblem) {
+    <app-api-error-message
+      [problem]="currentProblem"
+      [retryAllowed]="loadFailed()"
+      (retry)="retryLoad()"
+    />
+  }
+
+  @if (loading()) {
+    <app-loading-state label="Cargando producto para editar" />
+  } @else {
+    <form class="product-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <p class="product-form__required">Los campos marcados con * son obligatorios.</p>
+
+      <mat-form-field appearance="outline">
+        <mat-label>SKU</mat-label>
+        <input matInput formControlName="sku" maxlength="64" autocomplete="off" />
+        <mat-hint align="end">{{ form.controls.sku.value.length }}/64</mat-hint>
+        @if (form.controls.sku.touched && form.controls.sku.hasError('required')) {
+          <mat-error>El SKU es obligatorio.</mat-error>
+        } @else if (form.controls.sku.hasError('maxlength')) {
+          <mat-error>El SKU admite hasta 64 caracteres.</mat-error>
+        } @else if (form.controls.sku.hasError('api')) {
+          <mat-error>{{ form.controls.sku.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Nombre</mat-label>
+        <input matInput formControlName="name" maxlength="160" autocomplete="off" />
+        <mat-hint align="end">{{ form.controls.name.value.length }}/160</mat-hint>
+        @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+          <mat-error>El nombre es obligatorio.</mat-error>
+        } @else if (form.controls.name.hasError('maxlength')) {
+          <mat-error>El nombre admite hasta 160 caracteres.</mat-error>
+        } @else if (form.controls.name.hasError('api')) {
+          <mat-error>{{ form.controls.name.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field class="product-form__wide" appearance="outline">
+        <mat-label>Descripción</mat-label>
+        <textarea matInput formControlName="description" maxlength="1000" rows="4"></textarea>
+        <mat-hint align="end">{{ form.controls.description.value.length }}/1000</mat-hint>
+        @if (form.controls.description.hasError('maxlength')) {
+          <mat-error>La descripción admite hasta 1000 caracteres.</mat-error>
+        } @else if (form.controls.description.hasError('api')) {
+          <mat-error>{{ form.controls.description.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Precio</mat-label>
+        <input matInput type="number" formControlName="price" min="0" step="0.01" />
+        <span matTextPrefix>$&nbsp;</span>
+        @if (form.controls.price.touched && form.controls.price.hasError('required')) {
+          <mat-error>El precio es obligatorio.</mat-error>
+        } @else if (form.controls.price.hasError('min')) {
+          <mat-error>El precio no puede ser negativo.</mat-error>
+        } @else if (form.controls.price.hasError('max')) {
+          <mat-error>El precio excede el máximo permitido.</mat-error>
+        } @else if (form.controls.price.hasError('decimalScale')) {
+          <mat-error>Usa como máximo dos decimales.</mat-error>
+        } @else if (form.controls.price.hasError('api')) {
+          <mat-error>{{ form.controls.price.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      @if (!editing) {
+        <mat-form-field appearance="outline">
+          <mat-label>Stock mínimo inicial en MAIN</mat-label>
+          <input matInput type="number" formControlName="minimumStock" min="0" step="1" />
+          <mat-hint>Se configura sólo al crear el producto.</mat-hint>
+          @if (
+            form.controls.minimumStock.touched && form.controls.minimumStock.hasError('required')
+          ) {
+            <mat-error>El stock mínimo es obligatorio.</mat-error>
+          } @else if (
+            form.controls.minimumStock.hasError('min') ||
+            form.controls.minimumStock.hasError('pattern')
+          ) {
+            <mat-error>Usa un número entero igual o mayor que cero.</mat-error>
+          } @else if (form.controls.minimumStock.hasError('api')) {
+            <mat-error>{{ form.controls.minimumStock.getError('api') }}</mat-error>
+          }
+        </mat-form-field>
+      }
+
+      <mat-checkbox formControlName="active">Producto activo</mat-checkbox>
+
+      <div class="product-form__actions">
+        <button mat-flat-button type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Guardando…' : 'Guardar producto' }}
+        </button>
+        <a mat-button [routerLink]="cancelTarget()" [queryParams]="listQueryParams">Cancelar</a>
+      </div>
+    </form>
+  }
+</section>

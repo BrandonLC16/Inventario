@@ -8,8 +8,14 @@ import {
 } from '@angular/router';
 
 import { SessionService } from '../session/session.service';
-import { APP_SECTION_DATA_KEY, APP_SECTIONS, AppRole } from './app-navigation';
-import { authenticatedGuard, roleGuard } from './session.guards';
+import {
+  ALLOWED_ROLES_DATA_KEY,
+  APP_SECTION_DATA_KEY,
+  APP_SECTIONS,
+  AppRole,
+  INVENTORY_MANAGEMENT_ROLES,
+} from './app-navigation';
+import { allowedRolesGuard, authenticatedGuard, roleGuard } from './session.guards';
 
 describe('session guards', () => {
   const authenticated = signal(false);
@@ -17,6 +23,8 @@ describe('session guards', () => {
   const session = {
     isAuthenticated: authenticated.asReadonly(),
     roles: roles.asReadonly(),
+    hasAnyRole: (allowedRoles: readonly AppRole[]) =>
+      roles().some((role) => allowedRoles.includes(role)),
   };
 
   beforeEach(() => {
@@ -77,4 +85,26 @@ describe('session guards', () => {
       true,
     );
   });
+
+  it.each([
+    ['ADMIN', true],
+    ['INVENTORY_MANAGER', true],
+    ['SALES', false],
+  ] satisfies readonly (readonly [AppRole, boolean])[])(
+    'applies the product management policy for %s',
+    (role, expected) => {
+      roles.set([role]);
+      const route = {
+        data: { [ALLOWED_ROLES_DATA_KEY]: INVENTORY_MANAGEMENT_ROLES },
+      } as unknown as ActivatedRouteSnapshot;
+      const result = TestBed.runInInjectionContext(() =>
+        allowedRolesGuard(route, {} as RouterStateSnapshot),
+      );
+
+      expect(result === true).toBe(expected);
+      if (!expected) {
+        expect(TestBed.inject(Router).serializeUrl(result as never)).toBe('/forbidden');
+      }
+    },
+  );
 });

@@ -147,7 +147,7 @@ export class AppShell {
       }
 
       const label = currentRoute.snapshot.data[BREADCRUMB_DATA_KEY] as string | undefined;
-      if (label) {
+      if (label && breadcrumbs.at(-1)?.url !== (url || '/dashboard')) {
         breadcrumbs.push({ label, url: url || '/dashboard' });
       }
     }

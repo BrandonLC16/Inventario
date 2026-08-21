@@ -1,0 +1,81 @@
+<article class="products-page" aria-labelledby="product-detail-title">
+  <header class="products-header">
+    <div>
+      <p class="products-eyebrow">Producto</p>
+      <h1 id="product-detail-title" tabindex="-1">Detalle de producto</h1>
+      <p>Información general del registro seleccionado.</p>
+    </div>
+    <a mat-stroked-button routerLink="/products" [queryParams]="listQueryParams">
+      Volver al listado
+    </a>
+  </header>
+
+  @if (feedback(); as message) {
+    <app-operation-feedback
+      tone="success"
+      [message]="message"
+      [dismissible]="true"
+      (dismiss)="feedback.set(null)"
+    />
+  }
+
+  @if (deleteProblem(); as currentDeleteProblem) {
+    <app-api-error-message [problem]="currentDeleteProblem" />
+  }
+
+  @if (loading()) {
+    <app-loading-state label="Cargando detalle del producto" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (product(); as currentProduct) {
+    <section class="product-detail-card" aria-label="Datos del producto">
+      <div class="product-detail-card__heading">
+        <div>
+          <p class="product-detail-card__sku">{{ currentProduct.sku ?? 'Sin SKU' }}</p>
+          <h2>{{ currentProduct.name ?? 'Producto sin nombre' }}</h2>
+        </div>
+        <span class="status-pill" [class.status-pill--inactive]="currentProduct.active === false">
+          {{ currentProduct.active === false ? 'Inactivo' : 'Activo' }}
+        </span>
+      </div>
+      <dl class="product-details">
+        <div>
+          <dt>Precio</dt>
+          <dd>{{ currentProduct.price ?? 0 | currency: 'MXN' }}</dd>
+        </div>
+        <div>
+          <dt>Descripción</dt>
+          <dd>{{ currentProduct.description || 'Sin descripción' }}</dd>
+        </div>
+        <div>
+          <dt>Creado</dt>
+          <dd>{{ currentProduct.createdAt | date: 'medium' }}</dd>
+        </div>
+        <div>
+          <dt>Última actualización</dt>
+          <dd>{{ currentProduct.updatedAt | date: 'medium' }}</dd>
+        </div>
+      </dl>
+
+      @if (canManage()) {
+        <div class="product-actions">
+          <a
+            mat-flat-button
+            [routerLink]="['/products', currentProduct.id, 'edit']"
+            [queryParams]="listQueryParams"
+          >
+            Editar producto
+          </a>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="deleting()"
+            (click)="requestDelete()"
+          >
+            {{ deleting() ? 'Procesando…' : 'Dar de baja' }}
+          </button>
+        </div>
+      }
+    </section>
+  }
+</article>

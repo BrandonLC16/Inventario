@@ -1,0 +1,135 @@
+<section class="products-page" aria-labelledby="products-title">
+  <header class="products-header">
+    <div>
+      <p class="products-eyebrow">Catálogo</p>
+      <h1 id="products-title" tabindex="-1">Productos</h1>
+      <p>Consulta y administra los datos generales del catálogo.</p>
+    </div>
+    @if (canManage()) {
+      <a mat-flat-button routerLink="new" [queryParams]="detailQueryParams()">Nuevo producto</a>
+    }
+  </header>
+
+  @if (feedback(); as message) {
+    <app-operation-feedback
+      tone="success"
+      [message]="message"
+      [dismissible]="true"
+      (dismiss)="feedback.set(null)"
+    />
+  }
+
+  @if (deleteProblem(); as currentDeleteProblem) {
+    <app-api-error-message [problem]="currentDeleteProblem" />
+  }
+
+  <form class="product-filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
+    <mat-form-field appearance="outline">
+      <mat-label>SKU</mat-label>
+      <input matInput formControlName="sku" maxlength="64" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre</mat-label>
+      <input matInput formControlName="name" maxlength="160" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Estado</mat-label>
+      <mat-select formControlName="active">
+        <mat-option value="">Todos</mat-option>
+        <mat-option value="true">Activos</mat-option>
+        <mat-option value="false">Inactivos</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <div class="product-filters__actions">
+      <button mat-flat-button type="submit">Aplicar filtros</button>
+      <button mat-button type="button" (click)="clearFilters()">Limpiar</button>
+    </div>
+  </form>
+
+  @if (loading()) {
+    <app-loading-state label="Cargando productos" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (products().length === 0) {
+    <app-empty-state
+      title="No hay productos para mostrar"
+      description="Prueba con otros filtros o limpia la búsqueda."
+      actionLabel="Limpiar filtros"
+      (action)="clearFilters()"
+    />
+  } @else {
+    <div class="product-table-wrap">
+      <table class="product-table">
+        <caption class="visually-hidden">
+          Productos encontrados con los filtros actuales
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">SKU</th>
+            <th scope="col">Nombre</th>
+            <th scope="col">Precio</th>
+            <th scope="col">Estado</th>
+            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (product of products(); track $index) {
+            <tr>
+              <td data-label="SKU">{{ product.sku ?? '—' }}</td>
+              <td data-label="Nombre">{{ product.name ?? '—' }}</td>
+              <td data-label="Precio">{{ product.price ?? 0 | currency: 'MXN' }}</td>
+              <td data-label="Estado">
+                <span class="status-pill" [class.status-pill--inactive]="product.active === false">
+                  {{ product.active === false ? 'Inactivo' : 'Activo' }}
+                </span>
+              </td>
+              <td class="product-table__actions">
+                @if (product.id; as id) {
+                  <a mat-button [routerLink]="[id]" [queryParams]="detailQueryParams()">Ver</a>
+                  @if (canManage()) {
+                    <a mat-button [routerLink]="[id, 'edit']" [queryParams]="detailQueryParams()">
+                      Editar
+                    </a>
+                    <button
+                      mat-button
+                      type="button"
+                      [disabled]="deletingIds().has(id)"
+                      (click)="requestDelete(product)"
+                    >
+                      {{ deletingIds().has(id) ? 'Procesando…' : 'Dar de baja' }}
+                    </button>
+                  }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="product-pagination" aria-label="Paginación de productos">
+      <p>
+        Página {{ (page()?.page ?? query().page) + 1 }} de {{ page()?.totalPages ?? 1 }} ·
+        {{ page()?.totalElements ?? products().length }} productos
+      </p>
+      <div>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.first !== false"
+          (click)="goToPage((page()?.page ?? query().page) - 1)"
+        >
+          Anterior
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.last !== false"
+          (click)="goToPage((page()?.page ?? query().page) + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    </nav>
+  }
+</section>

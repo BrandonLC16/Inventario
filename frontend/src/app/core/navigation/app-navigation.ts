@@ -26,7 +26,8 @@ export interface NavigationGroupDefinition {
 }
 
 const ALL_ROLES: readonly AppRole[] = APP_ROLES;
-const INVENTORY_ROLES: readonly AppRole[] = ['ADMIN', 'INVENTORY_MANAGER'];
+export const INVENTORY_MANAGEMENT_ROLES: readonly AppRole[] = ['ADMIN', 'INVENTORY_MANAGER'];
+const INVENTORY_ROLES = INVENTORY_MANAGEMENT_ROLES;
 const SALES_ROLES: readonly AppRole[] = ['ADMIN', 'SALES'];
 const ADMIN_ROLES: readonly AppRole[] = ['ADMIN'];
 
@@ -153,6 +154,7 @@ export const NAVIGATION_SECTIONS: readonly AppSection[] = Object.values(APP_SECT
 
 export const APP_SECTION_DATA_KEY = 'appSection';
 export const BREADCRUMB_DATA_KEY = 'breadcrumb';
+export const ALLOWED_ROLES_DATA_KEY = 'allowedRoles';
 
 export function canAccessSection(roles: readonly AppRole[], section: AppSection): boolean {
   return roles.some((role) => section.roles.includes(role));
