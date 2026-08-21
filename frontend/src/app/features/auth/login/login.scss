@@ -69,6 +69,10 @@ h1 {
   color: var(--inv-color-danger);
 }
 
+app-api-error-message {
+  margin-block-end: var(--inv-space-4);
+}
+
 form,
 mat-form-field {
   display: block;

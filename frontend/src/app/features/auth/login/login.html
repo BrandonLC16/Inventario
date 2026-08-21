@@ -5,8 +5,12 @@
     <h1 id="login-title">Inicia sesión</h1>
     <p class="intro">Usa tu usuario o correo y tu contraseña de Inventory API.</p>
 
-    @if (errorMessage(); as message) {
+    @if (localErrorMessage(); as message) {
       <div class="login-error" role="alert" aria-live="assertive">{{ message }}</div>
+    }
+
+    @if (apiProblem(); as problem) {
+      <app-api-error-message [problem]="problem" />
     }
 
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -15,6 +19,8 @@
         <input matInput formControlName="identifier" autocomplete="username" />
         @if (form.controls.identifier.touched && form.controls.identifier.hasError('required')) {
           <mat-error>El usuario o correo es obligatorio.</mat-error>
+        } @else if (form.controls.identifier.hasError('api')) {
+          <mat-error>{{ form.controls.identifier.getError('api') }}</mat-error>
         }
       </mat-form-field>
 
@@ -28,11 +34,19 @@
         />
         @if (form.controls.password.touched && form.controls.password.hasError('required')) {
           <mat-error>La contraseña es obligatoria.</mat-error>
+        } @else if (form.controls.password.hasError('api')) {
+          <mat-error>{{ form.controls.password.getError('api') }}</mat-error>
         }
       </mat-form-field>
 
-      <button mat-flat-button type="submit" [disabled]="submitting()">
-        {{ submitting() ? 'Iniciando sesión…' : 'Iniciar sesión' }}
+      <button mat-flat-button type="submit" [disabled]="submitting() || retryAfter.blocked()">
+        @if (submitting()) {
+          Iniciando sesión…
+        } @else if (retryAfter.blocked()) {
+          Disponible en {{ retryAfter.remainingSeconds() }} s
+        } @else {
+          Iniciar sesión
+        }
       </button>
     </form>
 

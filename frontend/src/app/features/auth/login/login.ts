@@ -1,4 +1,3 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,12 +6,22 @@ import { MatInputModule } from '@angular/material/input';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { ApiErrorService, ApiProblem } from '../../../core/http/api-error.service';
+import { RetryAfterTracker } from '../../../core/http/retry-after-tracker';
 import { SessionService } from '../../../core/session/session.service';
+import { ApiErrorMessage } from '../../../shared/api-error-message/api-error-message';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule],
+  imports: [
+    ReactiveFormsModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    ApiErrorMessage,
+  ],
+  providers: [RetryAfterTracker],
   templateUrl: './login.html',
   styleUrl: './login.scss',
 })
@@ -21,27 +30,33 @@ export class Login {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly session = inject(SessionService);
+  private readonly apiErrors = inject(ApiErrorService);
 
   protected readonly submitting = signal(false);
-  protected readonly errorMessage = signal<string | null>(null);
+  protected readonly localErrorMessage = signal<string | null>(null);
+  protected readonly apiProblem = signal<ApiProblem | null>(null);
+  protected readonly retryAfter = inject(RetryAfterTracker);
   protected readonly form = this.formBuilder.nonNullable.group({
     identifier: ['', [Validators.required]],
     password: ['', [Validators.required]],
   });
 
   protected submit(): void {
-    if (this.submitting()) {
+    if (this.submitting() || this.retryAfter.blocked()) {
       return;
     }
 
+    this.localErrorMessage.set(null);
+    this.apiProblem.set(null);
+    this.apiErrors.clearValidationErrors(this.form);
+
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      this.errorMessage.set('Revisa los campos obligatorios antes de continuar.');
+      this.localErrorMessage.set('Revisa los campos obligatorios antes de continuar.');
       return;
     }
 
     this.submitting.set(true);
-    this.errorMessage.set(null);
 
     this.session
       .login(this.form.getRawValue())
@@ -50,7 +65,10 @@ export class Login {
         next: () => void this.router.navigateByUrl(this.safeReturnUrl()),
         error: (error: unknown) => {
           this.form.controls.password.reset('');
-          this.errorMessage.set(this.loginErrorMessage(error));
+          const problem = this.apiErrors.from(error);
+          this.apiErrors.applyValidationErrors(this.form, problem);
+          this.retryAfter.block(problem.retryAfterSeconds);
+          this.apiProblem.set(problem);
         },
       });
   }
@@ -65,15 +83,5 @@ export class Login {
       return returnUrl;
     }
     return '/dashboard';
-  }
-
-  private loginErrorMessage(error: unknown): string {
-    if (error instanceof HttpErrorResponse && error.status === 429) {
-      return 'Hay demasiados intentos. Espera el tiempo indicado antes de volver a intentarlo.';
-    }
-    if (error instanceof HttpErrorResponse && error.status === 401) {
-      return 'No fue posible iniciar sesión con esas credenciales.';
-    }
-    return 'No fue posible iniciar sesión. Intenta nuevamente.';
   }
 }

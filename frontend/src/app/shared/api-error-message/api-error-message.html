@@ -1,0 +1,67 @@
+<section
+  class="api-error"
+  data-error-source="api"
+  role="alert"
+  aria-live="assertive"
+  aria-atomic="true"
+  [attr.aria-label]="problem().title"
+>
+  <span class="api-error__mark" aria-hidden="true">!</span>
+  <div class="api-error__content">
+    <h2>{{ problem().title }}</h2>
+    <p>{{ problem().message }}</p>
+
+    @if (validationEntries().length > 0) {
+      <div class="api-error__validation" aria-label="Resumen de campos con error">
+        <p><strong>Revisa estos campos:</strong></p>
+        <ul>
+          @for (entry of validationEntries(); track entry[0]) {
+            <li>
+              <code>{{ entry[0] }}</code
+              >: {{ entry[1] }}
+            </li>
+          }
+        </ul>
+      </div>
+    }
+
+    @if (retryAfter.blocked()) {
+      <p class="api-error__wait" role="status" aria-live="polite">
+        Podrás intentarlo nuevamente en {{ retryAfter.remainingSeconds() }} segundos.
+      </p>
+    }
+
+    @if (problem().correlationId; as correlationId) {
+      <div class="api-error__support">
+        <label [for]="correlationInputId">Referencia para soporte</label>
+        <div>
+          <input
+            [id]="correlationInputId"
+            type="text"
+            readonly
+            [value]="correlationId"
+            (focus)="$any($event.target).select()"
+          />
+          <button mat-stroked-button type="button" (click)="copyCorrelationId()">
+            Copiar referencia
+          </button>
+        </div>
+        <span class="api-error__copy-status" role="status" aria-live="polite">{{
+          copyStatus()
+        }}</span>
+      </div>
+    }
+
+    @if (retryAllowed()) {
+      <button
+        class="api-error__retry"
+        mat-flat-button
+        type="button"
+        [disabled]="retryAfter.blocked()"
+        (click)="retry.emit()"
+      >
+        {{ retryLabel() }}
+      </button>
+    }
+  </div>
+</section>

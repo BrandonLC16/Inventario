@@ -119,6 +119,8 @@ describe('AppShell', () => {
 
     expect(router.url).toBe('/forbidden');
     expect(element.querySelector('h1')?.textContent).toContain('Acceso no disponible');
+    expect(element.querySelector('[data-error-source="routing"]')).not.toBeNull();
+    expect(element.querySelector('input[readonly]')).toBeNull();
   });
 
   it('allows navigation when any assigned role has access', async () => {
@@ -133,6 +135,9 @@ describe('AppShell', () => {
     const element = await navigate('/route-that-does-not-exist');
 
     expect(element.querySelector('h1')?.textContent).toContain('Página no encontrada');
+    expect(element.querySelector('[data-error-source="routing"]')).not.toBeNull();
+    expect(element.textContent).toContain('ruta disponible en el cliente');
+    expect(element.querySelector('input[readonly]')).toBeNull();
   });
 
   it('closes the mobile menu with Escape and restores focus', async () => {

@@ -1,4 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { convertToParamMap, ActivatedRoute, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
@@ -35,7 +35,7 @@ describe('Login', () => {
     const component = fixture.componentInstance;
     component['submit']();
     expect(session.login).not.toHaveBeenCalled();
-    expect(component['errorMessage']()).toContain('campos obligatorios');
+    expect(component['localErrorMessage']()).toContain('campos obligatorios');
 
     component['form'].setValue({ identifier: 'alicia', password: 'secret' });
     component['submit']();
@@ -64,7 +64,11 @@ describe('Login', () => {
         () =>
           new HttpErrorResponse({
             status: 401,
-            error: { message: 'internal detail must not be rendered' },
+            error: {
+              code: 'AUTHENTICATION_FAILED',
+              message: 'internal detail with refreshToken=secret must not be rendered',
+              correlationId: 'login-corr-01',
+            },
           }),
       ),
     );
@@ -76,7 +80,68 @@ describe('Login', () => {
 
     expect(component['form'].controls.password.value).toBe('');
     expect(fixture.nativeElement.textContent).not.toContain('internal detail');
+    expect(fixture.nativeElement.textContent).not.toContain('refreshToken=secret');
     expect(fixture.nativeElement.textContent).toContain('No fue posible iniciar sesión');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('input[readonly]')
+        ?.value,
+    ).toBe('login-corr-01');
+  });
+
+  it('associates API validation errors with their controls and announces a summary', () => {
+    session.login.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 400,
+            error: {
+              code: 'VALIDATION_FAILED',
+              validationErrors: { identifier: 'El identificador no es válido.' },
+            },
+          }),
+      ),
+    );
+    const component = fixture.componentInstance;
+    component['form'].setValue({ identifier: 'alicia', password: 'secret' });
+
+    component['submit']();
+    fixture.detectChanges();
+
+    expect(component['form'].controls.identifier.getError('api')).toBe(
+      'El identificador no es válido.',
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain(
+      'Hay campos que requieren atención',
+    );
+    expect(element.querySelector('[aria-label="Resumen de campos con error"]')).not.toBeNull();
+  });
+
+  it('respects Retry-After by temporarily disabling login without resubmitting', () => {
+    session.login.mockReturnValue(
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 429,
+            headers: new HttpHeaders({ 'Retry-After': '5' }),
+            error: { code: 'RATE_LIMIT_EXCEEDED' },
+          }),
+      ),
+    );
+    const component = fixture.componentInstance;
+    component['form'].setValue({ identifier: 'alicia', password: 'secret' });
+
+    component['submit']();
+    fixture.detectChanges();
+    component['submit']();
+
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      'form button[type="submit"]',
+    );
+    expect(component['retryAfter'].blocked()).toBe(true);
+    expect(button?.disabled).toBe(true);
+    expect(button?.textContent).toContain('Disponible en');
+    expect(session.login).toHaveBeenCalledOnce();
   });
 
   it('falls back to the dashboard for an external-looking return URL', async () => {

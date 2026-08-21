@@ -1,0 +1,111 @@
+:host {
+  display: block;
+}
+
+.api-error {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--inv-space-4);
+  padding: var(--inv-space-5);
+  border: 1px solid #e0abab;
+  border-radius: var(--inv-radius-md);
+  background: var(--inv-color-danger-soft);
+  color: var(--inv-color-text);
+}
+
+.api-error__mark {
+  display: grid;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: 50%;
+  background: var(--inv-color-danger);
+  color: #ffffff;
+  font-weight: 800;
+  place-items: center;
+}
+
+.api-error__content {
+  min-inline-size: 0;
+}
+
+h2,
+p {
+  margin-block-start: 0;
+}
+
+h2 {
+  margin-block-end: var(--inv-space-2);
+  font-size: var(--inv-font-size-lg);
+}
+
+.api-error__validation,
+.api-error__wait,
+.api-error__support {
+  margin-block-start: var(--inv-space-4);
+}
+
+.api-error__validation p,
+.api-error__wait {
+  margin-block-end: var(--inv-space-2);
+}
+
+.api-error__validation ul {
+  margin: 0;
+  padding-inline-start: var(--inv-space-5);
+}
+
+.api-error__validation code {
+  overflow-wrap: anywhere;
+}
+
+.api-error__wait {
+  color: var(--inv-color-warning);
+  font-weight: 700;
+}
+
+.api-error__support label {
+  display: block;
+  margin-block-end: var(--inv-space-2);
+  font-size: var(--inv-font-size-sm);
+  font-weight: 700;
+}
+
+.api-error__support > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inv-space-2);
+}
+
+.api-error__support input {
+  min-inline-size: min(100%, 16rem);
+  min-block-size: var(--inv-control-min-size);
+  padding-inline: var(--inv-space-3);
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-sm);
+  background: var(--inv-color-surface);
+  color: var(--inv-color-text);
+  font-family: ui-monospace, monospace;
+}
+
+.api-error__copy-status {
+  display: block;
+  min-block-size: 1.5em;
+  margin-block-start: var(--inv-space-1);
+  color: var(--inv-color-text-muted);
+  font-size: var(--inv-font-size-sm);
+}
+
+.api-error__retry {
+  margin-block-start: var(--inv-space-3);
+}
+
+@media (width < 30rem) {
+  .api-error {
+    grid-template-columns: 1fr;
+  }
+
+  .api-error__support input,
+  .api-error__support button {
+    inline-size: 100%;
+  }
+}

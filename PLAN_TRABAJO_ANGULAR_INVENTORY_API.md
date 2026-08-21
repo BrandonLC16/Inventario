@@ -5,7 +5,7 @@
 **Copia de trabajo:** `C:\Users\brand\OneDrive\Documentos\Inventario`  
 **Rama:** `master`  
 **Commit verificado:** `15de61f8085c55c01c61f0a18f8afe405378be76`  
-**Estado:** API sincronizada y funcional; FrontEnd en Fase 2, con `F2-01`–`F2-06` completadas y `F2-07` como siguiente entrega.
+**Estado:** API sincronizada y funcional; FrontEnd en Fase 2, con `F2-01`–`F2-07` completadas y `F2-08` como siguiente entrega.
 
 ## 1. Resultado ejecutivo
 
@@ -511,7 +511,7 @@ Alcanzado: no quedan hallazgos P0 abiertos y existe un contrato de sesión que A
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 17 de agosto de 2026 se comprobó inicialmente que `frontend/` no existía y el trabajo comenzó por **F2-01**, sin adelantar autenticación, diseño final ni módulos de negocio. `F2-01`–`F2-06` ya están completadas y la siguiente entrega habilitada es `F2-07`. Conviene pedir a Codex una entrega a la vez: un pedido útil identifica el comportamiento deseado, los archivos o documentos que debe consultar, las restricciones que debe conservar y las verificaciones que debe ejecutar.
+El 17 de agosto de 2026 se comprobó inicialmente que `frontend/` no existía y el trabajo comenzó por **F2-01**, sin adelantar autenticación, diseño final ni módulos de negocio. `F2-01`–`F2-07` ya están completadas y la siguiente entrega habilitada es `F2-08`. Conviene pedir a Codex una entrega a la vez: un pedido útil identifica el comportamiento deseado, los archivos o documentos que debe consultar, las restricciones que debe conservar y las verificaciones que debe ejecutar.
 
 Antes de cada entrega, Codex debe leer `AGENTS.md`, revisar el estado de Git y confirmar que la dependencia indicada está completa. Al terminar debe presentar los archivos modificados, las decisiones tomadas, los comandos ejecutados y cualquier verificación pendiente. No se marca una entrega como completada sólo porque el código exista: también debe contar con la evidencia mínima de la tabla.
 
@@ -532,7 +532,7 @@ F2-03 y F2-04 pueden desarrollarse como cambios independientes después de F2-02
 | `F2-04` | Sistema visual compartido | `F2-02` | Completado | Angular Material/CDK 22.0.6, tema Material 3, tokens y cinco estados shared; catálogo lazy `/design-system`; 6 archivos/24 pruebas, builds dentro de budget, contrastes AA calculados y QA visual aprobada por el usuario el 18 de agosto de 2026 |
 | `F2-05` | OpenAPI y ambientes | `F2-03`, `F2-04` | Completado | OpenAPI regenerado; generador reproducible (`2.40.1`/`7.24.0`), cliente separado e inmutable, URL base runtime, adaptador probado y sincronización en CI; backend `verify`/SpotBugs y FrontEnd `npm ci`/`npm run check` aprobados con 8 archivos/27 pruebas y builds de 1.46 MB y 280.09 kB |
 | `F2-06` | Sesión y autorización de UI | `F2-05` | Completado | sesión exclusivamente en memoria, login + `/me`, logout con limpieza garantizada, refresh single-flight y reemplazo atómico, interceptor por origen exacto y guards por rol; formato/lint, 10 archivos/49 pruebas y build de producción de 297.56 kB aprobados |
-| `F2-07` | Manejo común de errores | `F2-06` | Pendiente | comportamiento probado para 401/403/404/409/429 y correlación |
+| `F2-07` | Manejo común de errores | `F2-06` | Completado | mapeo seguro por `code` para 401/403/404/409/429, validaciones por campo, `Retry-After`, correlation ID copiable, fallback no JSON y distinción API/routing; cliente generado sincronizado, `npm run check` aprobado con 13 archivos/66 pruebas y builds de 1.49 MB y 297.57 kB |
 | `F2-08` | Pruebas E2E y cierre | `F2-01`–`F2-07` | Pendiente | flujos críticos E2E y todas las comprobaciones de la fase en verde |
 
 Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` conforme avance el trabajo y añade una nota breve de evidencia al cerrar cada punto. Si una comprobación no puede ejecutarse, el punto permanece `Bloqueado` o `En curso` hasta registrar la causa y completar la verificación.
@@ -815,7 +815,7 @@ La solución está desplegada, monitoreada y respaldada; los responsables aprueb
 
 ```text
 Fase 0 ✓ → Fase 1 ✓
-                    └─→ Fase 2 (en curso: F2-01–F2-06 completadas; F2-07 siguiente)
+                    └─→ Fase 2 (en curso: F2-01–F2-07 completadas; F2-08 siguiente)
                          ├─→ Fase 3 ─┬→ Fase 4
                          │           ├→ Fase 5
                          │           └→ Fase 6
@@ -836,7 +836,7 @@ Todas convergen en Fase 8 → Fase 9 → Fase 10.
 - exclusiones preventivas de secretos.
 - OpenAPI reproducible y CI verde.
 
-`F2-01`–`F2-06` están completadas. El cierre de `F2-03` incluyó 17 pruebas, builds sin advertencias de budget y revisión visual en escritorio y móvil; el único solapamiento detectado a 320 px se corrigió preservando el nombre visible y accesible de la aplicación. La tabla README de proveedores se completó el mismo día. `F2-04` obtuvo aprobación de QA visual el 18 de agosto de 2026. `F2-05` dejó el contrato y el cliente TypeScript regenerables y sincronizados en CI, configuración runtime sin secretos, 27 pruebas de FrontEnd aprobadas y verificaciones completas de backend. `F2-06` implementó la sesión no persistente de SEC-02 con 49 pruebas aprobadas, incluida concurrencia de refresh, fallo, limpieza, recarga, destinos externos y roles; la siguiente entrega es `F2-07`.
+`F2-01`–`F2-07` están completadas. El cierre de `F2-03` incluyó 17 pruebas, builds sin advertencias de budget y revisión visual en escritorio y móvil; el único solapamiento detectado a 320 px se corrigió preservando el nombre visible y accesible de la aplicación. La tabla README de proveedores se completó el mismo día. `F2-04` obtuvo aprobación de QA visual el 18 de agosto de 2026. `F2-05` dejó el contrato y el cliente TypeScript regenerables y sincronizados en CI, configuración runtime sin secretos, 27 pruebas de FrontEnd aprobadas y verificaciones completas de backend. `F2-06` implementó la sesión no persistente de SEC-02 con 49 pruebas aprobadas, incluida concurrencia de refresh, fallo, limpieza, recarga, destinos externos y roles. `F2-07` añadió mapeo y presentación común segura de errores con 66 pruebas aprobadas, incluida validación, rate limit, referencia de soporte y fallbacks; la siguiente entrega es `F2-08`.
 
 ### P1 — MVP FrontEnd
 

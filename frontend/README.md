@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual, `F2-05` integró el cliente generado y la configuración runtime de la API, y `F2-06` añadió la sesión real no persistente. Todavía no incluye módulos de negocio.
+Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual, `F2-05` integró el cliente generado y la configuración runtime de la API, `F2-06` añadió la sesión real no persistente y `F2-07` unificó los errores HTTP. Todavía no incluye módulos de negocio.
 
 ## Versiones fijadas
 
@@ -71,6 +71,16 @@ La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alime
 
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 
+## Manejo común de errores HTTP
+
+`ApiErrorService` transforma `HttpErrorResponse` mediante el `code` estable del backend y usa el estado HTTP sólo como fallback. Nunca muestra ni toma decisiones a partir de `message`, `error` o `path`; tampoco conserva el cuerpo original en el modelo de presentación. Cubre autenticación `401`, autorización `403`, recurso API ausente `404`, conflicto `409`, rate limit `429`, validación y fallback seguro para respuestas incompletas o no JSON.
+
+Los errores API usan `data-error-source="api"`, mientras que `/forbidden` y la ruta Angular desconocida usan `data-error-source="routing"`. Así, un `404` del servidor se presenta con referencia de soporte y no se confunde con una URL inexistente del cliente.
+
+`validationErrors` se valida antes de asociarlo únicamente a controles presentes, incluidos paths de arreglos como `items[0].quantity`. `Retry-After` acepta segundos o fecha HTTP, tiene un límite defensivo de 24 horas y bloquea temporalmente la acción sin ejecutarla otra vez. El componente común no ofrece reintento salvo que el consumidor lo habilite explícitamente para una operación segura.
+
+La referencia de soporte se toma primero de `X-Correlation-ID` y, como fallback, de `correlationId`; sólo acepta el formato seguro del backend. Se muestra en un campo de sólo lectura seleccionable y tiene una acción accesible para copiarla. El OpenAPI vigente todavía no publica el schema de `ApiError`, por lo que esta capa valida `HttpErrorResponse.error` como `unknown` y permanece fuera del cliente generado.
+
 ## Sistema visual compartido
 
 La ruta interna `/design-system` muestra los fundamentos y los componentes de `F2-04` en una sola vista adaptable. No forma parte de un dominio ni introduce reglas de negocio.
@@ -84,6 +94,7 @@ Los pares principales cumplen contraste WCAG 2.2 AA: texto general `#17233b` sob
 - carga anunciada con `role="status"` y `aria-busy`;
 - contenido vacío con acción opcional;
 - error recuperable con reintento y referencia de soporte opcional;
+- error API accesible con validaciones, espera y referencia copiable;
 - confirmación modal con trampa de foco, cierre con `Escape` y restauración al disparador;
 - feedback semántico de éxito, información, atención y error, con cierre opcional.
 

@@ -6,12 +6,12 @@ import { RouterLink } from '@angular/router';
   standalone: true,
   imports: [RouterLink],
   template: `
-    <section class="status-page">
+    <section class="status-page" data-error-source="routing">
       <p class="status-page__code">403</p>
       <h1 tabindex="-1">Acceso no disponible</h1>
       <p>
-        El rol de demostración no incluye esta área. El guard sólo orienta la navegación; la API
-        siempre vuelve a validar la autorización.
+        Tu sesión no incluye permiso para esta área. Esta página corresponde a una decisión de
+        navegación; la API siempre vuelve a validar la autorización.
       </p>
       <a routerLink="/dashboard">Volver al resumen</a>
     </section>
