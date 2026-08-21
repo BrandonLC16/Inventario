@@ -27,6 +27,12 @@ describe('RuntimeConfigService', () => {
     await loading;
 
     expect(service.apiBaseUrl).toBe('http://localhost:8080');
+    expect(service.matchesApiOrigin('http://localhost:8080/api/v1/products')).toBe(true);
+    expect(service.matchesApiOrigin('http://localhost:8080.evil.test/api/v1/products')).toBe(false);
+  });
+
+  it('does not match requests before runtime configuration is loaded', () => {
+    expect(service.matchesApiOrigin('http://localhost:8080/api/v1/products')).toBe(false);
   });
 
   it('rejects configuration containing credentials or an API path', async () => {

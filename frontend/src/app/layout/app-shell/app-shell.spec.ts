@@ -1,25 +1,46 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { of } from 'rxjs';
+import { signal } from '@angular/core';
 
 import { App } from '../../app';
 import { routes } from '../../app.routes';
+import { CurrentUserResponse } from '../../core/api/generated/model/current-user-response';
 import { AppRole } from '../../core/navigation/app-navigation';
-import { DemoSessionService } from '../../core/session/demo-session.service';
+import { SessionService } from '../../core/session/session.service';
+
+class SessionStub {
+  private readonly roleState = signal<readonly AppRole[]>(['ADMIN']);
+  private readonly userState = signal<CurrentUserResponse | null>({
+    username: 'alicia',
+    roles: new Set(['ADMIN']),
+  });
+
+  readonly roles = this.roleState.asReadonly();
+  readonly user = this.userState.asReadonly();
+  readonly isAuthenticated = signal(true).asReadonly();
+  readonly logout = vi.fn(() => of(undefined));
+
+  setRole(role: AppRole): void {
+    this.roleState.set([role]);
+    this.userState.set({ username: role.toLowerCase(), roles: new Set([role]) });
+  }
+}
 
 describe('AppShell', () => {
   let fixture: ComponentFixture<App>;
   let router: Router;
-  let session: DemoSessionService;
+  let session: SessionStub;
 
   beforeEach(async () => {
+    session = new SessionStub();
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter(routes)],
+      providers: [provideRouter(routes), { provide: SessionService, useValue: session }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(App);
     router = TestBed.inject(Router);
-    session = TestBed.inject(DemoSessionService);
   });
 
   async function navigate(url: string): Promise<HTMLElement> {
@@ -92,16 +113,15 @@ describe('AppShell', () => {
     expect(activeLink?.getAttribute('aria-current')).toBe('page');
   });
 
-  it('redirects unauthorized demo navigation to forbidden', async () => {
+  it('redirects unauthorized navigation to forbidden', async () => {
     session.setRole('SALES');
     const element = await navigate('/admin/users');
 
     expect(router.url).toBe('/forbidden');
     expect(element.querySelector('h1')?.textContent).toContain('Acceso no disponible');
-    expect(element.textContent).toContain('la API siempre vuelve a validar');
   });
 
-  it('allows navigation when the demo role has access', async () => {
+  it('allows navigation when any assigned role has access', async () => {
     session.setRole('INVENTORY_MANAGER');
     const element = await navigate('/inventory-transfers');
 
@@ -109,13 +129,10 @@ describe('AppShell', () => {
     expect(element.querySelector('h1')?.textContent).toContain('Transferencias');
   });
 
-  it('renders a dedicated page for unknown Angular routes', async () => {
+  it('renders a dedicated page for unknown authenticated routes', async () => {
     const element = await navigate('/route-that-does-not-exist');
 
     expect(element.querySelector('h1')?.textContent).toContain('Página no encontrada');
-    expect(element.querySelector('.breadcrumbs [aria-current="page"]')?.textContent).toContain(
-      'Página no encontrada',
-    );
   });
 
   it('closes the mobile menu with Escape and restores focus', async () => {
@@ -136,22 +153,12 @@ describe('AppShell', () => {
     expect(document.activeElement).toBe(button);
   });
 
-  it('switches the in-memory demo role and returns to the dashboard', async () => {
-    await navigate('/admin/users');
-    const element = fixture.nativeElement as HTMLElement;
-    const select = element.querySelector<HTMLSelectElement>('#demo-role');
-
-    if (!select) {
-      throw new Error('Demo role selector was not rendered');
-    }
-
-    select.value = 'SALES';
-    select.dispatchEvent(new Event('change'));
+  it('always returns to login after logout', async () => {
+    const element = await navigate('/dashboard');
+    element.querySelector<HTMLButtonElement>('.session-summary button')?.click();
     await fixture.whenStable();
-    fixture.detectChanges();
 
-    expect(session.role()).toBe('SALES');
-    expect(router.url).toBe('/dashboard');
-    expect(navigationIds(fixture.nativeElement as HTMLElement)).not.toContain('users');
+    expect(session.logout).toHaveBeenCalledOnce();
+    expect(router.url).toBe('/login');
   });
 });

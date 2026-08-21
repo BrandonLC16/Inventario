@@ -6,13 +6,13 @@ import {
   BREADCRUMB_DATA_KEY,
   NAVIGATION_SECTIONS,
 } from './core/navigation/app-navigation';
-import { demoRoleGuard } from './core/navigation/demo-role.guard';
+import { authenticatedGuard, roleGuard } from './core/navigation/session.guards';
 
 const sectionRoutes: Routes = NAVIGATION_SECTIONS.map(
   (section): Route => ({
     path: section.path,
     title: `${section.label} | Inventario`,
-    canActivate: [demoRoleGuard],
+    canActivate: [roleGuard],
     data: {
       [APP_SECTION_DATA_KEY]: section satisfies AppSection,
       [BREADCRUMB_DATA_KEY]: section.label,
@@ -26,7 +26,13 @@ const sectionRoutes: Routes = NAVIGATION_SECTIONS.map(
 
 export const routes: Routes = [
   {
+    path: 'login',
+    title: 'Iniciar sesión | Inventario',
+    loadComponent: () => import('./features/auth/login/login').then(({ Login }) => Login),
+  },
+  {
     path: '',
+    canActivate: [authenticatedGuard],
     loadComponent: () => import('./layout/app-shell/app-shell').then(({ AppShell }) => AppShell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },

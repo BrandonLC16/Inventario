@@ -154,8 +154,8 @@ export const NAVIGATION_SECTIONS: readonly AppSection[] = Object.values(APP_SECT
 export const APP_SECTION_DATA_KEY = 'appSection';
 export const BREADCRUMB_DATA_KEY = 'breadcrumb';
 
-export function canAccessSection(role: AppRole, section: AppSection): boolean {
-  return section.roles.includes(role);
+export function canAccessSection(roles: readonly AppRole[], section: AppSection): boolean {
+  return roles.some((role) => section.roles.includes(role));
 }
 
 export function isAppRole(value: string): value is AppRole {

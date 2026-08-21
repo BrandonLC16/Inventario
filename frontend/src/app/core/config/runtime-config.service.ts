@@ -22,6 +22,18 @@ export class RuntimeConfigService {
     return this.apiOrigin;
   }
 
+  matchesApiOrigin(requestUrl: string): boolean {
+    if (!this.apiOrigin) {
+      return false;
+    }
+
+    try {
+      return new URL(requestUrl, this.document.baseURI).origin === this.apiOrigin;
+    } catch {
+      return false;
+    }
+  }
+
   async load(http: HttpClient): Promise<void> {
     const value: unknown = await firstValueFrom(
       http.get<unknown>(RUNTIME_CONFIG_URL, { headers: { Accept: 'application/json' } }),

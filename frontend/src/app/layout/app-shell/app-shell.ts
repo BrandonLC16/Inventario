@@ -17,18 +17,16 @@ import {
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { filter } from 'rxjs';
+import { filter, finalize } from 'rxjs';
 
 import {
-  APP_ROLES,
   BREADCRUMB_DATA_KEY,
   NAVIGATION_GROUPS,
   NAVIGATION_SECTIONS,
   ROLE_LABELS,
   canAccessSection,
-  isAppRole,
 } from '../../core/navigation/app-navigation';
-import { DemoSessionService } from '../../core/session/demo-session.service';
+import { SessionService } from '../../core/session/session.service';
 
 interface Breadcrumb {
   readonly label: string;
@@ -46,10 +44,18 @@ export class AppShell {
   private readonly activatedRoute = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  protected readonly session = inject(DemoSessionService);
-  protected readonly roles = APP_ROLES;
-  protected readonly roleLabels = ROLE_LABELS;
+  protected readonly session = inject(SessionService);
   protected readonly menuOpen = signal(false);
+  protected readonly loggingOut = signal(false);
+  protected readonly displayName = computed(
+    () => this.session.user()?.username ?? this.session.user()?.email ?? 'Usuario',
+  );
+  protected readonly roleSummary = computed(() =>
+    this.session
+      .roles()
+      .map((role) => ROLE_LABELS[role])
+      .join(', '),
+  );
 
   private readonly menuButton = viewChild<ElementRef<HTMLButtonElement>>('menuButton');
   private readonly firstNavigationLink =
@@ -66,7 +72,7 @@ export class AppShell {
     NAVIGATION_GROUPS.map((group) => ({
       ...group,
       sections: NAVIGATION_SECTIONS.filter(
-        (section) => section.group === group.id && canAccessSection(this.session.role(), section),
+        (section) => section.group === group.id && canAccessSection(this.session.roles(), section),
       ),
     })).filter((group) => group.sections.length > 0),
   );
@@ -99,14 +105,16 @@ export class AppShell {
     this.menuOpen.set(false);
   }
 
-  protected changeRole(event: Event): void {
-    const role = (event.target as HTMLSelectElement).value;
-
-    if (isAppRole(role)) {
-      this.session.setRole(role);
-      this.closeMenu();
-      void this.router.navigate(['/dashboard']);
+  protected logout(): void {
+    if (this.loggingOut()) {
+      return;
     }
+
+    this.loggingOut.set(true);
+    this.session
+      .logout()
+      .pipe(finalize(() => this.loggingOut.set(false)))
+      .subscribe(() => void this.router.navigate(['/login']));
   }
 
   @HostListener('document:keydown.escape')

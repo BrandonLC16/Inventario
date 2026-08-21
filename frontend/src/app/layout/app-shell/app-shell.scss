@@ -63,8 +63,8 @@
 
 .brand strong,
 .brand small,
-.demo-session strong,
-.demo-session small {
+.session-summary strong,
+.session-summary small {
   display: block;
 }
 
@@ -98,20 +98,19 @@
   background: #1c315b;
 }
 
-.demo-session {
+.session-summary {
   display: flex;
   align-items: center;
   gap: 0.8rem;
 }
 
-.demo-session__identity {
+.session-summary__identity {
   display: flex;
   align-items: center;
   gap: 0.6rem;
 }
 
-.demo-session__identity small,
-.demo-session label {
+.session-summary__identity small {
   color: #68738a;
   font-size: 0.68rem;
   font-weight: 700;
@@ -119,7 +118,7 @@
   text-transform: uppercase;
 }
 
-.demo-session__identity strong {
+.session-summary__identity strong {
   max-inline-size: 12rem;
   overflow: hidden;
   font-size: 0.83rem;
@@ -127,7 +126,7 @@
   white-space: nowrap;
 }
 
-.demo-session__avatar {
+.session-summary__avatar {
   display: grid;
   place-items: center;
   inline-size: 2.15rem;
@@ -138,26 +137,21 @@
   font-weight: 800;
 }
 
-.demo-session label {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.demo-session select {
+.session-summary button {
   min-block-size: 2.5rem;
-  max-inline-size: 13rem;
-  padding-inline: 0.75rem 2rem;
+  padding-inline: 0.85rem;
   border: 1px solid #bec9dd;
   border-radius: 0.65rem;
   background: #ffffff;
   color: #24324d;
-  font: inherit;
   font-size: 0.82rem;
   font-weight: 650;
+  cursor: pointer;
+}
+
+.session-summary button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .shell__sidebar {
@@ -310,13 +304,12 @@
   }
 
   .brand small,
-  .demo-session__identity {
+  .session-summary__identity {
     display: none;
   }
 
-  .demo-session select {
-    inline-size: min(8.75rem, 34vw);
-    padding-inline: 0.55rem 1.4rem;
+  .session-summary button {
+    padding-inline: 0.55rem;
     font-size: 0.76rem;
   }
 

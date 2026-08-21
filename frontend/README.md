@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual y `F2-05` integró el cliente generado y la configuración runtime de la API. Todavía no incluye autenticación real ni módulos de negocio.
+Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual, `F2-05` integró el cliente generado y la configuración runtime de la API, y `F2-06` añadió la sesión real no persistente. Todavía no incluye módulos de negocio.
 
 ## Versiones fijadas
 
@@ -50,11 +50,11 @@ npm start
 
 La aplicación queda disponible en `http://localhost:4200/` y recarga al detectar cambios.
 
-## Shell y navegación de demostración
+## Sesión, shell y navegación por roles
 
 El shell común vive en `src/app/layout/` e incluye encabezado, menú lateral adaptable, breadcrumbs derivados de metadata de rutas, enlace para saltar al contenido y páginas específicas para acceso no permitido y rutas desconocidas. En anchos menores de `60rem`, la navegación se convierte en un panel temporal; por debajo de `42rem`, el encabezado reduce la información secundaria.
 
-El selector **Vista de rol** permite comprobar en memoria las tres identidades de prueba. Cambiar el rol vuelve al resumen y actualiza el menú con esta política:
+`/login` autentica con el cliente generado y obtiene después la identidad vigente mediante `/api/v1/auth/me`. El encabezado muestra esa identidad y permite cerrar la sesión. La matriz de roles controla el menú y los guards con esta política:
 
 | Área                                               | `ADMIN` | `INVENTORY_MANAGER` | `SALES` |
 | -------------------------------------------------- | :-----: | :-----------------: | :-----: |
@@ -63,9 +63,11 @@ El selector **Vista de rol** permite comprobar en memoria las tres identidades d
 | Clientes y pedidos                                 |   Sí    |         No          |   Sí    |
 | Usuarios                                           |   Sí    |         No          |   No    |
 
-La identidad de demostración usa únicamente un Signal del servicio de sesión. No escribe en `localStorage`, `sessionStorage`, cookies ni otro almacenamiento, y una recarga restaura el rol inicial. No contiene tokens ni representa una autenticación real.
+`SessionService` es el único propietario del access token y el refresh token. Conserva el par en un único Signal privado, lo reemplaza de forma atómica sólo cuando la respuesta de login o refresh está completa y nunca lo escribe en Web Storage, IndexedDB, Cache API, cookies, service workers ni estado sincronizado. Una recarga, una pestaña nueva o la restauración del navegador requieren login.
 
-La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alimenta tanto las rutas como el menú y el guard de demostración. Ocultar una opción o redirigir a `/forbidden` sólo mejora la experiencia: **la API siempre es la autoridad y debe volver a autorizar cada petición**.
+El interceptor añade Bearer únicamente cuando el origen de la petición coincide exactamente con `apiBaseUrl`. Excluye login, refresh y logout del token y de la autorrenovación; varias respuestas `401` comparten un solo refresh. Un `401` de esa renovación limpia la memoria y vuelve a `/login`. Logout limpia primero la memoria e intenta revocar el refresh incluso si la API falla.
+
+La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alimenta tanto las rutas como el menú y el guard por roles. Ocultar una opción o redirigir a `/forbidden` sólo mejora la experiencia: **la API siempre es la autoridad y debe volver a autorizar cada petición**.
 
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 
@@ -113,7 +115,7 @@ La aplicación carga `public/config/runtime-config.json` antes de crear servicio
 }
 ```
 
-En un despliegue, reemplaza este archivo estático por la configuración del entorno; no recompiles el cliente ni introduzcas secretos. El provider crea la configuración generada con `withCredentials: false`. Los tokens de sesión se incorporarán únicamente en memoria durante `F2-06`.
+En un despliegue, reemplaza este archivo estático por la configuración del entorno; no recompiles el cliente ni introduzcas secretos. El provider crea la configuración generada con `withCredentials: false`; la sesión sólo compara peticiones contra el origen ya validado.
 
 CI regenera el OpenAPI con PostgreSQL/Testcontainers después del checkout y ejecuta `npm run generate:api:check` antes de lint, pruebas y builds. Así detecta tanto cambios del contrato como ediciones manuales o archivos generados obsoletos.
 

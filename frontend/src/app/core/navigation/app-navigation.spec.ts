@@ -9,7 +9,7 @@ import {
 
 describe('app navigation policy', () => {
   const visibleSectionIds = (role: AppRole): string[] =>
-    NAVIGATION_SECTIONS.filter((section) => canAccessSection(role, section)).map(
+    NAVIGATION_SECTIONS.filter((section) => canAccessSection([role], section)).map(
       (section) => section.id,
     );
 
@@ -65,5 +65,10 @@ describe('app navigation policy', () => {
   it('accepts only roles declared by the application', () => {
     expect(APP_ROLES.every((role) => isAppRole(role))).toBe(true);
     expect(isAppRole('WAREHOUSE_ADMIN')).toBe(false);
+  });
+
+  it('allows a section when any assigned role is authorized', () => {
+    expect(canAccessSection(['SALES', 'INVENTORY_MANAGER'], APP_SECTIONS.suppliers)).toBe(true);
+    expect(canAccessSection(['SALES'], APP_SECTIONS.suppliers)).toBe(false);
   });
 });

@@ -24,23 +24,19 @@
       </span>
     </a>
 
-    <div class="demo-session" aria-label="Sesión de demostración">
-      <div class="demo-session__identity">
-        <span class="demo-session__avatar" aria-hidden="true">{{
-          session.identity().displayName.charAt(0)
+    <div class="session-summary" aria-label="Sesión actual">
+      <div class="session-summary__identity">
+        <span class="session-summary__avatar" aria-hidden="true">{{
+          displayName().charAt(0)
         }}</span>
         <span>
-          <small>Sesión de prueba</small>
-          <strong>{{ session.identity().displayName }}</strong>
+          <small>{{ roleSummary() }}</small>
+          <strong>{{ displayName() }}</strong>
         </span>
       </div>
-
-      <label for="demo-role">Vista de rol</label>
-      <select id="demo-role" [value]="session.role()" (change)="changeRole($event)">
-        @for (role of roles; track role) {
-          <option [value]="role">{{ roleLabels[role] }}</option>
-        }
-      </select>
+      <button type="button" [disabled]="loggingOut()" (click)="logout()">
+        {{ loggingOut() ? 'Cerrando…' : 'Cerrar sesión' }}
+      </button>
     </div>
   </header>
 
