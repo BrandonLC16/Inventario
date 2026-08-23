@@ -65,6 +65,9 @@
         <a mat-stroked-button [routerLink]="['/warehouses', currentWarehouse.id, 'inventory']">
           Ver inventario
         </a>
+        <a mat-stroked-button [routerLink]="['/warehouses', currentWarehouse.id, 'settings']">
+          Configuración de inventario
+        </a>
         @if (canManage()) {
           <a
             mat-flat-button

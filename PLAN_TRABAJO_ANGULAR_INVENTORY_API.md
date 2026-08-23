@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02 y F3-03 están completadas** con features lazy para productos, almacenes y saldos de inventario, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. Los siguientes cortes disponibles son F3-04, F3-05 y F3-06.
+El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03 y F3-04 están completadas** con features lazy para productos, almacenes, saldos y configuración de inventario, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. Los siguientes cortes disponibles son F3-05 y F3-06.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -669,7 +669,7 @@ Secuencia recomendada:
 
 ```text
 Fase 2 ✓ ─┬→ F3-01 ✓┐
-          └→ F3-02 ✓┴→ F3-03 ✓┬→ F3-04 ─┐
+          └→ F3-02 ✓┴→ F3-03 ✓┬→ F3-04 ✓┐
                                ├→ F3-05 ─┼→ F3-08
                                └→ F3-06 ─┤
 F3-01 + F3-03 ─────────────────→ F3-07 ─┘
@@ -682,7 +682,7 @@ F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 par
 | `F3-01` | CRUD y búsqueda de productos | Fase 2 | Completado | rutas lazy y adaptador CRUD; filtros/paginación remotos; `minimumStock` sólo en alta; roles probados; 83 unit/component y 18 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-02` | Catálogo de almacenes | Fase 2 | Completado | rutas lazy y adaptador CRUD; paginación remota sólo con `page`/`size`; roles, `404`, código duplicado, `409`, doble envío y responsive probados; 101 unit/component y 23 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-03` | Existencias globales/por almacén | `F3-01`, `F3-02` | Completado | rutas lazy MAIN/almacén; composición por `productId` con dos llamadas por página y sin N+1; aislamiento, cero/null, obsolescencia, roles y responsive probados; 111 unit/component y 29 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
-| `F3-04` | Mínimos y activación por almacén | `F3-03` | Pendiente | lectura/edición diferenciada del catálogo y conflictos probados |
+| `F3-04` | Mínimos y activación por almacén | `F3-03` | Completado | lectura paginada para los tres roles y edición para gestores; estado global/local separado sin N+1; mínimo, `204` + recarga, `409`, doble envío, aislamiento y accesibilidad probados; 121 unit/component y 35 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-05` | Ajustes manuales | `F3-03` | Pendiente | confirmación, una sola petición, reconciliación y rechazos probados |
 | `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Pendiente | filtros remotos, trazabilidad completa, permisos y pruebas aprobadas |
 | `F3-07` | Baja de producto protegida | `F3-01`, `F3-03`, `F3-05` | Pendiente | baja exitosa y bloqueos por saldo/reserva/documento representados sin perder estado |
@@ -737,6 +737,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evide
 **Trabajo esperado.** Codex debe implementar `/warehouses/:id/settings` usando las rutas `settings` del almacén. Todos los roles leen `sku`, `name`, `minimumStock` y estado por almacén; sólo gestores actualizan `minimumStock >= 0` y `active`. La respuesta de escritura es `204`, por lo que la fila se vuelve a consultar antes de mostrar el dato como reconciliado. Desactivar una configuración puede responder `409` si conserva stock o reservas. Cambiar el catálogo con `PUT /products/{id}` no modifica settings y la UI no debe insinuar lo contrario.
 
 **Seguimiento.** Se completa cuando se distingue visual y semánticamente producto global inactivo de producto inactivo en un almacén, los gestores actualizan una fila sin afectar otras ubicaciones, `SALES` sólo consulta y un conflicto conserva el formulario con una explicación accionable y correlation ID. Prueba mínimo negativo/cero, `204`, recarga, permisos, doble envío y aislamiento entre almacenes.
+
+**Evidencia de cierre (23 de agosto de 2026).** `/warehouses/:id/settings` lista settings paginados y valida que todas las filas pertenezcan al almacén solicitado. Como `InventorySettingResponse` no contiene el estado global, éste se obtiene con una única consulta al producto al abrir la fila y se muestra separado y de sólo lectura, sin llamadas por fila en el listado. La escritura queda reservada a gestores y encadena `PUT 204` con el `GET` individual antes de reconciliar. Los conflictos por desactivación conservan valores y correlation ID. `npm run generate:api:check` confirmó el cliente sincronizado y `npm run check` aprobó formato, lint, 121 pruebas unitarias/de componente, 35 E2E y builds de desarrollo y producción. No se modificaron backend, OpenAPI ni código generado.
 
 **Pedido sugerido a Codex:**
 
@@ -1053,4 +1055,3 @@ Una funcionalidad se considera terminada cuando:
 - [Decisión SEC-02: sesión del navegador](docs/decisions/SEC-02-browser-refresh-token.md)
 - [Runbook de rotación JWT](docs/runbooks/jwt-key-rotation.md)
 - [CI #20 del commit auditado](https://github.com/BrandonLC16/Inventario/actions/runs/32044666247)
-

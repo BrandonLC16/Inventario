@@ -148,6 +148,67 @@ describe('InventoryApiAdapter', () => {
       });
     expect(inconsistentError).toBeInstanceOf(Error);
   });
+
+  it('lists settings only for the requested warehouse and preserves zero', () => {
+    let result: number | undefined;
+    adapter.listSettings('warehouse-north', { page: 1, size: 10 }).subscribe((page) => {
+      result = page.content?.[0]?.minimumStock;
+    });
+
+    const request = httpTesting.expectOne(
+      'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/settings?page=1&size=10',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      content: [product('product-a', 'warehouse-north', 'SKU-A', 'Producto A', 0, false)],
+    });
+
+    expect(result).toBe(0);
+  });
+
+  it('rejects settings leaked from another warehouse', () => {
+    let receivedError: unknown;
+    adapter.listSettings('warehouse-north').subscribe({
+      error: (error: unknown) => {
+        receivedError = error;
+      },
+    });
+
+    httpTesting
+      .expectOne('https://api.example.test/api/v1/warehouses/warehouse-north/inventory/settings')
+      .flush({
+        content: [product('product-a', 'warehouse-south', 'SKU-A', 'Producto A')],
+      });
+
+    expect(receivedError).toBeInstanceOf(Error);
+  });
+
+  it('re-reads and validates one setting only after configure returns 204', () => {
+    let result: unknown;
+    adapter
+      .configureSetting('warehouse-north', 'product-a', { minimumStock: 7, active: false })
+      .subscribe((setting) => {
+        result = setting;
+      });
+
+    const update = httpTesting.expectOne(
+      'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/product-a/settings',
+    );
+    expect(update.request.method).toBe('PUT');
+    expect(update.request.body).toEqual({ minimumStock: 7, active: false });
+    httpTesting.expectNone(
+      'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/product-a/settings',
+    );
+    update.flush(null, { status: 204, statusText: 'No Content' });
+
+    const refresh = httpTesting.expectOne(
+      'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/product-a/settings',
+    );
+    expect(refresh.request.method).toBe('GET');
+    refresh.flush(product('product-a', 'warehouse-north', 'SKU-A', 'Producto A', 7, false));
+
+    expect(result).toMatchObject({ minimumStock: 7, active: false });
+  });
 });
 
 function balance(
@@ -160,6 +221,13 @@ function balance(
   return { productId, warehouseId, quantity, reservedQuantity, availableQuantity };
 }
 
-function product(productId: string, warehouseId: string, sku: string, name: string) {
-  return { productId, warehouseId, sku, name, active: true, minimumStock: 0 };
+function product(
+  productId: string,
+  warehouseId: string,
+  sku: string,
+  name: string,
+  minimumStock = 0,
+  active = true,
+) {
+  return { productId, warehouseId, sku, name, active, minimumStock };
 }

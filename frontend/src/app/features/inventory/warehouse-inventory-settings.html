@@ -1,0 +1,222 @@
+<section class="settings-page" aria-labelledby="settings-title">
+  <header class="settings-header">
+    <div>
+      <p class="settings-eyebrow">Configuración por almacén</p>
+      <h1 id="settings-title" tabindex="-1">Mínimos y activación</h1>
+      <p>
+        Configura alertas y disponibilidad operativa de productos en
+        {{ locationLabel() }}.
+      </p>
+    </div>
+    <div class="settings-header__actions">
+      <a mat-stroked-button [routerLink]="['/warehouses', warehouseId(), 'inventory']">
+        Ver inventario
+      </a>
+      <a mat-button [routerLink]="['/warehouses', warehouseId()]">Ver almacén</a>
+    </div>
+  </header>
+
+  <aside class="settings-scope" aria-label="Diferencia entre estados del producto">
+    <strong>Dos estados independientes.</strong>
+    <span>
+      El estado global pertenece al catálogo de productos. La activación de esta pantalla aplica
+      sólo a {{ locationLabel() }} y no modifica el catálogo global.
+    </span>
+  </aside>
+
+  @if (loading()) {
+    <app-loading-state label="Cargando configuración de inventario" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (rows().length === 0) {
+    <app-empty-state
+      title="No hay productos configurables"
+      description="Este almacén todavía no tiene productos disponibles en su configuración."
+    />
+  } @else {
+    <div class="settings-table-wrap">
+      <table class="settings-table">
+        <caption class="visually-hidden">
+          Configuración de mínimos y activación de productos por almacén
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">SKU</th>
+            <th scope="col">Producto</th>
+            <th scope="col">Mínimo</th>
+            <th scope="col">Estado en almacén</th>
+            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (setting of rows(); track setting.productId) {
+            <tr>
+              <td data-label="SKU">
+                <a [routerLink]="['/products', setting.productId]">{{ setting.sku }}</a>
+              </td>
+              <td data-label="Producto">{{ setting.name }}</td>
+              <td data-label="Mínimo">{{ setting.minimumStock }}</td>
+              <td data-label="Estado en almacén">
+                <span class="status-pill" [class.status-pill--inactive]="setting.active === false">
+                  {{ setting.active === false ? 'Inactivo aquí' : 'Activo aquí' }}
+                </span>
+              </td>
+              <td class="settings-table__actions">
+                <button mat-button type="button" (click)="openSetting(setting)">
+                  {{ canManage() ? 'Configurar' : 'Consultar estados' }}
+                  <span class="visually-hidden"> {{ setting.sku }}</span>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (page(); as currentPage) {
+      <nav class="settings-pagination" aria-label="Paginación de configuraciones">
+        <p aria-live="polite">
+          Página {{ (currentPage.page ?? query().page) + 1 }} de {{ currentPage.totalPages || 1 }} ·
+          {{ currentPage.totalElements ?? rows().length }}
+          productos
+        </p>
+        <div>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="currentPage.first !== false"
+            (click)="goToPage(query().page - 1)"
+          >
+            Anterior
+          </button>
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="currentPage.last !== false"
+            (click)="goToPage(query().page + 1)"
+          >
+            Siguiente
+          </button>
+        </div>
+      </nav>
+    }
+  }
+
+  @if (selectedSetting(); as selected) {
+    <section class="settings-editor" aria-labelledby="settings-editor-title">
+      <div class="settings-editor__heading">
+        <div>
+          <p class="settings-eyebrow">{{ canManage() ? 'Edición' : 'Consulta' }}</p>
+          <h2 id="settings-editor-title" #editorTitle tabindex="-1">
+            {{ selected.sku }} · {{ selected.name }}
+          </h2>
+        </div>
+        <button mat-button type="button" [disabled]="submitting()" (click)="closeSetting()">
+          Cerrar
+        </button>
+      </div>
+
+      @if (detailLoading()) {
+        <app-loading-state label="Consultando estados del producto" />
+      } @else if (detailProblem(); as currentDetailProblem) {
+        <app-api-error-message
+          [problem]="currentDetailProblem"
+          [retryAllowed]="true"
+          (retry)="retryDetail()"
+        />
+      } @else if (globalProduct(); as product) {
+        <dl class="settings-state-comparison" aria-label="Estados independientes del producto">
+          <div>
+            <dt>Estado global del producto</dt>
+            <dd>
+              <span class="status-pill" [class.status-pill--inactive]="product.active === false">
+                {{ product.active === false ? 'Inactivo en catálogo' : 'Activo en catálogo' }}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt>Estado en {{ locationLabel() }}</dt>
+            <dd>
+              <span class="status-pill" [class.status-pill--inactive]="selected.active === false">
+                {{ selected.active === false ? 'Inactivo aquí' : 'Activo aquí' }}
+              </span>
+            </dd>
+          </div>
+        </dl>
+
+        @if (product.active === false) {
+          <app-operation-feedback
+            tone="info"
+            message="El producto está inactivo en el catálogo global. Activarlo aquí no reactiva el producto global."
+          />
+        }
+
+        @if (localError(); as message) {
+          <app-operation-feedback tone="error" [message]="message" />
+        }
+        @if (success(); as message) {
+          <app-operation-feedback tone="success" [message]="message" />
+        }
+        @if (saveProblem(); as currentSaveProblem) {
+          <app-api-error-message [problem]="currentSaveProblem" />
+          @if (currentSaveProblem.status === 409 && attemptedDeactivation()) {
+            <p class="settings-editor__conflict-help" role="note">
+              No se desactivó la configuración. Revisa y libera el stock físico o las reservas de
+              este producto en {{ locationLabel() }}; tus valores permanecen en el formulario.
+            </p>
+          }
+        }
+
+        @if (canManage()) {
+          <form class="settings-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <mat-form-field appearance="outline">
+              <mat-label>Stock mínimo</mat-label>
+              <input
+                matInput
+                type="number"
+                formControlName="minimumStock"
+                min="0"
+                max="2147483647"
+                step="1"
+                inputmode="numeric"
+              />
+              <mat-hint>Entero igual o mayor que cero.</mat-hint>
+              @if (form.controls.minimumStock.touched && form.controls.minimumStock.invalid) {
+                <mat-error>Usa un número entero entre 0 y 2147483647.</mat-error>
+              }
+            </mat-form-field>
+
+            <mat-checkbox formControlName="active">
+              Producto habilitado en {{ locationLabel() }}
+            </mat-checkbox>
+            <p class="settings-form__help">Este control no cambia el estado global del producto.</p>
+
+            <div class="settings-form__actions">
+              <button
+                mat-flat-button
+                type="submit"
+                [disabled]="submitting() || retryAfter.blocked()"
+              >
+                @if (submitting()) {
+                  Guardando…
+                } @else if (retryAfter.blocked()) {
+                  Disponible en {{ retryAfter.remainingSeconds() }} s
+                } @else {
+                  Guardar configuración
+                }
+              </button>
+              <button mat-button type="button" [disabled]="submitting()" (click)="closeSetting()">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        } @else {
+          <p class="settings-editor__read-only">
+            Tienes acceso de consulta. Sólo Administración y Gestión de inventario pueden cambiar el
+            mínimo o la activación por almacén.
+          </p>
+        }
+      }
+    </section>
+  }
+</section>

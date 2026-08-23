@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes y `F3-03` los saldos de inventario de `MAIN` y por almacén; los demás dominios de negocio continúan como entregas posteriores del plan.
+Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes, `F3-03` los saldos de inventario de `MAIN` y por almacén y `F3-04` la configuración de mínimos y activación por almacén; los demás dominios de negocio continúan como entregas posteriores del plan.
 
 ## Versiones fijadas
 
@@ -76,6 +76,8 @@ La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alime
 Los catálogos de productos y almacenes son features lazy. Ambos permiten lectura a los tres roles y reservan alta, edición y baja/desactivación para `ADMIN` e `INVENTORY_MANAGER`. Almacenes usa exclusivamente `page` y `size` del servidor: no ofrece ni simula búsqueda local. Su desactivación requiere confirmación, conserva visible el registro inactivo y presenta de forma segura los conflictos por existencias, reservas o documentos abiertos.
 
 `/inventory` muestra exclusivamente los saldos del almacén determinista `MAIN`; es un alias compatible de la API y nunca representa un total multi-almacén. `/warehouses/:id/inventory` consulta una ubicación concreta. Ambas vistas muestran existencias físicas, reservadas y disponibles con paginación remota. Cada página combina saldos con `sku`/`name` desde los settings del mismo almacén mediante `productId`: son dos peticiones por página, no una petición por fila, y cualquier diferencia de almacén, cardinalidad o IDs se rechaza como respuesta inconsistente.
+
+`/warehouses/:id/settings` pagina remotamente los mínimos y la activación de cada producto en una ubicación. Los tres roles consultan y sólo `ADMIN` e `INVENTORY_MANAGER` modifican. `InventorySettingResponse.active` pertenece exclusivamente al almacén: el contrato no incluye ahí el estado global del producto, por lo que la pantalla lo consulta sólo al abrir una fila, lo presenta separado y de sólo lectura y enlaza al catálogo; así evita tanto fusionar conceptos como introducir N+1 en el listado. Después de cada `PUT` con `204`, el adaptador vuelve a ejecutar el `GET` individual y sólo entonces reconcilia la fila. Un `409` al desactivar conserva intacto el formulario y muestra orientación sobre stock/reservas junto con la referencia de soporte.
 
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 
@@ -206,9 +208,9 @@ Los límites se fijaron en `F2-02` y se siguen comparando con la medición más 
 | Configuración | Bundle inicial medido | Aviso inicial | Error inicial | Aviso por estilo | Error por estilo |
 | ------------- | --------------------: | ------------: | ------------: | ---------------: | ---------------: |
 | Desarrollo    |             `1.49 MB` |     `1.75 MB` |        `2 MB` |           `6 kB` |          `10 kB` |
-| Producción    |           `297.57 kB` |      `350 kB` |      `450 kB` |           `6 kB` |          `10 kB` |
+| Producción    |           `326.95 kB` |      `350 kB` |      `450 kB` |           `6 kB` |          `10 kB` |
 
-El umbral de desarrollo es mayor porque conserva código sin optimizar y source maps. El de producción permite aproximadamente `52 kB` antes del aviso y `152 kB` antes del error sobre la medición actual. Los estilos por componente se limitan de forma independiente para impedir que una sola vista concentre CSS excesivo. Todo error de budget hace fallar el build y CI ejecuta ambas configuraciones.
+El umbral de desarrollo es mayor porque conserva código sin optimizar y source maps. El de producción permite aproximadamente `23 kB` antes del aviso y `123 kB` antes del error sobre la medición actual. Los estilos por componente se limitan de forma independiente para impedir que una sola vista concentre CSS excesivo. Todo error de budget hace fallar el build y CI ejecuta ambas configuraciones.
 
 ## Strictness y excepciones
 

@@ -47,6 +47,15 @@ export const WAREHOUSE_ROUTES: Routes = [
       import('../inventory/inventory-balances').then(({ InventoryBalances }) => InventoryBalances),
   },
   {
+    path: ':id/settings',
+    title: 'Configuración de inventario | Inventario',
+    data: { [BREADCRUMB_DATA_KEY]: 'Configuración de inventario' },
+    loadComponent: () =>
+      import('../inventory/warehouse-inventory-settings').then(
+        ({ WarehouseInventorySettings }) => WarehouseInventorySettings,
+      ),
+  },
+  {
     path: ':id',
     title: 'Detalle de almacén | Inventario',
     data: { [BREADCRUMB_DATA_KEY]: 'Detalle' },
