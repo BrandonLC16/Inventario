@@ -263,6 +263,100 @@ describe('InventoryApiAdapter', () => {
 
     expect(receivedError).toBeInstanceOf(Error);
   });
+
+  it('uses the MAIN low-stock alias with server filters and validates replenishment', () => {
+    let result: unknown;
+    adapter
+      .listLowStock(MAIN_WAREHOUSE_ID, {
+        page: 1,
+        size: 10,
+        search: 'SKU-A',
+        outOfStockOnly: true,
+      })
+      .subscribe((page) => (result = page));
+
+    const request = httpTesting.expectOne(
+      `https://api.example.test/api/v1/inventory/low-stock?page=1&size=10&search=SKU-A&outOfStockOnly=true`,
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      content: [lowStock('product-a', MAIN_WAREHOUSE_ID, 3, 3, 0, 5, 5, 'OUT_OF_STOCK')],
+      page: 1,
+      size: 10,
+    });
+
+    expect(result).toMatchObject({ content: [{ sku: 'SKU-product-a', replenishmentQuantity: 5 }] });
+    httpTesting.expectNone((candidate) => candidate.url.includes('/products/'));
+  });
+
+  it('uses one warehouse Kardex request with all remote filters and keeps deleted product IDs', () => {
+    let result: unknown;
+    adapter
+      .listMovements('warehouse-north', {
+        page: 2,
+        size: 25,
+        productId: '10000000-0000-4000-8000-000000000001',
+        type: 'ORDER_RESERVED',
+        from: '2026-08-01T00:00:00.000Z',
+        to: '2026-08-02T00:00:00.000Z',
+        reference: 'ORDER-1',
+      })
+      .subscribe((page) => (result = page));
+
+    const request = httpTesting.expectOne(
+      (candidate) =>
+        candidate.url ===
+          'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/movements' &&
+        candidate.params.get('productId') === '10000000-0000-4000-8000-000000000001' &&
+        candidate.params.get('type') === 'ORDER_RESERVED' &&
+        candidate.params.get('reference') === 'ORDER-1',
+    );
+    request.flush({
+      content: [
+        movement(
+          'movement-a',
+          'warehouse-north',
+          'deleted-product-id',
+          'ORDER_RESERVED',
+          0,
+          8,
+          8,
+          3,
+          0,
+          3,
+        ),
+      ],
+    });
+
+    expect(result).toMatchObject({ content: [{ productId: 'deleted-product-id' }] });
+    httpTesting.expectNone((candidate) => candidate.url.includes('/products/'));
+  });
+
+  it('rejects alert and Kardex rows leaked from another warehouse', () => {
+    const errors: unknown[] = [];
+    adapter
+      .listLowStock('warehouse-north')
+      .subscribe({ error: (error: unknown) => errors.push(error) });
+    httpTesting
+      .expectOne('https://api.example.test/api/v1/warehouses/warehouse-north/inventory/low-stock')
+      .flush({
+        content: [lowStock('product-a', 'warehouse-south', 2, 0, 2, 5, 3, 'LOW_STOCK')],
+      });
+
+    adapter
+      .listMovements('warehouse-north')
+      .subscribe({ error: (error: unknown) => errors.push(error) });
+    httpTesting
+      .expectOne('https://api.example.test/api/v1/warehouses/warehouse-north/inventory/movements')
+      .flush({
+        content: [
+          movement('movement-a', 'warehouse-south', 'product-a', 'MANUAL_IN', 1, 0, 1, 0, 0, 0),
+        ],
+      });
+
+    expect(errors).toHaveLength(2);
+    expect(errors.every((error) => error instanceof Error)).toBe(true);
+  });
 });
 
 function balance(
@@ -284,4 +378,56 @@ function product(
   active = true,
 ) {
   return { productId, warehouseId, sku, name, active, minimumStock };
+}
+
+function lowStock(
+  productId: string,
+  warehouseId: string,
+  quantity: number,
+  reservedQuantity: number,
+  availableQuantity: number,
+  minimumStock: number,
+  replenishmentQuantity: number,
+  alert: 'LOW_STOCK' | 'OUT_OF_STOCK',
+) {
+  return {
+    warehouseId,
+    productId,
+    sku: `SKU-${productId}`,
+    name: `Producto ${productId}`,
+    quantity,
+    reservedQuantity,
+    availableQuantity,
+    minimumStock,
+    replenishmentQuantity,
+    alert,
+  };
+}
+
+function movement(
+  id: string,
+  warehouseId: string,
+  productId: string,
+  movementType: 'MANUAL_IN' | 'ORDER_RESERVED',
+  quantityDelta: number,
+  balanceBefore: number,
+  balanceAfter: number,
+  reservationDelta: number,
+  reservedBefore: number,
+  reservedAfter: number,
+) {
+  return {
+    id,
+    warehouseId,
+    productId,
+    movementType,
+    quantityDelta,
+    balanceBefore,
+    balanceAfter,
+    reservationDelta,
+    reservedBefore,
+    reservedAfter,
+    occurredAt: '2026-08-23T12:00:00Z',
+    responsibleUser: 'operator-id',
+  };
 }

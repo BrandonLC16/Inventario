@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes, `F3-03` los saldos de inventario de `MAIN` y por almacén, `F3-04` la configuración de mínimos y activación por almacén y `F3-05` los ajustes manuales; los demás dominios de negocio continúan como entregas posteriores del plan.
+Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes, `F3-03` los saldos de inventario de `MAIN` y por almacén, `F3-04` la configuración de mínimos y activación por almacén, `F3-05` los ajustes manuales y `F3-06` las alertas y el Kardex; los demás dominios de negocio continúan como entregas posteriores del plan.
 
 ## Versiones fijadas
 
@@ -81,6 +81,8 @@ Los catálogos de productos y almacenes son features lazy. Ambos permiten lectur
 
 Los gestores pueden iniciar un ajuste manual desde una fila de `/inventory` o `/warehouses/:id/inventory`. Entrada y salida se traducen a un `quantityDelta` entero firmado y no cero; la referencia es opcional y admite 128 caracteres. Antes del envío se confirma ubicación, saldo actual, delta y resultado previsto. `MAIN` usa el alias `/api/v1/inventory/{productId}/adjustments`; los demás almacenes usan su ruta explícita. La mutación se envía una sola vez, queda excluida del replay de autenticación y nunca ofrece reintento automático. La tabla se reconcilia exclusivamente con `InventoryResponse`; ante stock/reservas, red incierta, `401`, `403` o `429`, el formulario conserva el contexto.
 
+`/inventory/alerts` y `/inventory/kardex` consultan exclusivamente `MAIN`; `/warehouses/:id/inventory/alerts` y `/warehouses/:id/inventory/kardex` aíslan una ubicación concreta. Las cuatro rutas son lazy y están limitadas a `ADMIN` e `INVENTORY_MANAGER`. Alertas usa `search`, `outOfStockOnly`, `page` y `size` del servidor y muestra disponible, mínimo y reposición sugerida directamente desde el DTO. Kardex conserva en URL `productId`, tipo, fechas ISO inclusivas, referencia exacta y paginación; separa efectos físicos y reservados. Como el contrato histórico no aporta SKU/nombre y conserva movimientos de productos dados de baja, muestra `productId` como fallback seguro y no realiza consultas por fila.
+
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 
 ## Manejo común de errores HTTP
@@ -156,7 +158,7 @@ Durante el desarrollo puedes mantenerlas observando cambios:
 npm run test:watch
 ```
 
-Las 133 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes, catálogos, saldos, settings, ajustes manuales y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
+Las 149 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes, catálogos, saldos, settings, ajustes manuales, alertas, Kardex y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
 
 ```powershell
 npm run e2e

@@ -1,0 +1,165 @@
+<section class="operations-page" aria-labelledby="kardex-title">
+  <header class="operations-header">
+    <div>
+      <p class="operations-eyebrow">Trazabilidad</p>
+      <h1 id="kardex-title" #pageTitle tabindex="-1">Kardex de {{ locationLabel() }}</h1>
+      <p>Historial físico y reservado, ordenado por la API del más reciente al más antiguo.</p>
+    </div>
+    <nav class="operations-header__actions" aria-label="Vistas de inventario">
+      <a mat-stroked-button [routerLink]="inventoryRoute()">Saldos</a>
+      <a mat-stroked-button [routerLink]="alertsRoute()">Alertas</a>
+    </nav>
+  </header>
+
+  @if (mainAlias()) {
+    <aside class="operations-note" aria-label="Alcance del Kardex MAIN">
+      <strong>MAIN es un almacén, no un historial multi-almacén.</strong>
+      <span>La ruta compatible consulta movimientos de MAIN exclusivamente.</span>
+    </aside>
+  }
+
+  <aside
+    class="operations-note operations-note--history"
+    aria-label="Identificación histórica de productos"
+  >
+    <strong>El historial permanece aunque el producto se haya dado de baja.</strong>
+    <span
+      >El contrato histórico no incluye nombre ni SKU; se muestra el `productId` seguro sin
+      consultas por fila.</span
+    >
+  </aside>
+
+  @if (localError(); as message) {
+    <p class="operations-local-error" role="alert">{{ message }}</p>
+  }
+
+  <form
+    class="operations-filters operations-filters--kardex"
+    [formGroup]="filterForm"
+    (ngSubmit)="applyFilters()"
+    novalidate
+  >
+    <mat-form-field appearance="outline">
+      <mat-label>ID de producto</mat-label>
+      <input matInput formControlName="productId" autocomplete="off" />
+      @if (filterForm.controls.productId.touched && filterForm.controls.productId.invalid) {
+        <mat-error>Introduce un UUID de producto válido.</mat-error>
+      }
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Tipo de movimiento</mat-label>
+      <mat-select formControlName="type">
+        <mat-option value="">Todos</mat-option>
+        @for (type of movementTypes; track type) {
+          <mat-option [value]="type">{{ type }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Desde</mat-label>
+      <input matInput type="datetime-local" formControlName="from" />
+      <mat-hint>Fecha y hora local, límite inclusivo.</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Hasta</mat-label>
+      <input matInput type="datetime-local" formControlName="to" />
+      <mat-hint>Fecha y hora local, límite inclusivo.</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Referencia exacta</mat-label>
+      <input matInput formControlName="reference" maxlength="128" autocomplete="off" />
+      @if (filterForm.controls.reference.hasError('maxlength')) {
+        <mat-error>La referencia admite hasta 128 caracteres.</mat-error>
+      }
+    </mat-form-field>
+    <div class="operations-filters__actions">
+      <button mat-flat-button type="submit">Aplicar filtros</button>
+      <button mat-button type="button" (click)="clearFilters()">Limpiar</button>
+    </div>
+  </form>
+
+  @if (loading()) {
+    <app-loading-state [label]="'Cargando Kardex de ' + locationLabel()" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (movements().length === 0) {
+    <app-empty-state
+      title="No hay movimientos con estos filtros"
+      description="Prueba otro rango, tipo, producto o referencia exacta."
+      actionLabel="Limpiar filtros"
+      (action)="clearFilters()"
+    />
+  } @else {
+    <div class="operations-table-wrap">
+      <table class="operations-table operations-table--kardex">
+        <caption class="visually-hidden">
+          Movimientos de inventario de
+          {{
+            locationLabel()
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Fecha y tipo</th>
+            <th scope="col">Producto</th>
+            <th scope="col">Efecto físico</th>
+            <th scope="col">Efecto reservado</th>
+            <th scope="col">Referencia</th>
+            <th scope="col">Responsable</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (movement of movements(); track movement.id) {
+            <tr>
+              <td data-label="Fecha y tipo">
+                <strong>{{ movementLabel(movement) }}</strong>
+                <span>{{ movement.occurredAt | date: 'medium' }}</span>
+              </td>
+              <td data-label="Producto">
+                <code>{{ movement.productId }}</code>
+                <small>Identificador histórico</small>
+              </td>
+              <td data-label="Efecto físico">
+                <strong>{{ signed(movement.quantityDelta) }}</strong>
+                <span>{{ movement.balanceBefore }} → {{ movement.balanceAfter }}</span>
+              </td>
+              <td data-label="Efecto reservado">
+                <strong>{{ signed(movement.reservationDelta) }}</strong>
+                <span>{{ movement.reservedBefore }} → {{ movement.reservedAfter }}</span>
+              </td>
+              <td data-label="Referencia">{{ movement.businessReference || 'Sin referencia' }}</td>
+              <td data-label="Responsable">
+                <code>{{ movement.responsibleUser }}</code>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="operations-pagination" aria-label="Paginación del Kardex">
+      <p aria-live="polite">
+        Página {{ (page()?.page ?? query().page) + 1 }} de {{ page()?.totalPages ?? 1 }} ·
+        {{ page()?.totalElements ?? movements().length }} movimientos
+      </p>
+      <div>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.first !== false"
+          (click)="goToPage((page()?.page ?? query().page) - 1)"
+        >
+          Anterior
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.last !== false"
+          (click)="goToPage((page()?.page ?? query().page) + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    </nav>
+  }
+</section>

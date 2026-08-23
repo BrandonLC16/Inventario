@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04 y F3-05 están completadas** con features lazy para productos, almacenes, saldos, configuración y ajustes manuales de inventario, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. El siguiente corte disponible es F3-06.
+El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04, F3-05 y F3-06 están completadas** con features lazy para productos, almacenes, saldos, configuración, ajustes, alertas y Kardex, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. El siguiente corte disponible es F3-07.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -671,7 +671,7 @@ Secuencia recomendada:
 Fase 2 ✓ ─┬→ F3-01 ✓┐
           └→ F3-02 ✓┴→ F3-03 ✓┬→ F3-04 ✓┐
                                ├→ F3-05 ✓┼→ F3-08
-                               └→ F3-06 ─┤
+                               └→ F3-06 ✓┤
 F3-01 + F3-03 ─────────────────→ F3-07 ─┘
 ```
 
@@ -684,7 +684,7 @@ F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 par
 | `F3-03` | Existencias globales/por almacén | `F3-01`, `F3-02` | Completado | rutas lazy MAIN/almacén; composición por `productId` con dos llamadas por página y sin N+1; aislamiento, cero/null, obsolescencia, roles y responsive probados; 111 unit/component y 29 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-04` | Mínimos y activación por almacén | `F3-03` | Completado | lectura paginada para los tres roles y edición para gestores; estado global/local separado sin N+1; mínimo, `204` + recarga, `409`, doble envío, aislamiento y accesibilidad probados; 121 unit/component y 35 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-05` | Ajustes manuales | `F3-03` | Completado | entrada/salida firmada, rutas MAIN/almacén, confirmación, una sola petición sin replay, reconciliación desde API, rechazos y accesibilidad probados; 133 unit/component y 44 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
-| `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Pendiente | filtros remotos, trazabilidad completa, permisos y pruebas aprobadas |
+| `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Completado | rutas lazy MAIN/almacén para gestores; filtros y paginación remotos en URL; reposición, efectos físicos/reservados, obsolescencia y producto eliminado sin N+1 probados; 149 unit/component y 49 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-07` | Baja de producto protegida | `F3-01`, `F3-03`, `F3-05` | Pendiente | baja exitosa y bloqueos por saldo/reserva/documento representados sin perder estado |
 | `F3-08` | Permisos, concurrencia y doble envío | `F3-01`–`F3-07` | Pendiente | matriz transversal unit/component/E2E y `npm run check` en verde |
 
@@ -765,6 +765,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evide
 **Trabajo esperado.** Codex debe implementar alertas para `MAIN` y por almacén con `search`, `outOfStockOnly`, `page` y `size`, mostrando mínimo, disponible, reposición sugerida y `LOW_STOCK`/`OUT_OF_STOCK`. El Kardex usa filtros remotos combinables `productId`, `type`, fechas ISO inclusivas y referencia exacta; valida que `from <= to`; mantiene paginación estable y representa por separado `quantityDelta`/saldos físicos y `reservationDelta`/saldos reservados. No inventa nombres para productos eliminados: si ya no pueden consultarse, muestra un identificador seguro y conserva el historial. Evita N+1 y respuestas obsoletas.
 
 **Seguimiento.** Se completa cuando filtros, URL y paginación son reproducibles; cambiar almacén limpia resultados incompatibles; las alertas coinciden con el mínimo configurado; y cada movimiento muestra tipo, antes/después, referencia, fecha, actor y almacén. Prueba todos los filtros, rango inválido, producto eliminado, vacíos, permisos, teclado y viewport móvil.
+
+**Evidencia de cierre (23 de agosto de 2026).** Las rutas lazy de alertas y Kardex existen para `MAIN` y para cada almacén y aplican guard de `ADMIN`/`INVENTORY_MANAGER`; `SALES` se redirige antes de consultar esos endpoints. Alertas usa únicamente su DTO, que ya incluye SKU/nombre y reposición. Kardex hace una sola petición paginada con filtros combinables y presenta `productId` como fallback histórico, por lo que incluso un producto dado de baja no introduce N+1 ni pierde trazabilidad. Se validan fechas y referencia, los filtros sobreviven en URL y `switchMap` descarta respuestas obsoletas al cambiar filtros o almacén. `npm run generate:api:check` confirmó el cliente sincronizado y `npm run check` aprobó formato, lint, 149 pruebas unitarias/de componente, 49 E2E y builds de desarrollo y producción. No se modificaron backend, OpenAPI ni código generado.
 
 **Pedido sugerido a Codex:**
 

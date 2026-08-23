@@ -2,7 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { HttpContext } from '@angular/common/http';
 import { Observable, concatMap, forkJoin, map } from 'rxjs';
 
-import { FindAll10RequestParams, InventoryService } from './generated/api/inventory.service';
+import {
+  FindAll10RequestParams,
+  FindAllMovementsRequestParams,
+  FindLowStock1RequestParams,
+  InventoryService,
+} from './generated/api/inventory.service';
 import {
   FindSettingsRequestParams,
   WarehouseInventoryService,
@@ -10,12 +15,30 @@ import {
 import { InventoryResponse } from './generated/model/inventory-response';
 import { InventorySettingRequest } from './generated/model/inventory-setting-request';
 import { InventorySettingResponse } from './generated/model/inventory-setting-response';
+import { LowStockResponse } from './generated/model/low-stock-response';
 import { PageResponseInventoryResponse } from './generated/model/page-response-inventory-response';
 import { PageResponseInventorySettingResponse } from './generated/model/page-response-inventory-setting-response';
+import { PageResponseLowStockResponse } from './generated/model/page-response-low-stock-response';
 import { StockAdjustmentRequest } from './generated/model/stock-adjustment-request';
+import { StockMovementPageResponse } from './generated/model/stock-movement-page-response';
+import { StockMovementResponse } from './generated/model/stock-movement-response';
 import { DISABLE_AUTH_REPLAY } from '../session/session.interceptor';
 
 export const MAIN_WAREHOUSE_ID = '00000000-0000-0000-0000-000000000001';
+
+const MOVEMENT_TYPES = new Set<string>([
+  'INITIAL_STOCK',
+  'MANUAL_IN',
+  'MANUAL_OUT',
+  'ORDER_RESERVED',
+  'ORDER_RESERVATION_RELEASED',
+  'ORDER_CONFIRMED',
+  'ORDER_CANCELLED',
+  'PURCHASE_RECEIVED',
+  'TRANSFER_OUT',
+  'TRANSFER_IN',
+  'PHYSICAL_COUNT_ADJUSTMENT',
+]);
 
 export interface InventoryBalanceRow {
   readonly balance: InventoryResponse;
@@ -100,6 +123,52 @@ export class InventoryApiAdapter {
             { context },
           );
     return response.pipe(map((balance) => this.validateBalance(balance, warehouseId, productId)));
+  }
+
+  listLowStock(
+    warehouseId: string,
+    request: FindLowStock1RequestParams = {},
+  ): Observable<PageResponseLowStockResponse> {
+    const response =
+      warehouseId === MAIN_WAREHOUSE_ID
+        ? this.inventoryApi.findLowStock1(request)
+        : this.warehouseInventoryApi.findLowStock({ warehouseId, ...request });
+    return response.pipe(
+      map((page) => {
+        const productIds = new Set<string>();
+        for (const alert of page.content ?? []) {
+          const productId = this.validateLowStock(alert, warehouseId);
+          if (productIds.has(productId)) {
+            throw new Error('Low-stock alerts contain a duplicate product.');
+          }
+          productIds.add(productId);
+        }
+        return page;
+      }),
+    );
+  }
+
+  listMovements(
+    warehouseId: string,
+    request: FindAllMovementsRequestParams = {},
+  ): Observable<StockMovementPageResponse> {
+    const response =
+      warehouseId === MAIN_WAREHOUSE_ID
+        ? this.inventoryApi.findAllMovements(request)
+        : this.warehouseInventoryApi.findMovements({ warehouseId, ...request });
+    return response.pipe(
+      map((page) => {
+        const movementIds = new Set<string>();
+        for (const movement of page.content ?? []) {
+          const movementId = this.validateMovement(movement, warehouseId);
+          if (movementIds.has(movementId)) {
+            throw new Error('Stock movement page contains a duplicate movement.');
+          }
+          movementIds.add(movementId);
+        }
+        return page;
+      }),
+    );
   }
 
   private composePage(
@@ -199,5 +268,71 @@ export class InventoryApiAdapter {
       throw new Error('Warehouse inventory setting is incomplete or inconsistent.');
     }
     return setting;
+  }
+
+  private validateLowStock(alert: LowStockResponse, warehouseId: string): string {
+    const quantity = alert.quantity;
+    const reserved = alert.reservedQuantity;
+    const available = alert.availableQuantity;
+    const minimum = alert.minimumStock;
+    const replenishment = alert.replenishmentQuantity;
+    if (
+      !alert.productId ||
+      alert.warehouseId !== warehouseId ||
+      !alert.sku?.trim() ||
+      !alert.name?.trim() ||
+      !Number.isSafeInteger(quantity) ||
+      !Number.isSafeInteger(reserved) ||
+      !Number.isSafeInteger(available) ||
+      !Number.isSafeInteger(minimum) ||
+      !Number.isSafeInteger(replenishment) ||
+      quantity! < 0 ||
+      reserved! < 0 ||
+      available! < 0 ||
+      minimum! < 0 ||
+      available !== quantity! - reserved! ||
+      replenishment !== Math.max(0, minimum! - available!) ||
+      (alert.alert === 'OUT_OF_STOCK'
+        ? available !== 0
+        : alert.alert !== 'LOW_STOCK' || available === 0 || available! >= minimum!)
+    ) {
+      throw new Error('Low-stock alert is incomplete or inconsistent.');
+    }
+    return alert.productId;
+  }
+
+  private validateMovement(movement: StockMovementResponse, warehouseId: string): string {
+    const quantityDelta = movement.quantityDelta;
+    const balanceBefore = movement.balanceBefore;
+    const balanceAfter = movement.balanceAfter;
+    const reservationDelta = movement.reservationDelta;
+    const reservedBefore = movement.reservedBefore;
+    const reservedAfter = movement.reservedAfter;
+    if (
+      !movement.id ||
+      !movement.productId ||
+      movement.warehouseId !== warehouseId ||
+      !movement.movementType ||
+      !MOVEMENT_TYPES.has(movement.movementType) ||
+      !Number.isSafeInteger(quantityDelta) ||
+      !Number.isSafeInteger(balanceBefore) ||
+      !Number.isSafeInteger(balanceAfter) ||
+      !Number.isSafeInteger(reservationDelta) ||
+      !Number.isSafeInteger(reservedBefore) ||
+      !Number.isSafeInteger(reservedAfter) ||
+      balanceBefore! < 0 ||
+      balanceAfter! < 0 ||
+      reservedBefore! < 0 ||
+      reservedAfter! < 0 ||
+      balanceAfter !== balanceBefore! + quantityDelta! ||
+      reservedAfter !== reservedBefore! + reservationDelta! ||
+      (quantityDelta === 0 && reservationDelta === 0) ||
+      !movement.occurredAt ||
+      !Number.isFinite(Date.parse(movement.occurredAt)) ||
+      !movement.responsibleUser?.trim()
+    ) {
+      throw new Error('Stock movement is incomplete or inconsistent.');
+    }
+    return movement.id;
   }
 }

@@ -37,6 +37,30 @@ export const WAREHOUSE_ROUTES: Routes = [
     loadComponent: () => import('./warehouse-form').then(({ WarehouseForm }) => WarehouseForm),
   },
   {
+    path: ':id/inventory/alerts',
+    title: 'Alertas del almacén | Inventario',
+    canActivate: [allowedRolesGuard],
+    data: {
+      [ALLOWED_ROLES_DATA_KEY]: INVENTORY_MANAGEMENT_ROLES,
+      [BREADCRUMB_DATA_KEY]: 'Alertas',
+      inventoryScope: 'warehouse',
+    },
+    loadComponent: () =>
+      import('../inventory/inventory-alerts').then(({ InventoryAlerts }) => InventoryAlerts),
+  },
+  {
+    path: ':id/inventory/kardex',
+    title: 'Kardex del almacén | Inventario',
+    canActivate: [allowedRolesGuard],
+    data: {
+      [ALLOWED_ROLES_DATA_KEY]: INVENTORY_MANAGEMENT_ROLES,
+      [BREADCRUMB_DATA_KEY]: 'Kardex',
+      inventoryScope: 'warehouse',
+    },
+    loadComponent: () =>
+      import('../inventory/inventory-kardex').then(({ InventoryKardex }) => InventoryKardex),
+  },
+  {
     path: ':id/inventory',
     title: 'Inventario del almacén | Inventario',
     data: {

@@ -7,9 +7,31 @@
       </h1>
       <p>Consulta saldos físicos, reservados y disponibles de {{ locationLabel() }}.</p>
     </div>
-    @if (!mainAlias()) {
-      <a mat-stroked-button [routerLink]="['/warehouses', warehouseId()]">Ver almacén</a>
-    }
+    <div class="inventory-header__actions">
+      @if (canManage()) {
+        <a
+          mat-stroked-button
+          [routerLink]="
+            mainAlias()
+              ? ['/inventory/alerts']
+              : ['/warehouses', warehouseId(), 'inventory', 'alerts']
+          "
+          >Alertas</a
+        >
+        <a
+          mat-stroked-button
+          [routerLink]="
+            mainAlias()
+              ? ['/inventory/kardex']
+              : ['/warehouses', warehouseId(), 'inventory', 'kardex']
+          "
+          >Kardex</a
+        >
+      }
+      @if (!mainAlias()) {
+        <a mat-stroked-button [routerLink]="['/warehouses', warehouseId()]">Ver almacén</a>
+      }
+    </div>
   </header>
 
   @if (mainAlias()) {

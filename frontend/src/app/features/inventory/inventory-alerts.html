@@ -1,0 +1,128 @@
+<section class="operations-page" aria-labelledby="alerts-title">
+  <header class="operations-header">
+    <div>
+      <p class="operations-eyebrow">Reposición</p>
+      <h1 id="alerts-title" #pageTitle tabindex="-1">Alertas de {{ locationLabel() }}</h1>
+      <p>Productos agotados o con disponibilidad por debajo del mínimo configurado.</p>
+    </div>
+    <nav class="operations-header__actions" aria-label="Vistas de inventario">
+      <a mat-stroked-button [routerLink]="inventoryRoute()">Saldos</a>
+      <a mat-stroked-button [routerLink]="kardexRoute()">Kardex</a>
+    </nav>
+  </header>
+
+  @if (mainAlias()) {
+    <aside class="operations-note" aria-label="Alcance de alertas MAIN">
+      <strong>MAIN es un almacén, no un agregado multi-almacén.</strong>
+      <span>Estas alertas consultan únicamente el alias de MAIN.</span>
+    </aside>
+  }
+
+  <form
+    class="operations-filters operations-filters--alerts"
+    [formGroup]="filterForm"
+    (ngSubmit)="applyFilters()"
+  >
+    <mat-form-field appearance="outline">
+      <mat-label>Buscar por SKU o nombre</mat-label>
+      <input matInput formControlName="search" autocomplete="off" />
+    </mat-form-field>
+    <mat-checkbox formControlName="outOfStockOnly">Sólo productos agotados</mat-checkbox>
+    <div class="operations-filters__actions">
+      <button mat-flat-button type="submit">Aplicar filtros</button>
+      <button mat-button type="button" (click)="clearFilters()">Limpiar</button>
+    </div>
+  </form>
+
+  @if (loading()) {
+    <app-loading-state [label]="'Cargando alertas de ' + locationLabel()" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (alerts().length === 0) {
+    <app-empty-state
+      title="No hay alertas con estos filtros"
+      description="La API no devolvió productos que requieran reposición en esta ubicación."
+      actionLabel="Limpiar filtros"
+      (action)="clearFilters()"
+    />
+  } @else {
+    <div class="operations-table-wrap">
+      <table class="operations-table">
+        <caption class="visually-hidden">
+          Alertas de reposición de
+          {{
+            locationLabel()
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Producto</th>
+            <th scope="col">Alerta</th>
+            <th scope="col" class="number">Físicas</th>
+            <th scope="col" class="number">Reservadas</th>
+            <th scope="col" class="number">Disponibles</th>
+            <th scope="col" class="number">Mínimo</th>
+            <th scope="col" class="number">Reponer</th>
+            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (alert of alerts(); track alert.productId) {
+            <tr>
+              <td data-label="Producto">
+                <strong>{{ alert.sku }}</strong>
+                <span>{{ alert.name }}</span>
+              </td>
+              <td data-label="Alerta">
+                <span class="alert-pill" [class.alert-pill--out]="alert.alert === 'OUT_OF_STOCK'">
+                  {{ alertLabel(alert) }}
+                </span>
+              </td>
+              <td data-label="Físicas" class="number">{{ alert.quantity }}</td>
+              <td data-label="Reservadas" class="number">{{ alert.reservedQuantity }}</td>
+              <td data-label="Disponibles" class="number">{{ alert.availableQuantity }}</td>
+              <td data-label="Mínimo" class="number">{{ alert.minimumStock }}</td>
+              <td data-label="Reponer" class="number operations-table__replenishment">
+                {{ alert.replenishmentQuantity }}
+              </td>
+              <td class="operations-table__actions">
+                <a
+                  mat-button
+                  [routerLink]="kardexRoute()"
+                  [queryParams]="{ productId: alert.productId }"
+                >
+                  Ver Kardex<span class="visually-hidden"> de {{ alert.sku }}</span>
+                </a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="operations-pagination" aria-label="Paginación de alertas">
+      <p aria-live="polite">
+        Página {{ (page()?.page ?? query().page) + 1 }} de {{ page()?.totalPages ?? 1 }} ·
+        {{ page()?.totalElements ?? alerts().length }} alertas
+      </p>
+      <div>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.first !== false"
+          (click)="goToPage((page()?.page ?? query().page) - 1)"
+        >
+          Anterior
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.last !== false"
+          (click)="goToPage((page()?.page ?? query().page) + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    </nav>
+  }
+</section>
