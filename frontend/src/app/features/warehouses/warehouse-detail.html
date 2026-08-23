@@ -1,0 +1,87 @@
+<article class="warehouses-page" aria-labelledby="warehouse-detail-title">
+  <header class="warehouses-header">
+    <div>
+      <p class="warehouses-eyebrow">Almacén</p>
+      <h1 id="warehouse-detail-title" tabindex="-1">Detalle de almacén</h1>
+      <p>Información general y disponibilidad operativa de la ubicación seleccionada.</p>
+    </div>
+    <a mat-stroked-button routerLink="/warehouses" [queryParams]="listQueryParams">
+      Volver al listado
+    </a>
+  </header>
+
+  @if (feedback(); as message) {
+    <app-operation-feedback
+      tone="success"
+      [message]="message"
+      [dismissible]="true"
+      (dismiss)="feedback.set(null)"
+    />
+  }
+
+  @if (deactivateProblem(); as currentDeactivateProblem) {
+    <app-api-error-message [problem]="currentDeactivateProblem" />
+  }
+
+  @if (loading()) {
+    <app-loading-state label="Cargando detalle del almacén" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (warehouse(); as currentWarehouse) {
+    <section class="warehouse-detail-card" aria-label="Datos del almacén">
+      <div class="warehouse-detail-card__heading">
+        <div>
+          <p class="warehouse-detail-card__code">{{ currentWarehouse.code ?? 'Sin código' }}</p>
+          <h2>{{ currentWarehouse.name ?? 'Almacén sin nombre' }}</h2>
+        </div>
+        <span class="status-pill" [class.status-pill--inactive]="currentWarehouse.active === false">
+          {{ currentWarehouse.active === false ? 'Inactivo' : 'Activo' }}
+        </span>
+      </div>
+
+      @if (currentWarehouse.active === false) {
+        <app-operation-feedback
+          tone="info"
+          message="Este almacén está inactivo y no admite nuevas operaciones."
+        />
+      }
+
+      <dl class="warehouse-details">
+        <div>
+          <dt>Descripción</dt>
+          <dd>{{ currentWarehouse.description || 'Sin descripción' }}</dd>
+        </div>
+        <div>
+          <dt>Creado</dt>
+          <dd>{{ currentWarehouse.createdAt | date: 'medium' }}</dd>
+        </div>
+        <div>
+          <dt>Última actualización</dt>
+          <dd>{{ currentWarehouse.updatedAt | date: 'medium' }}</dd>
+        </div>
+      </dl>
+
+      @if (canManage()) {
+        <div class="warehouse-actions">
+          <a
+            mat-flat-button
+            [routerLink]="['/warehouses', currentWarehouse.id, 'edit']"
+            [queryParams]="listQueryParams"
+          >
+            Editar almacén
+          </a>
+          @if (currentWarehouse.active !== false) {
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="deactivating()"
+              (click)="requestDeactivate()"
+            >
+              {{ deactivating() ? 'Procesando…' : 'Desactivar' }}
+            </button>
+          }
+        </div>
+      }
+    </section>
+  }
+</article>

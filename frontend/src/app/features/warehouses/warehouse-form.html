@@ -1,0 +1,88 @@
+<section class="warehouses-page" aria-labelledby="warehouse-form-title">
+  <header class="warehouses-header">
+    <div>
+      <p class="warehouses-eyebrow">Ubicaciones</p>
+      <h1 id="warehouse-form-title" tabindex="-1">{{ title }}</h1>
+      <p>
+        {{
+          editing
+            ? 'Actualiza los datos generales y el estado operativo del almacén.'
+            : 'Registra una nueva ubicación para la operación de inventario.'
+        }}
+      </p>
+    </div>
+  </header>
+
+  @if (localError(); as message) {
+    <app-operation-feedback tone="error" [message]="message" />
+  }
+  @if (success(); as message) {
+    <app-operation-feedback tone="success" [message]="message" />
+  }
+  @if (problem(); as currentProblem) {
+    <app-api-error-message
+      [problem]="currentProblem"
+      [retryAllowed]="loadFailed()"
+      (retry)="retryLoad()"
+    />
+  }
+
+  @if (loading()) {
+    <app-loading-state label="Cargando almacén para editar" />
+  } @else {
+    <form class="warehouse-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <p class="warehouse-form__required">Los campos marcados con * son obligatorios.</p>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Código</mat-label>
+        <input matInput formControlName="code" maxlength="32" autocomplete="off" />
+        <mat-hint
+          >El servidor normaliza el código · {{ form.controls.code.value.length }}/32</mat-hint
+        >
+        @if (form.controls.code.touched && form.controls.code.hasError('required')) {
+          <mat-error>El código es obligatorio.</mat-error>
+        } @else if (form.controls.code.hasError('maxlength')) {
+          <mat-error>El código admite hasta 32 caracteres.</mat-error>
+        } @else if (form.controls.code.hasError('api')) {
+          <mat-error>{{ form.controls.code.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Nombre</mat-label>
+        <input matInput formControlName="name" maxlength="160" autocomplete="off" />
+        <mat-hint align="end">{{ form.controls.name.value.length }}/160</mat-hint>
+        @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+          <mat-error>El nombre es obligatorio.</mat-error>
+        } @else if (form.controls.name.hasError('maxlength')) {
+          <mat-error>El nombre admite hasta 160 caracteres.</mat-error>
+        } @else if (form.controls.name.hasError('api')) {
+          <mat-error>{{ form.controls.name.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field class="warehouse-form__wide" appearance="outline">
+        <mat-label>Descripción</mat-label>
+        <textarea matInput formControlName="description" maxlength="1000" rows="4"></textarea>
+        <mat-hint align="end">{{ form.controls.description.value.length }}/1000</mat-hint>
+        @if (form.controls.description.hasError('maxlength')) {
+          <mat-error>La descripción admite hasta 1000 caracteres.</mat-error>
+        } @else if (form.controls.description.hasError('api')) {
+          <mat-error>{{ form.controls.description.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-checkbox formControlName="active">Almacén activo</mat-checkbox>
+      <p class="warehouse-form__status-help">
+        Un almacén inactivo permanece visible, pero no admite nuevas operaciones.
+      </p>
+
+      <div class="warehouse-form__actions">
+        <button mat-flat-button type="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Guardando…' : 'Guardar almacén' }}
+        </button>
+        <a mat-button [routerLink]="cancelTarget()" [queryParams]="listQueryParams">Cancelar</a>
+      </div>
+    </form>
+  }
+</section>

@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Fundación standalone del cliente Angular de Inventory API. `F2-01` creó el proyecto, `F2-02` añadió las comprobaciones de calidad, `F2-03` incorporó el shell y la navegación por rol, `F2-04` definió el sistema visual, `F2-05` integró el cliente generado y la configuración runtime de la API, `F2-06` añadió la sesión real no persistente, `F2-07` unificó los errores HTTP y `F2-08` cerró la fase con pruebas E2E reproducibles. Todavía no incluye módulos de negocio.
+Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos y `F3-02` el catálogo de almacenes; los demás dominios de negocio continúan como entregas posteriores del plan.
 
 ## Versiones fijadas
 
@@ -72,6 +72,8 @@ El shell común vive en `src/app/layout/` e incluye encabezado, menú lateral ad
 El interceptor añade Bearer únicamente cuando el origen de la petición coincide exactamente con `apiBaseUrl`. Excluye login, refresh y logout del token y de la autorrenovación; varias respuestas `401` comparten un solo refresh. Un `401` de esa renovación limpia la memoria y vuelve a `/login`. Logout limpia primero la memoria e intenta revocar el refresh incluso si la API falla.
 
 La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alimenta tanto las rutas como el menú y el guard por roles. Ocultar una opción o redirigir a `/forbidden` sólo mejora la experiencia: **la API siempre es la autoridad y debe volver a autorizar cada petición**.
+
+Los catálogos de productos y almacenes son features lazy. Ambos permiten lectura a los tres roles y reservan alta, edición y baja/desactivación para `ADMIN` e `INVENTORY_MANAGER`. Almacenes usa exclusivamente `page` y `size` del servidor: no ofrece ni simula búsqueda local. Su desactivación requiere confirmación, conserva visible el registro inactivo y presenta de forma segura los conflictos por existencias, reservas o documentos abiertos.
 
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 

@@ -10,7 +10,7 @@ import {
 import { authenticatedGuard, roleGuard } from './core/navigation/session.guards';
 
 const sectionRoutes: Routes = NAVIGATION_SECTIONS.filter(
-  (section) => section.id !== 'products',
+  (section) => !['products', 'warehouses'].includes(section.id),
 ).map(
   (section): Route => ({
     path: section.path,
@@ -49,6 +49,18 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./features/products/products.routes').then(
             ({ PRODUCT_ROUTES }) => PRODUCT_ROUTES,
+          ),
+      },
+      {
+        path: APP_SECTIONS.warehouses.path,
+        canActivate: [roleGuard],
+        data: {
+          [APP_SECTION_DATA_KEY]: APP_SECTIONS.warehouses,
+          [BREADCRUMB_DATA_KEY]: APP_SECTIONS.warehouses.label,
+        },
+        loadChildren: () =>
+          import('./features/warehouses/warehouses.routes').then(
+            ({ WAREHOUSE_ROUTES }) => WAREHOUSE_ROUTES,
           ),
       },
       ...sectionRoutes,

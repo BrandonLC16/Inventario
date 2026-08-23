@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 21 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01 está completada** con la feature lazy de productos, CRUD feliz, filtros y paginación remotos, permisos, pruebas unitarias/de componente y E2E; `warehouses` e `inventory` continúan usando el placeholder común. El siguiente corte independiente disponible es F3-02; F3-03 depende de F3-01 y F3-02.
+El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01 y F3-02 están completadas** con features lazy para productos y almacenes, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E; `inventory` continúa usando el placeholder común. El siguiente corte disponible es F3-03.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -669,7 +669,7 @@ Secuencia recomendada:
 
 ```text
 Fase 2 ✓ ─┬→ F3-01 ✓┐
-          └→ F3-02 ─┴→ F3-03 ─┬→ F3-04 ─┐
+          └→ F3-02 ✓┴→ F3-03 ─┬→ F3-04 ─┐
                                ├→ F3-05 ─┼→ F3-08
                                └→ F3-06 ─┤
 F3-01 + F3-03 ─────────────────→ F3-07 ─┘
@@ -680,7 +680,7 @@ F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 par
 | ID | Entrega | Dependencia | Estado | Evidencia mínima para completar |
 |---|---|---|---|---|
 | `F3-01` | CRUD y búsqueda de productos | Fase 2 | Completado | rutas lazy y adaptador CRUD; filtros/paginación remotos; `minimumStock` sólo en alta; roles probados; 83 unit/component y 18 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
-| `F3-02` | Catálogo de almacenes | Fase 2 | Pendiente | catálogo y mantenimiento por rol, desactivación segura y pruebas aprobadas |
+| `F3-02` | Catálogo de almacenes | Fase 2 | Completado | rutas lazy y adaptador CRUD; paginación remota sólo con `page`/`size`; roles, `404`, código duplicado, `409`, doble envío y responsive probados; 101 unit/component y 23 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-03` | Existencias globales/por almacén | `F3-01`, `F3-02` | Pendiente | saldos conciliados por almacén, paginación remota y estados completos |
 | `F3-04` | Mínimos y activación por almacén | `F3-03` | Pendiente | lectura/edición diferenciada del catálogo y conflictos probados |
 | `F3-05` | Ajustes manuales | `F3-03` | Pendiente | confirmación, una sola petición, reconciliación y rechazos probados |
@@ -709,6 +709,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evide
 **Trabajo esperado.** Codex debe crear `features/warehouses/`, reemplazar `/warehouses` y añadir el detalle o panel necesario para crear, editar y desactivar. Reutiliza `WarehousesService` mediante un adaptador manual, con `page` y `size` del servidor. El formulario refleja código máximo 32, nombre 160, descripción 1000 y estado activo; el servidor normaliza el código. Todos los roles consultan, mientras que sólo gestores modifican. La desactivación exige confirmación y puede recibir `409` si hay stock, reservas u órdenes abiertas; un almacén inactivo permanece identificable y no admite nuevas operaciones.
 
 **Seguimiento.** Se completa cuando la lista y el detalle manejan carga, vacío, error, paginación y estado activo; los gestores pueden crear/editar/desactivar sin doble envío; `SALES` queda en lectura; y las pruebas cubren código duplicado, `404`, conflicto de desactivación, permisos y navegación responsive. No agregues filtros que el endpoint no soporta.
+
+**Evidencia de cierre (23 de agosto de 2026).** La feature lazy quedó disponible en `/warehouses`, `/warehouses/new`, `/warehouses/:id` y `/warehouses/:id/edit`, con adaptador manual y consulta limitada a `page`/`size`. `npm run generate:api:check` confirmó el cliente sincronizado; `npm run check` aprobó formato, lint, 101 pruebas unitarias/de componente, 23 E2E y builds de desarrollo y producción. La regeneración previa del OpenAPI del backend no pudo repetirse porque Docker/Testcontainers no encontró un daemon; no hubo cambios de API y la comprobación del cliente usó el contrato canónico vigente en `target/openapi/inventory-api-v1.json`.
 
 **Pedido sugerido a Codex:**
 

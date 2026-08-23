@@ -1,0 +1,117 @@
+<section class="warehouses-page" aria-labelledby="warehouses-title">
+  <header class="warehouses-header">
+    <div>
+      <p class="warehouses-eyebrow">Ubicaciones</p>
+      <h1 id="warehouses-title" tabindex="-1">Almacenes</h1>
+      <p>
+        Consulta las ubicaciones operativas y su estado. El listado usa paginación del servidor.
+      </p>
+    </div>
+    @if (canManage()) {
+      <a mat-flat-button routerLink="new" [queryParams]="detailQueryParams()">Nuevo almacén</a>
+    }
+  </header>
+
+  @if (feedback(); as message) {
+    <app-operation-feedback
+      tone="success"
+      [message]="message"
+      [dismissible]="true"
+      (dismiss)="feedback.set(null)"
+    />
+  }
+
+  @if (deactivateProblem(); as currentDeactivateProblem) {
+    <app-api-error-message [problem]="currentDeactivateProblem" />
+  }
+
+  @if (loading()) {
+    <app-loading-state label="Cargando almacenes" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (warehouses().length === 0) {
+    <app-empty-state
+      title="No hay almacenes para mostrar"
+      description="Todavía no existen ubicaciones registradas en esta página."
+    />
+  } @else {
+    <div class="warehouse-table-wrap">
+      <table class="warehouse-table">
+        <caption class="visually-hidden">
+          Almacenes de la página actual
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Código</th>
+            <th scope="col">Nombre</th>
+            <th scope="col">Descripción</th>
+            <th scope="col">Estado</th>
+            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (warehouse of warehouses(); track warehouse.id ?? $index) {
+            <tr>
+              <td data-label="Código">{{ warehouse.code ?? '—' }}</td>
+              <td data-label="Nombre">{{ warehouse.name ?? '—' }}</td>
+              <td data-label="Descripción">{{ warehouse.description || 'Sin descripción' }}</td>
+              <td data-label="Estado">
+                <span
+                  class="status-pill"
+                  [class.status-pill--inactive]="warehouse.active === false"
+                >
+                  {{ warehouse.active === false ? 'Inactivo' : 'Activo' }}
+                </span>
+              </td>
+              <td class="warehouse-table__actions">
+                @if (warehouse.id; as id) {
+                  <a mat-button [routerLink]="[id]" [queryParams]="detailQueryParams()">Ver</a>
+                  @if (canManage()) {
+                    <a mat-button [routerLink]="[id, 'edit']" [queryParams]="detailQueryParams()">
+                      Editar
+                    </a>
+                    @if (warehouse.active !== false) {
+                      <button
+                        mat-button
+                        type="button"
+                        [disabled]="deactivatingIds().has(id)"
+                        (click)="requestDeactivate(warehouse)"
+                      >
+                        {{ deactivatingIds().has(id) ? 'Procesando…' : 'Desactivar' }}
+                      </button>
+                    }
+                  }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="warehouse-pagination" aria-label="Paginación de almacenes">
+      <p aria-live="polite">
+        Página {{ (page()?.page ?? query().page) + 1 }} de {{ page()?.totalPages ?? 1 }} ·
+        {{ page()?.totalElements ?? warehouses().length }} almacenes
+      </p>
+      <div>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.first !== false"
+          (click)="goToPage((page()?.page ?? query().page) - 1)"
+        >
+          Anterior
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.last !== false"
+          (click)="goToPage((page()?.page ?? query().page) + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    </nav>
+  }
+</section>
