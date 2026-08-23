@@ -1,4 +1,4 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { DOCUMENT } from '@angular/common';
 import { inject } from '@angular/core';
 import { catchError, switchMap, throwError } from 'rxjs';
@@ -11,6 +11,8 @@ const NON_REFRESHABLE_AUTH_PATHS = new Set([
   '/api/v1/auth/refresh',
   '/api/v1/auth/logout',
 ]);
+
+export const DISABLE_AUTH_REPLAY = new HttpContextToken<boolean>(() => false);
 
 export const sessionInterceptor: HttpInterceptorFn = (request, next) => {
   const runtimeConfig = inject(RuntimeConfigService);
@@ -33,7 +35,12 @@ export const sessionInterceptor: HttpInterceptorFn = (request, next) => {
 
   return next(authenticatedRequest).pipe(
     catchError((error: unknown) => {
-      if (!(error instanceof HttpErrorResponse) || error.status !== 401 || !session.canRefresh()) {
+      if (
+        !(error instanceof HttpErrorResponse) ||
+        error.status !== 401 ||
+        request.context.get(DISABLE_AUTH_REPLAY) ||
+        !session.canRefresh()
+      ) {
         return throwError(() => error);
       }
 

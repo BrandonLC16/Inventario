@@ -125,6 +125,7 @@ async function navigateInSession(
   page: import('@playwright/test').Page,
   path: string,
 ): Promise<void> {
+  await page.waitForFunction(() => window.location.pathname !== '/login');
   await page.evaluate((target) => {
     window.history.pushState({}, '', target);
     window.dispatchEvent(new PopStateEvent('popstate'));

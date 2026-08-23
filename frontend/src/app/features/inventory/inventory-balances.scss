@@ -158,6 +158,11 @@ h1 {
   font-weight: 800;
 }
 
+.inventory-table__actions {
+  text-align: end !important;
+  white-space: nowrap;
+}
+
 .inventory-pagination {
   justify-content: space-between;
   gap: var(--inv-space-4);
@@ -237,5 +242,14 @@ h1 {
     color: var(--inv-color-text-muted);
     font-size: var(--inv-font-size-sm);
     font-weight: 700;
+  }
+
+  .inventory-table__actions {
+    display: flex !important;
+    justify-content: start;
+  }
+
+  .inventory-table__actions::before {
+    content: none !important;
   }
 }

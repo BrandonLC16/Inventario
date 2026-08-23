@@ -16,6 +16,7 @@ import {
   MAIN_WAREHOUSE_ID,
 } from '../../core/api/inventory-api.adapter';
 import { WarehousesApiAdapter } from '../../core/api/warehouses-api.adapter';
+import { SessionService } from '../../core/session/session.service';
 import { InventoryBalances } from './inventory-balances';
 
 describe('InventoryBalances MAIN', () => {
@@ -77,6 +78,9 @@ describe('InventoryBalances MAIN', () => {
     expect(text).toContain('/api/v1/inventory');
     expect(text).toContain('SKU-product-zero');
     expect(text).toContain('Sin movimientos');
+    expect(fixture.nativeElement.querySelectorAll('[aria-label^="Ajustar stock de"]')).toHaveLength(
+      0,
+    );
     const cells = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLTableCellElement>('tbody td'),
     );
@@ -147,8 +151,12 @@ describe('InventoryBalances warehouse isolation', () => {
     fixture.detectChanges();
 
     expect(north.observed).toBe(true);
+    fixture.componentInstance['adjustmentRow'].set(
+      balancePage('north-product', 'warehouse-north', 9, 1, 8).rows[0]!,
+    );
     params.next(convertToParamMap({ id: 'warehouse-south' }));
     expect(north.observed).toBe(false);
+    expect(fixture.componentInstance['adjustmentRow']()).toBeNull();
     expect(inventoryAdapter.listWarehouse).toHaveBeenLastCalledWith('warehouse-south', {
       page: 0,
       size: 20,
@@ -164,6 +172,44 @@ describe('InventoryBalances warehouse isolation', () => {
     expect(fixture.nativeElement.textContent).not.toContain('SKU-north-product');
     expect(fixture.nativeElement.textContent).toContain('warehouse-south');
   });
+
+  it('exposes adjustment only to managers and reconciles the selected row from the API response', async () => {
+    const data = new BehaviorSubject<Data>({ inventoryScope: 'warehouse' });
+    const params = new BehaviorSubject(convertToParamMap({ id: 'warehouse-north' }));
+    const queryParams = new BehaviorSubject(convertToParamMap({}));
+    const page = balancePage('product-a', 'warehouse-north', 8, 3, 5);
+    const inventoryAdapter = {
+      listMain: vi.fn(),
+      listWarehouse: vi.fn(() => of(page)),
+    };
+    const warehousesAdapter = {
+      list: vi.fn(() => of({ content: [], first: true, last: true })),
+      get: vi.fn(() => of({ id: 'warehouse-north', code: 'NORTH', name: 'Norte', active: true })),
+    };
+    await configureComponent(data, params, queryParams, inventoryAdapter, warehousesAdapter, true);
+    const fixture = TestBed.createComponent(InventoryBalances);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    component['openAdjustment'](page.rows[0]!);
+    expect(component['adjustmentRow']()?.balance.quantity).toBe(8);
+
+    component['reconcileAdjustment']({
+      productId: 'product-a',
+      warehouseId: 'warehouse-north',
+      quantity: 6,
+      reservedQuantity: 3,
+      availableQuantity: 3,
+    });
+
+    expect(component['rows']()[0]?.balance).toMatchObject({
+      quantity: 6,
+      reservedQuantity: 3,
+      availableQuantity: 3,
+    });
+    expect(component['adjustmentRow']()).toBeNull();
+    expect(component['adjustmentFeedback']()).toContain('saldo confirmado por Inventory API');
+  });
 });
 
 async function configureComponent(
@@ -172,6 +218,7 @@ async function configureComponent(
   queryParams: BehaviorSubject<ParamMap>,
   inventoryAdapter: unknown,
   warehousesAdapter: unknown,
+  canManage = false,
 ): Promise<void> {
   TestBed.resetTestingModule();
   await TestBed.configureTestingModule({
@@ -189,6 +236,7 @@ async function configureComponent(
       },
       { provide: InventoryApiAdapter, useValue: inventoryAdapter },
       { provide: WarehousesApiAdapter, useValue: warehousesAdapter },
+      { provide: SessionService, useValue: { hasAnyRole: () => canManage } },
     ],
   }).compileComponents();
   vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

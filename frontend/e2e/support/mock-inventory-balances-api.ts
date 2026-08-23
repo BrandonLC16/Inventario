@@ -1,6 +1,6 @@
 import { Page, Route } from '@playwright/test';
 
-import { API_ORIGIN, installMockInventoryApi } from './mock-inventory-api';
+import { API_ORIGIN, installMockInventoryApi, MockInventoryApiState } from './mock-inventory-api';
 
 const MAIN_WAREHOUSE_ID = '00000000-0000-0000-0000-000000000001';
 export const NORTH_WAREHOUSE_ID = '00000000-0000-0000-0000-000000000002';
@@ -23,10 +23,27 @@ export interface MockInventoryBalancesState {
   readonly settingsRequests: () => readonly string[];
 }
 
+export type AdjustmentFailure = 'network' | 400 | 401 | 403 | 429;
+
+export interface MockInventoryBalancesOptions {
+  readonly adjustmentFailure?: AdjustmentFailure;
+}
+
+export interface MockAdjustmentRequest {
+  readonly path: string;
+  readonly body: { readonly quantityDelta: number; readonly reference?: string };
+}
+
+export interface MockInventoryAdjustmentsState
+  extends MockInventoryBalancesState, MockInventoryApiState {
+  readonly adjustmentRequests: () => readonly MockAdjustmentRequest[];
+}
+
 export async function installMockInventoryBalancesApi(
   page: Page,
-): Promise<MockInventoryBalancesState> {
-  await installMockInventoryApi(page);
+  options: MockInventoryBalancesOptions = {},
+): Promise<MockInventoryAdjustmentsState> {
+  const auth = await installMockInventoryApi(page);
   const warehouses: readonly MockWarehouse[] = [
     { id: MAIN_WAREHOUSE_ID, code: 'MAIN', name: 'Almacén principal', active: true },
     { id: NORTH_WAREHOUSE_ID, code: 'NORTH', name: 'Almacén norte', active: true },
@@ -34,13 +51,28 @@ export async function installMockInventoryBalancesApi(
   const products = initialProducts();
   const balanceRequests: string[] = [];
   const settingsRequests: string[] = [];
+  const adjustmentRequests: MockAdjustmentRequest[] = [];
+  const adjustedBalances = new Map<string, number>();
 
   await page.route(`${API_ORIGIN}/api/v1/inventory**`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+    const parts = url.pathname.split('/').filter(Boolean);
     if (request.method() === 'GET' && url.pathname === '/api/v1/inventory') {
       balanceRequests.push(`${url.pathname}${url.search}`);
-      await fulfillBalancePage(route, url, products, MAIN_WAREHOUSE_ID);
+      await fulfillBalancePage(route, url, products, MAIN_WAREHOUSE_ID, adjustedBalances);
+      return;
+    }
+    if (request.method() === 'PATCH' && parts.length === 5 && parts[4] === 'adjustments') {
+      await fulfillAdjustment(
+        route,
+        url.pathname,
+        MAIN_WAREHOUSE_ID,
+        parts[3] ?? '',
+        adjustmentRequests,
+        adjustedBalances,
+        options.adjustmentFailure,
+      );
       return;
     }
     await fulfillJson(route, 405, { code: 'METHOD_NOT_ALLOWED' });
@@ -71,7 +103,25 @@ export async function installMockInventoryBalancesApi(
 
     if (request.method() === 'GET' && parts[4] === 'inventory' && parts.length === 5) {
       balanceRequests.push(`${url.pathname}${url.search}`);
-      await fulfillBalancePage(route, url, products, warehouseId);
+      await fulfillBalancePage(route, url, products, warehouseId, adjustedBalances);
+      return;
+    }
+
+    if (
+      request.method() === 'PATCH' &&
+      parts[4] === 'inventory' &&
+      parts[6] === 'adjustments' &&
+      parts.length === 7
+    ) {
+      await fulfillAdjustment(
+        route,
+        url.pathname,
+        warehouseId,
+        parts[5] ?? '',
+        adjustmentRequests,
+        adjustedBalances,
+        options.adjustmentFailure,
+      );
       return;
     }
 
@@ -103,8 +153,10 @@ export async function installMockInventoryBalancesApi(
   });
 
   return {
+    ...auth,
     balanceRequests: () => balanceRequests,
     settingsRequests: () => settingsRequests,
+    adjustmentRequests: () => adjustmentRequests,
   };
 }
 
@@ -113,6 +165,7 @@ async function fulfillBalancePage(
   url: URL,
   products: readonly MockProduct[],
   warehouseId: string,
+  adjustedBalances: ReadonlyMap<string, number>,
 ): Promise<void> {
   const pageNumber = Number(url.searchParams.get('page') ?? 0);
   const size = Number(url.searchParams.get('size') ?? 20);
@@ -121,7 +174,8 @@ async function fulfillBalancePage(
     ...response,
     content: response.content.map((product, index) => {
       const sequence = pageNumber * size + index + 1;
-      const quantity = warehouseId === MAIN_WAREHOUSE_ID ? sequence - 1 : 100 + sequence;
+      const initialQuantity = warehouseId === MAIN_WAREHOUSE_ID ? sequence - 1 : 100 + sequence;
+      const quantity = adjustedBalances.get(`${warehouseId}:${product.id}`) ?? initialQuantity;
       const reservedQuantity = sequence % 2 === 0 ? 1 : 0;
       return {
         warehouseId,
@@ -132,6 +186,64 @@ async function fulfillBalancePage(
         ...(quantity === 0 ? {} : { updatedAt: '2026-08-23T12:00:00Z' }),
       };
     }),
+  });
+}
+
+async function fulfillAdjustment(
+  route: Route,
+  path: string,
+  warehouseId: string,
+  productId: string,
+  requests: MockAdjustmentRequest[],
+  adjustedBalances: Map<string, number>,
+  failure?: AdjustmentFailure,
+): Promise<void> {
+  const body = route.request().postDataJSON() as MockAdjustmentRequest['body'];
+  requests.push({ path, body });
+  if (failure === 'network') {
+    await route.abort('failed');
+    return;
+  }
+  if (failure) {
+    await route.fulfill({
+      status: failure,
+      contentType: 'application/json',
+      headers:
+        failure === 429
+          ? {
+              'Access-Control-Expose-Headers': 'Retry-After, X-Correlation-ID',
+              'Retry-After': '30',
+              'X-Correlation-ID': 'adjust-429',
+            }
+          : {},
+      body: JSON.stringify({
+        code:
+          failure === 400
+            ? 'INVALID_REQUEST'
+            : failure === 401
+              ? 'AUTHENTICATION_REQUIRED'
+              : failure === 403
+                ? 'ACCESS_DENIED'
+                : 'RATE_LIMIT_EXCEEDED',
+        correlationId: `adjust-${failure}`,
+      }),
+    });
+    return;
+  }
+
+  const key = `${warehouseId}:${productId}`;
+  const sequence = Number(productId.slice(-12));
+  const initialQuantity = warehouseId === MAIN_WAREHOUSE_ID ? sequence - 1 : 100 + sequence;
+  const quantity = (adjustedBalances.get(key) ?? initialQuantity) + body.quantityDelta;
+  const reservedQuantity = sequence % 2 === 0 ? 1 : 0;
+  adjustedBalances.set(key, quantity);
+  await fulfillJson(route, 200, {
+    warehouseId,
+    productId,
+    quantity,
+    reservedQuantity,
+    availableQuantity: quantity - reservedQuantity,
+    updatedAt: '2026-08-23T13:00:00Z',
   });
 }
 

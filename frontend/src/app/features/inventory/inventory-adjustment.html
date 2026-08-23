@@ -1,0 +1,106 @@
+<section class="adjustment" aria-labelledby="adjustment-title">
+  <header class="adjustment__heading">
+    <div>
+      <p class="adjustment__eyebrow">Ajuste manual</p>
+      <h2 id="adjustment-title" #adjustmentTitle tabindex="-1">
+        {{ row().product.sku }} · {{ row().product.name }}
+      </h2>
+      <p>La operación afectará únicamente a {{ locationLabel() }}.</p>
+    </div>
+    <button mat-button type="button" [disabled]="busy()" (click)="cancel()">Cerrar</button>
+  </header>
+
+  <dl class="adjustment__balances" aria-label="Saldo antes del ajuste">
+    <div>
+      <dt>Físicas</dt>
+      <dd>{{ row().balance.quantity }}</dd>
+    </div>
+    <div>
+      <dt>Reservadas</dt>
+      <dd>{{ row().balance.reservedQuantity }}</dd>
+    </div>
+    <div>
+      <dt>Disponibles</dt>
+      <dd>{{ row().balance.availableQuantity }}</dd>
+    </div>
+  </dl>
+
+  @if (localError(); as message) {
+    <app-operation-feedback tone="error" [message]="message" />
+  }
+  @if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" />
+    @if (currentProblem.status === 400 && form.controls.direction.value === 'out') {
+      <p class="adjustment__guidance" role="note">
+        El servidor rechazó la salida. Actualiza los saldos: puede faltar stock disponible o existir
+        una reserva concurrente. No se envió otro ajuste automáticamente.
+      </p>
+    }
+  }
+  @if (uncertainOutcome()) {
+    <p class="adjustment__uncertain" role="alert">
+      La conexión se interrumpió y no es seguro asumir el resultado. Consulta de nuevo el saldo
+      antes de decidir si realizas otro ajuste; esta operación no se reintentará automáticamente.
+    </p>
+  }
+
+  <form class="adjustment-form" [formGroup]="form" (ngSubmit)="requestConfirmation()" novalidate>
+    <mat-form-field appearance="outline">
+      <mat-label>Tipo de movimiento</mat-label>
+      <mat-select formControlName="direction">
+        <mat-option value="in">Entrada</mat-option>
+        <mat-option value="out">Salida</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Cantidad</mat-label>
+      <input
+        matInput
+        type="number"
+        formControlName="quantity"
+        min="1"
+        max="2147483647"
+        step="1"
+        inputmode="numeric"
+      />
+      <mat-hint>Entero mayor que cero; la salida se enviará como delta negativo.</mat-hint>
+      @if (form.controls.quantity.touched && form.controls.quantity.invalid) {
+        <mat-error>Usa un número entero entre 1 y 2147483647.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field class="adjustment-form__wide" appearance="outline">
+      <mat-label>Referencia opcional</mat-label>
+      <input matInput formControlName="reference" maxlength="128" autocomplete="off" />
+      <mat-hint align="end">{{ form.controls.reference.value.length }}/128</mat-hint>
+      @if (form.controls.reference.hasError('maxlength')) {
+        <mat-error>La referencia admite hasta 128 caracteres.</mat-error>
+      } @else if (form.controls.reference.hasError('api')) {
+        <mat-error>{{ form.controls.reference.getError('api') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <aside class="adjustment__preview" aria-live="polite">
+      <strong>Resultado previsto</strong>
+      <span>Delta {{ delta() > 0 ? '+' : '' }}{{ delta() }}</span>
+      <span>{{ projectedPhysical() }} físicas · {{ projectedAvailable() }} disponibles</span>
+      <small>El saldo no cambiará hasta recibir la respuesta de Inventory API.</small>
+    </aside>
+
+    <div class="adjustment-form__actions">
+      <button mat-flat-button type="submit" [disabled]="busy() || retryAfter.blocked()">
+        @if (submitting()) {
+          Aplicando…
+        } @else if (confirming()) {
+          Esperando confirmación…
+        } @else if (retryAfter.blocked()) {
+          Disponible en {{ retryAfter.remainingSeconds() }} s
+        } @else {
+          Revisar y confirmar
+        }
+      </button>
+      <button mat-button type="button" [disabled]="busy()" (click)="cancel()">Cancelar</button>
+    </div>
+  </form>
+</section>

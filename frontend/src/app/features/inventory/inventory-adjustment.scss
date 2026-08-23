@@ -1,0 +1,122 @@
+:host {
+  display: block;
+}
+
+.adjustment {
+  display: grid;
+  gap: var(--inv-space-5);
+  padding: clamp(var(--inv-space-5), 4vw, var(--inv-space-7));
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-lg);
+  background: var(--inv-color-surface);
+  box-shadow: var(--inv-elevation-1);
+}
+
+.adjustment__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--inv-space-4);
+}
+
+.adjustment__eyebrow {
+  margin: 0;
+  color: var(--inv-color-primary);
+  font-size: var(--inv-font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.adjustment h2 {
+  margin: var(--inv-space-2) 0;
+  outline: none;
+}
+
+.adjustment__heading p:last-child,
+.adjustment__preview small {
+  margin: 0;
+  color: var(--inv-color-text-muted);
+}
+
+.adjustment__balances {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--inv-space-3);
+  margin: 0;
+}
+
+.adjustment__balances div,
+.adjustment__preview {
+  padding: var(--inv-space-4);
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-md);
+  background: var(--inv-color-surface-subtle);
+}
+
+.adjustment__balances dt {
+  color: var(--inv-color-text-muted);
+  font-size: var(--inv-font-size-sm);
+  font-weight: 700;
+}
+
+.adjustment__balances dd {
+  margin: var(--inv-space-1) 0 0;
+  font-size: var(--inv-font-size-xl);
+  font-weight: 800;
+}
+
+.adjustment-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--inv-space-4);
+}
+
+.adjustment-form__wide,
+.adjustment__preview,
+.adjustment-form__actions {
+  grid-column: 1 / -1;
+}
+
+.adjustment__preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inv-space-2) var(--inv-space-5);
+  align-items: baseline;
+}
+
+.adjustment__preview small {
+  flex-basis: 100%;
+}
+
+.adjustment__guidance,
+.adjustment__uncertain {
+  margin: 0;
+  padding: var(--inv-space-4);
+  border-inline-start: 0.25rem solid var(--inv-color-warning);
+  background: var(--inv-color-warning-soft);
+}
+
+.adjustment-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inv-space-2);
+}
+
+@media (width < 44rem) {
+  .adjustment__heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .adjustment__balances,
+  .adjustment-form {
+    grid-template-columns: 1fr;
+  }
+
+  .adjustment-form__wide,
+  .adjustment__preview,
+  .adjustment-form__actions {
+    grid-column: auto;
+  }
+}

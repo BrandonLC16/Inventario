@@ -1,5 +1,6 @@
 import {
   HttpClient,
+  HttpContext,
   HttpErrorResponse,
   provideHttpClient,
   withInterceptors,
@@ -12,7 +13,7 @@ import { Configuration } from '../api/generated/configuration';
 import { CurrentUserResponse } from '../api/generated/model/current-user-response';
 import { TokenResponse } from '../api/generated/model/token-response';
 import { RuntimeConfigService } from '../config/runtime-config.service';
-import { sessionInterceptor } from './session.interceptor';
+import { DISABLE_AUTH_REPLAY, sessionInterceptor } from './session.interceptor';
 import { SessionService } from './session.service';
 
 const API_ORIGIN = 'https://api.example.test';
@@ -135,6 +136,30 @@ describe('SessionService and sessionInterceptor', () => {
 
     expect(results.sort()).toEqual(['products', 'warehouses']);
     expect(session.accessToken()).toBe('access-second');
+  });
+
+  it('does not refresh or replay a request explicitly marked as non-idempotent', () => {
+    authenticate();
+    let receivedStatus: number | undefined;
+
+    http
+      .patch(
+        `${API_ORIGIN}/api/v1/inventory/product-a/adjustments`,
+        { quantityDelta: 1 },
+        { context: new HttpContext().set(DISABLE_AUTH_REPLAY, true) },
+      )
+      .subscribe({
+        error: (error: HttpErrorResponse) => {
+          receivedStatus = error.status;
+        },
+      });
+
+    httpTesting
+      .expectOne(`${API_ORIGIN}/api/v1/inventory/product-a/adjustments`)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    expect(receivedStatus).toBe(401);
+    httpTesting.expectNone(`${API_ORIGIN}/api/v1/auth/refresh`);
   });
 
   it('clears memory and releases every waiter when refresh returns 401', async () => {

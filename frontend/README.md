@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes, `F3-03` los saldos de inventario de `MAIN` y por almacén y `F3-04` la configuración de mínimos y activación por almacén; los demás dominios de negocio continúan como entregas posteriores del plan.
+Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes, `F3-03` los saldos de inventario de `MAIN` y por almacén, `F3-04` la configuración de mínimos y activación por almacén y `F3-05` los ajustes manuales; los demás dominios de negocio continúan como entregas posteriores del plan.
 
 ## Versiones fijadas
 
@@ -79,6 +79,8 @@ Los catálogos de productos y almacenes son features lazy. Ambos permiten lectur
 
 `/warehouses/:id/settings` pagina remotamente los mínimos y la activación de cada producto en una ubicación. Los tres roles consultan y sólo `ADMIN` e `INVENTORY_MANAGER` modifican. `InventorySettingResponse.active` pertenece exclusivamente al almacén: el contrato no incluye ahí el estado global del producto, por lo que la pantalla lo consulta sólo al abrir una fila, lo presenta separado y de sólo lectura y enlaza al catálogo; así evita tanto fusionar conceptos como introducir N+1 en el listado. Después de cada `PUT` con `204`, el adaptador vuelve a ejecutar el `GET` individual y sólo entonces reconcilia la fila. Un `409` al desactivar conserva intacto el formulario y muestra orientación sobre stock/reservas junto con la referencia de soporte.
 
+Los gestores pueden iniciar un ajuste manual desde una fila de `/inventory` o `/warehouses/:id/inventory`. Entrada y salida se traducen a un `quantityDelta` entero firmado y no cero; la referencia es opcional y admite 128 caracteres. Antes del envío se confirma ubicación, saldo actual, delta y resultado previsto. `MAIN` usa el alias `/api/v1/inventory/{productId}/adjustments`; los demás almacenes usan su ruta explícita. La mutación se envía una sola vez, queda excluida del replay de autenticación y nunca ofrece reintento automático. La tabla se reconcilia exclusivamente con `InventoryResponse`; ante stock/reservas, red incierta, `401`, `403` o `429`, el formulario conserva el contexto.
+
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 
 ## Manejo común de errores HTTP
@@ -154,7 +156,7 @@ Durante el desarrollo puedes mantenerlas observando cambios:
 npm run test:watch
 ```
 
-Las 66 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
+Las 133 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes, catálogos, saldos, settings, ajustes manuales y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
 
 ```powershell
 npm run e2e

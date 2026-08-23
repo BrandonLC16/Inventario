@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03 y F3-04 están completadas** con features lazy para productos, almacenes, saldos y configuración de inventario, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. Los siguientes cortes disponibles son F3-05 y F3-06.
+El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04 y F3-05 están completadas** con features lazy para productos, almacenes, saldos, configuración y ajustes manuales de inventario, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. El siguiente corte disponible es F3-06.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -670,7 +670,7 @@ Secuencia recomendada:
 ```text
 Fase 2 ✓ ─┬→ F3-01 ✓┐
           └→ F3-02 ✓┴→ F3-03 ✓┬→ F3-04 ✓┐
-                               ├→ F3-05 ─┼→ F3-08
+                               ├→ F3-05 ✓┼→ F3-08
                                └→ F3-06 ─┤
 F3-01 + F3-03 ─────────────────→ F3-07 ─┘
 ```
@@ -683,7 +683,7 @@ F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 par
 | `F3-02` | Catálogo de almacenes | Fase 2 | Completado | rutas lazy y adaptador CRUD; paginación remota sólo con `page`/`size`; roles, `404`, código duplicado, `409`, doble envío y responsive probados; 101 unit/component y 23 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-03` | Existencias globales/por almacén | `F3-01`, `F3-02` | Completado | rutas lazy MAIN/almacén; composición por `productId` con dos llamadas por página y sin N+1; aislamiento, cero/null, obsolescencia, roles y responsive probados; 111 unit/component y 29 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-04` | Mínimos y activación por almacén | `F3-03` | Completado | lectura paginada para los tres roles y edición para gestores; estado global/local separado sin N+1; mínimo, `204` + recarga, `409`, doble envío, aislamiento y accesibilidad probados; 121 unit/component y 35 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
-| `F3-05` | Ajustes manuales | `F3-03` | Pendiente | confirmación, una sola petición, reconciliación y rechazos probados |
+| `F3-05` | Ajustes manuales | `F3-03` | Completado | entrada/salida firmada, rutas MAIN/almacén, confirmación, una sola petición sin replay, reconciliación desde API, rechazos y accesibilidad probados; 133 unit/component y 44 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Pendiente | filtros remotos, trazabilidad completa, permisos y pruebas aprobadas |
 | `F3-07` | Baja de producto protegida | `F3-01`, `F3-03`, `F3-05` | Pendiente | baja exitosa y bloqueos por saldo/reserva/documento representados sin perder estado |
 | `F3-08` | Permisos, concurrencia y doble envío | `F3-01`–`F3-07` | Pendiente | matriz transversal unit/component/E2E y `npm run check` en verde |
@@ -751,6 +751,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evide
 **Trabajo esperado.** Codex debe añadir la acción a la vista del almacén y preferir la ruta explícita `/warehouses/{warehouseId}/inventory/{productId}/adjustments`; el alias `/inventory/{productId}/adjustments` se reserva para `MAIN`. Sólo gestores acceden. El formulario puede presentar Entrada/Salida, pero serializa un `quantityDelta` entero distinto de cero y una `reference` opcional de hasta 128 caracteres. Antes de enviar muestra producto, almacén, saldo físico/reservado/disponible, delta y resultado previsto; bloquea el botón mientras hay petición. La respuesta del servidor, no el cálculo optimista, sustituye el saldo visible. Un `400` por stock reservado o saldo negativo conserva contexto y no deja cambios parciales.
 
 **Seguimiento.** Se completa cuando una confirmación produce exactamente una petición, cancelar no produce ninguna, cambiar de almacén invalida el diálogo abierto y la respuesta reconciliada actualiza saldo y vistas dependientes. Prueba entradas, salidas, cero, referencia límite, saldo insuficiente/reservado, `401`/`403`/`429`, doble clic, fallo de red incierto y ausencia de reintento automático.
+
+**Evidencia de cierre (23 de agosto de 2026).** Los ajustes están disponibles para `ADMIN` e `INVENTORY_MANAGER` desde los saldos de `MAIN` y de cada almacén; `SALES` conserva lectura sin acciones de escritura. El adaptador selecciona el alias de `MAIN` o la ruta explícita del almacén y marca esta mutación como no reproducible tras `401`. Confirmación, doble clic, cancelación, delta no cero, referencia, stock disponible/reservado, cambio de almacén, red incierta, `401`, `403`, `429` y foco/teclado quedan cubiertos. La fila sólo cambia con el `InventoryResponse` recibido. `npm run generate:api:check` confirmó el cliente sincronizado y `npm run check` aprobó formato, lint, 133 pruebas unitarias/de componente, 44 E2E y builds de desarrollo y producción. No se modificaron backend, OpenAPI ni código generado.
 
 **Pedido sugerido a Codex:**
 

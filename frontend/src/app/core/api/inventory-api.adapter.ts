@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { HttpContext } from '@angular/common/http';
 import { Observable, concatMap, forkJoin, map } from 'rxjs';
 
 import { FindAll10RequestParams, InventoryService } from './generated/api/inventory.service';
@@ -11,6 +12,8 @@ import { InventorySettingRequest } from './generated/model/inventory-setting-req
 import { InventorySettingResponse } from './generated/model/inventory-setting-response';
 import { PageResponseInventoryResponse } from './generated/model/page-response-inventory-response';
 import { PageResponseInventorySettingResponse } from './generated/model/page-response-inventory-setting-response';
+import { StockAdjustmentRequest } from './generated/model/stock-adjustment-request';
+import { DISABLE_AUTH_REPLAY } from '../session/session.interceptor';
 
 export const MAIN_WAREHOUSE_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -79,6 +82,26 @@ export class InventoryApiAdapter {
       .pipe(concatMap(() => this.getSetting(warehouseId, productId)));
   }
 
+  adjustStock(
+    warehouseId: string,
+    productId: string,
+    stockAdjustmentRequest: StockAdjustmentRequest,
+  ): Observable<InventoryResponse> {
+    const context = new HttpContext().set(DISABLE_AUTH_REPLAY, true);
+    const response =
+      warehouseId === MAIN_WAREHOUSE_ID
+        ? this.inventoryApi.adjust1({ productId, stockAdjustmentRequest }, 'body', false, {
+            context,
+          })
+        : this.warehouseInventoryApi.adjust(
+            { warehouseId, productId, stockAdjustmentRequest },
+            'body',
+            false,
+            { context },
+          );
+    return response.pipe(map((balance) => this.validateBalance(balance, warehouseId, productId)));
+  }
+
   private composePage(
     warehouseId: string,
     request: FindAll10RequestParams,
@@ -132,7 +155,11 @@ export class InventoryApiAdapter {
     );
   }
 
-  private validateBalance(balance: InventoryResponse, warehouseId: string): void {
+  private validateBalance(
+    balance: InventoryResponse,
+    warehouseId: string,
+    productId?: string,
+  ): InventoryResponse {
     const quantity = balance.quantity;
     const reserved = balance.reservedQuantity;
     const available = balance.availableQuantity;
@@ -140,6 +167,7 @@ export class InventoryApiAdapter {
     if (
       !balance.productId ||
       balance.warehouseId !== warehouseId ||
+      (productId !== undefined && balance.productId !== productId) ||
       !Number.isSafeInteger(quantity) ||
       !Number.isSafeInteger(reserved) ||
       !Number.isSafeInteger(available) ||
@@ -150,6 +178,7 @@ export class InventoryApiAdapter {
     ) {
       throw new Error('Inventory balance is incomplete or inconsistent.');
     }
+    return balance;
   }
 
   private validateSetting(

@@ -27,7 +27,7 @@ test('MAIN is explicit, composes reordered product metadata and pages remotely',
 
   await page.getByRole('button', { name: 'Siguiente' }).click();
   await expect(page).toHaveURL(/page=1/);
-  await expect(page.getByRole('cell', { name: 'SKU-021' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'SKU-021', exact: true })).toBeVisible();
   expect(api.balanceRequests().at(-1)).toBe('/api/v1/inventory?page=1&size=20');
 });
 
@@ -63,7 +63,7 @@ for (const identifier of ['admin', 'inventory', 'sales']) {
     await page.getByRole('link', { name: 'Inventario', exact: true }).click();
 
     await expect(page.getByRole('heading', { name: 'Inventario de MAIN' })).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'SKU-001' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'SKU-001', exact: true })).toBeVisible();
   });
 }
 

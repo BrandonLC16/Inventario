@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { Configuration } from './generated/configuration';
+import { DISABLE_AUTH_REPLAY } from '../session/session.interceptor';
 import {
   InventoryApiAdapter,
   InventoryBalancePage,
@@ -208,6 +209,59 @@ describe('InventoryApiAdapter', () => {
     refresh.flush(product('product-a', 'warehouse-north', 'SKU-A', 'Producto A', 7, false));
 
     expect(result).toMatchObject({ minimumStock: 7, active: false });
+  });
+
+  it('uses the MAIN alias once and reconciles only from its response', () => {
+    let result: unknown;
+    adapter
+      .adjustStock(MAIN_WAREHOUSE_ID, 'product-a', { quantityDelta: -2, reference: ' MERMA ' })
+      .subscribe((balance) => {
+        result = balance;
+      });
+
+    const request = httpTesting.expectOne(
+      'https://api.example.test/api/v1/inventory/product-a/adjustments',
+    );
+    expect(request.request.method).toBe('PATCH');
+    expect(request.request.body).toEqual({ quantityDelta: -2, reference: ' MERMA ' });
+    expect(request.request.context.get(DISABLE_AUTH_REPLAY)).toBe(true);
+    expect(result).toBeUndefined();
+    request.flush(balance('product-a', MAIN_WAREHOUSE_ID, 6, 3, 3));
+
+    expect(result).toMatchObject({ quantity: 6, reservedQuantity: 3, availableQuantity: 3 });
+  });
+
+  it('uses the warehouse route and never retries a failed mutation', () => {
+    let receivedError: unknown;
+    adapter
+      .adjustStock('warehouse-north', 'product-a', { quantityDelta: 4 })
+      .subscribe({ error: (error: unknown) => (receivedError = error) });
+
+    const request = httpTesting.expectOne(
+      'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/product-a/adjustments',
+    );
+    expect(request.request.method).toBe('PATCH');
+    request.flush(null, { status: 0, statusText: 'Network error' });
+
+    expect(receivedError).toBeTruthy();
+    httpTesting.expectNone(
+      'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/product-a/adjustments',
+    );
+  });
+
+  it('rejects an adjustment response from another warehouse or product', () => {
+    let receivedError: unknown;
+    adapter
+      .adjustStock('warehouse-north', 'product-a', { quantityDelta: 1 })
+      .subscribe({ error: (error: unknown) => (receivedError = error) });
+
+    httpTesting
+      .expectOne(
+        'https://api.example.test/api/v1/warehouses/warehouse-north/inventory/product-a/adjustments',
+      )
+      .flush(balance('product-b', 'warehouse-north', 1, 0, 1));
+
+    expect(receivedError).toBeInstanceOf(Error);
   });
 });
 

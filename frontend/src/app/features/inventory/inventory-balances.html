@@ -38,7 +38,7 @@
         <mat-label>Almacén</mat-label>
         <mat-select
           [value]="warehouseId()"
-          [disabled]="warehouseLoading()"
+          [disabled]="warehouseLoading() || adjustmentBusy()"
           (selectionChange)="selectWarehouse($event.value)"
         >
           <mat-option [value]="'00000000-0000-0000-0000-000000000001'">
@@ -60,7 +60,7 @@
         <button
           mat-stroked-button
           type="button"
-          [disabled]="warehouseLoading() || warehousePage()?.first !== false"
+          [disabled]="adjustmentBusy() || warehouseLoading() || warehousePage()?.first !== false"
           (click)="goToWarehousePage(query().warehousePage - 1)"
         >
           Almacenes anteriores
@@ -71,7 +71,7 @@
         <button
           mat-stroked-button
           type="button"
-          [disabled]="warehouseLoading() || warehousePage()?.last !== false"
+          [disabled]="adjustmentBusy() || warehouseLoading() || warehousePage()?.last !== false"
           (click)="goToWarehousePage(query().warehousePage + 1)"
         >
           Más almacenes
@@ -94,6 +94,15 @@
       <dd>Físicas menos reservadas.</dd>
     </div>
   </dl>
+
+  @if (adjustmentFeedback(); as message) {
+    <app-operation-feedback
+      tone="success"
+      [message]="message"
+      [dismissible]="true"
+      (dismiss)="adjustmentFeedback.set(null)"
+    />
+  }
 
   @if (balanceLoading()) {
     <app-loading-state [label]="'Cargando inventario de ' + locationLabel()" />
@@ -125,6 +134,9 @@
             <th scope="col" class="inventory-table__number">Reservadas</th>
             <th scope="col" class="inventory-table__number">Disponibles</th>
             <th scope="col">Último movimiento</th>
+            @if (canManage()) {
+              <th scope="col"><span class="visually-hidden">Acciones</span></th>
+            }
           </tr>
         </thead>
         <tbody>
@@ -153,11 +165,35 @@
                     : 'Sin movimientos'
                 }}
               </td>
+              @if (canManage()) {
+                <td class="inventory-table__actions">
+                  <button
+                    mat-button
+                    type="button"
+                    [disabled]="adjustmentBusy()"
+                    (click)="openAdjustment(row)"
+                  >
+                    Ajustar stock
+                    <span class="visually-hidden"> de {{ row.product.sku }}</span>
+                  </button>
+                </td>
+              }
             </tr>
           }
         </tbody>
       </table>
     </div>
+
+    @if (adjustmentRow(); as selectedAdjustment) {
+      <app-inventory-adjustment
+        [row]="selectedAdjustment"
+        [warehouseId]="warehouseId()"
+        [locationLabel]="locationLabel()"
+        (busyChange)="adjustmentBusy.set($event)"
+        (adjusted)="reconcileAdjustment($event)"
+        (cancelled)="closeAdjustment()"
+      />
+    }
 
     <nav class="inventory-pagination" aria-label="Paginación de saldos de inventario">
       <p aria-live="polite">
@@ -169,7 +205,7 @@
         <button
           mat-stroked-button
           type="button"
-          [disabled]="balancePage()?.response?.first !== false"
+          [disabled]="adjustmentBusy() || balancePage()?.response?.first !== false"
           (click)="goToBalancePage((balancePage()?.response?.page ?? query().page) - 1)"
         >
           Anterior
@@ -177,7 +213,7 @@
         <button
           mat-stroked-button
           type="button"
-          [disabled]="balancePage()?.response?.last !== false"
+          [disabled]="adjustmentBusy() || balancePage()?.response?.last !== false"
           (click)="goToBalancePage((balancePage()?.response?.page ?? query().page) + 1)"
         >
           Siguiente
