@@ -1,0 +1,188 @@
+<section class="inventory-page" aria-labelledby="inventory-title">
+  <header class="inventory-header">
+    <div>
+      <p class="inventory-eyebrow">Existencias</p>
+      <h1 id="inventory-title" tabindex="-1">
+        {{ mainAlias() ? 'Inventario de MAIN' : 'Inventario por almacén' }}
+      </h1>
+      <p>Consulta saldos físicos, reservados y disponibles de {{ locationLabel() }}.</p>
+    </div>
+    @if (!mainAlias()) {
+      <a mat-stroked-button [routerLink]="['/warehouses', warehouseId()]">Ver almacén</a>
+    }
+  </header>
+
+  @if (mainAlias()) {
+    <aside class="main-alias-note" aria-label="Alcance del inventario MAIN">
+      <strong>MAIN es un almacén, no un total multi-almacén.</strong>
+      <span>
+        <code>/api/v1/inventory</code> es un alias compatible que consulta únicamente MAIN.
+      </span>
+    </aside>
+  }
+
+  <section class="warehouse-selector" aria-labelledby="warehouse-selector-title">
+    <div>
+      <h2 id="warehouse-selector-title">Seleccionar ubicación</h2>
+      <p>Cambiar de almacén vuelve a consultar sus saldos; no mezcla ubicaciones.</p>
+    </div>
+
+    @if (warehouseProblem(); as currentWarehouseProblem) {
+      <app-api-error-message
+        [problem]="currentWarehouseProblem"
+        [retryAllowed]="true"
+        (retry)="retryWarehouses()"
+      />
+    } @else {
+      <mat-form-field appearance="outline">
+        <mat-label>Almacén</mat-label>
+        <mat-select
+          [value]="warehouseId()"
+          [disabled]="warehouseLoading()"
+          (selectionChange)="selectWarehouse($event.value)"
+        >
+          <mat-option [value]="'00000000-0000-0000-0000-000000000001'">
+            MAIN · almacén compatible
+          </mat-option>
+          @for (warehouse of warehouseOptions(); track warehouse.id) {
+            <mat-option [value]="warehouse.id">
+              {{ warehouse.code ?? 'Sin código' }} · {{ warehouse.name ?? 'Sin nombre' }}
+              {{ warehouse.active === false ? '(inactivo)' : '' }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (warehouseLoading()) {
+          <mat-hint>Cargando ubicaciones…</mat-hint>
+        }
+      </mat-form-field>
+
+      <nav class="warehouse-selector__pagination" aria-label="Paginación del selector de almacén">
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="warehouseLoading() || warehousePage()?.first !== false"
+          (click)="goToWarehousePage(query().warehousePage - 1)"
+        >
+          Almacenes anteriores
+        </button>
+        <span aria-live="polite"
+          >Página {{ (warehousePage()?.page ?? query().warehousePage) + 1 }}</span
+        >
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="warehouseLoading() || warehousePage()?.last !== false"
+          (click)="goToWarehousePage(query().warehousePage + 1)"
+        >
+          Más almacenes
+        </button>
+      </nav>
+    }
+  </section>
+
+  <dl class="balance-legend" aria-label="Definiciones de existencias">
+    <div>
+      <dt>Físicas</dt>
+      <dd>Unidades presentes en el almacén.</dd>
+    </div>
+    <div>
+      <dt>Reservadas</dt>
+      <dd>Unidades comprometidas por pedidos.</dd>
+    </div>
+    <div>
+      <dt>Disponibles</dt>
+      <dd>Físicas menos reservadas.</dd>
+    </div>
+  </dl>
+
+  @if (balanceLoading()) {
+    <app-loading-state [label]="'Cargando inventario de ' + locationLabel()" />
+  } @else if (balanceProblem(); as currentBalanceProblem) {
+    <app-api-error-message
+      [problem]="currentBalanceProblem"
+      [retryAllowed]="true"
+      (retry)="retryBalances()"
+    />
+  } @else if (rows().length === 0) {
+    <app-empty-state
+      title="No hay productos para mostrar"
+      [description]="'No existen saldos visibles en ' + locationLabel() + ' para esta página.'"
+    />
+  } @else {
+    <div class="inventory-table-wrap">
+      <table class="inventory-table">
+        <caption class="visually-hidden">
+          Saldos de productos en
+          {{
+            locationLabel()
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">SKU</th>
+            <th scope="col">Producto</th>
+            <th scope="col" class="inventory-table__number">Físicas</th>
+            <th scope="col" class="inventory-table__number">Reservadas</th>
+            <th scope="col" class="inventory-table__number">Disponibles</th>
+            <th scope="col">Último movimiento</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.balance.productId) {
+            <tr>
+              <td data-label="SKU">{{ row.product.sku }}</td>
+              <td data-label="Producto">
+                <a [routerLink]="['/products', row.balance.productId]">{{ row.product.name }}</a>
+              </td>
+              <td data-label="Físicas" class="inventory-table__number">
+                {{ row.balance.quantity }}
+              </td>
+              <td data-label="Reservadas" class="inventory-table__number">
+                {{ row.balance.reservedQuantity }}
+              </td>
+              <td
+                data-label="Disponibles"
+                class="inventory-table__number inventory-table__available"
+              >
+                {{ row.balance.availableQuantity }}
+              </td>
+              <td data-label="Último movimiento">
+                {{
+                  row.balance.updatedAt
+                    ? (row.balance.updatedAt | date: 'medium')
+                    : 'Sin movimientos'
+                }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="inventory-pagination" aria-label="Paginación de saldos de inventario">
+      <p aria-live="polite">
+        Página {{ (balancePage()?.response?.page ?? query().page) + 1 }} de
+        {{ balancePage()?.response?.totalPages ?? 1 }} ·
+        {{ balancePage()?.response?.totalElements ?? rows().length }} productos
+      </p>
+      <div>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="balancePage()?.response?.first !== false"
+          (click)="goToBalancePage((balancePage()?.response?.page ?? query().page) - 1)"
+        >
+          Anterior
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="balancePage()?.response?.last !== false"
+          (click)="goToBalancePage((balancePage()?.response?.page ?? query().page) + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    </nav>
+  }
+</section>

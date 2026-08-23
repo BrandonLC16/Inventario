@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01 y F3-02 están completadas** con features lazy para productos y almacenes, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E; `inventory` continúa usando el placeholder común. El siguiente corte disponible es F3-03.
+El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02 y F3-03 están completadas** con features lazy para productos, almacenes y saldos de inventario, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. Los siguientes cortes disponibles son F3-04, F3-05 y F3-06.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -669,7 +669,7 @@ Secuencia recomendada:
 
 ```text
 Fase 2 ✓ ─┬→ F3-01 ✓┐
-          └→ F3-02 ✓┴→ F3-03 ─┬→ F3-04 ─┐
+          └→ F3-02 ✓┴→ F3-03 ✓┬→ F3-04 ─┐
                                ├→ F3-05 ─┼→ F3-08
                                └→ F3-06 ─┤
 F3-01 + F3-03 ─────────────────→ F3-07 ─┘
@@ -681,7 +681,7 @@ F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 par
 |---|---|---|---|---|
 | `F3-01` | CRUD y búsqueda de productos | Fase 2 | Completado | rutas lazy y adaptador CRUD; filtros/paginación remotos; `minimumStock` sólo en alta; roles probados; 83 unit/component y 18 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-02` | Catálogo de almacenes | Fase 2 | Completado | rutas lazy y adaptador CRUD; paginación remota sólo con `page`/`size`; roles, `404`, código duplicado, `409`, doble envío y responsive probados; 101 unit/component y 23 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
-| `F3-03` | Existencias globales/por almacén | `F3-01`, `F3-02` | Pendiente | saldos conciliados por almacén, paginación remota y estados completos |
+| `F3-03` | Existencias globales/por almacén | `F3-01`, `F3-02` | Completado | rutas lazy MAIN/almacén; composición por `productId` con dos llamadas por página y sin N+1; aislamiento, cero/null, obsolescencia, roles y responsive probados; 111 unit/component y 29 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-04` | Mínimos y activación por almacén | `F3-03` | Pendiente | lectura/edición diferenciada del catálogo y conflictos probados |
 | `F3-05` | Ajustes manuales | `F3-03` | Pendiente | confirmación, una sola petición, reconciliación y rechazos probados |
 | `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Pendiente | filtros remotos, trazabilidad completa, permisos y pruebas aprobadas |
@@ -723,6 +723,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evide
 **Trabajo esperado.** Codex debe crear `features/inventory/`, adaptadores manuales y rutas para la vista de `MAIN` y `/warehouses/:id/inventory`. Muestra `quantity`, `reservedQuantity`, `availableQuantity` y `updatedAt`; conserva `available = physical - reserved` y representa `updatedAt=null` como producto aún sin movimientos. Los nombres/SKU deben componerse por `productId` sin una petición por fila y sin suponer que dos páginas tienen el mismo orden; si el contrato actual no permite una composición correcta y eficiente, detén la entrega y documenta la brecha. Todos los roles pueden consultar. Usa paginación remota, selector de almacén y enlaces a producto/configuración según permisos.
 
 **Seguimiento.** Se completa cuando cambiar de almacén nunca conserva saldos de la ubicación anterior, `MAIN` se etiqueta como alias de compatibilidad y no como total global, los tres tipos de existencia son comprensibles y la UI cubre cero, carga, vacío, error, recarga y paginación. Las pruebas deben demostrar aislamiento por almacén, unión por ID, cancelación de respuestas obsoletas y acceso de los tres roles.
+
+**Evidencia de cierre (23 de agosto de 2026).** `/inventory` identifica explícitamente a `MAIN` como almacén y alias compatible, mientras `/warehouses/:id/inventory` conserva el aislamiento de la ubicación seleccionada. Cada página une `InventoryResponse` con `InventorySettingResponse` mediante `productId`, valida cardinalidad/almacén/cantidades y usa exactamente dos peticiones independientemente del número de filas. El selector pagina almacenes remotamente. `npm run generate:api:check` confirmó el cliente sincronizado y `npm run check` aprobó formato, lint, 111 pruebas unitarias/de componente, 29 E2E y builds de desarrollo y producción. No se modificaron backend, OpenAPI ni código generado.
 
 **Pedido sugerido a Codex:**
 

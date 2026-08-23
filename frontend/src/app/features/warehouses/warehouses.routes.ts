@@ -37,6 +37,16 @@ export const WAREHOUSE_ROUTES: Routes = [
     loadComponent: () => import('./warehouse-form').then(({ WarehouseForm }) => WarehouseForm),
   },
   {
+    path: ':id/inventory',
+    title: 'Inventario del almacén | Inventario',
+    data: {
+      [BREADCRUMB_DATA_KEY]: 'Inventario',
+      inventoryScope: 'warehouse',
+    },
+    loadComponent: () =>
+      import('../inventory/inventory-balances').then(({ InventoryBalances }) => InventoryBalances),
+  },
+  {
     path: ':id',
     title: 'Detalle de almacén | Inventario',
     data: { [BREADCRUMB_DATA_KEY]: 'Detalle' },

@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos y `F3-02` el catálogo de almacenes; los demás dominios de negocio continúan como entregas posteriores del plan.
+Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes y `F3-03` los saldos de inventario de `MAIN` y por almacén; los demás dominios de negocio continúan como entregas posteriores del plan.
 
 ## Versiones fijadas
 
@@ -74,6 +74,8 @@ El interceptor añade Bearer únicamente cuando el origen de la petición coinci
 La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alimenta tanto las rutas como el menú y el guard por roles. Ocultar una opción o redirigir a `/forbidden` sólo mejora la experiencia: **la API siempre es la autoridad y debe volver a autorizar cada petición**.
 
 Los catálogos de productos y almacenes son features lazy. Ambos permiten lectura a los tres roles y reservan alta, edición y baja/desactivación para `ADMIN` e `INVENTORY_MANAGER`. Almacenes usa exclusivamente `page` y `size` del servidor: no ofrece ni simula búsqueda local. Su desactivación requiere confirmación, conserva visible el registro inactivo y presenta de forma segura los conflictos por existencias, reservas o documentos abiertos.
+
+`/inventory` muestra exclusivamente los saldos del almacén determinista `MAIN`; es un alias compatible de la API y nunca representa un total multi-almacén. `/warehouses/:id/inventory` consulta una ubicación concreta. Ambas vistas muestran existencias físicas, reservadas y disponibles con paginación remota. Cada página combina saldos con `sku`/`name` desde los settings del mismo almacén mediante `productId`: son dos peticiones por página, no una petición por fila, y cualquier diferencia de almacén, cardinalidad o IDs se rechaza como respuesta inconsistente.
 
 Con teclado, el enlace inicial salta al contenido, abrir el menú móvil mueve el foco a su primer enlace, `Escape` lo cierra y devuelve el foco al botón, y cada navegación enfoca el encabezado principal de la nueva vista.
 
