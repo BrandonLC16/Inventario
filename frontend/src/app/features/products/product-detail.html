@@ -20,7 +20,10 @@
   }
 
   @if (deleteProblem(); as currentDeleteProblem) {
-    <app-api-error-message [problem]="currentDeleteProblem" />
+    <app-product-delete-problem
+      [problem]="currentDeleteProblem"
+      [productId]="product()?.id ?? ''"
+    />
   }
 
   @if (loading()) {
@@ -35,7 +38,7 @@
           <h2>{{ currentProduct.name ?? 'Producto sin nombre' }}</h2>
         </div>
         <span class="status-pill" [class.status-pill--inactive]="currentProduct.active === false">
-          {{ currentProduct.active === false ? 'Inactivo' : 'Activo' }}
+          {{ currentProduct.active === false ? 'Suspendido' : 'Activo' }}
         </span>
       </div>
       <dl class="product-details">

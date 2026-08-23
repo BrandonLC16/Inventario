@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04, F3-05 y F3-06 están completadas** con features lazy para productos, almacenes, saldos, configuración, ajustes, alertas y Kardex, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. El siguiente corte disponible es F3-07.
+El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04, F3-05, F3-06 y F3-07 están completadas** con features lazy para productos, almacenes, saldos, configuración, ajustes, alertas y Kardex, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. El siguiente corte disponible es F3-08.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -672,7 +672,7 @@ Fase 2 ✓ ─┬→ F3-01 ✓┐
           └→ F3-02 ✓┴→ F3-03 ✓┬→ F3-04 ✓┐
                                ├→ F3-05 ✓┼→ F3-08
                                └→ F3-06 ✓┤
-F3-01 + F3-03 ─────────────────→ F3-07 ─┘
+F3-01 + F3-03 ─────────────────→ F3-07 ✓┘
 ```
 
 F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 parten de la vista multi-almacén de F3-03. Las pruebas se escriben durante cada entrega; F3-08 agrega los escenarios transversales y decide el cierre de la fase.
@@ -685,7 +685,7 @@ F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 par
 | `F3-04` | Mínimos y activación por almacén | `F3-03` | Completado | lectura paginada para los tres roles y edición para gestores; estado global/local separado sin N+1; mínimo, `204` + recarga, `409`, doble envío, aislamiento y accesibilidad probados; 121 unit/component y 35 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-05` | Ajustes manuales | `F3-03` | Completado | entrada/salida firmada, rutas MAIN/almacén, confirmación, una sola petición sin replay, reconciliación desde API, rechazos y accesibilidad probados; 133 unit/component y 44 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Completado | rutas lazy MAIN/almacén para gestores; filtros y paginación remotos en URL; reposición, efectos físicos/reservados, obsolescencia y producto eliminado sin N+1 probados; 149 unit/component y 49 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
-| `F3-07` | Baja de producto protegida | `F3-01`, `F3-03`, `F3-05` | Pendiente | baja exitosa y bloqueos por saldo/reserva/documento representados sin perder estado |
+| `F3-07` | Baja de producto protegida | `F3-01`, `F3-03`, `F3-05` | Completado | suspensión y baja separadas; confirmación terminal; `204` + recarga y trazabilidad; tres bloqueos `409`, correlation ID, permisos y doble clic probados; 155 unit/component y 52 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-08` | Permisos, concurrencia y doble envío | `F3-01`–`F3-07` | Pendiente | matriz transversal unit/component/E2E y `npm run check` en verde |
 
 Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evidencia mínima por los resultados reales al cerrar cada entrega. Si falta una comprobación, existe una prueba inestable o el contrato no alcanza para implementar el comportamiento sin llamadas por fila, la entrega no está completa: documenta el bloqueo antes de proponer un cambio de API.
@@ -779,6 +779,8 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evide
 **Trabajo esperado.** Codex debe mostrar una confirmación reforzada que explique que la baja es terminal para la operación, identificar el producto y no sugerir que libera el SKU. Antes de confirmar puede mostrar los saldos ya cargados, pero no decide localmente si la baja es válida: la API conserva la autoridad. En éxito `204`, refresca catálogo y navegación. En `409`, mantiene el producto visible, muestra los posibles bloqueos conocidos —saldo, reserva u operación pendiente— sin afirmar cuál fue si el código no lo distingue, conserva correlation ID y ofrece rutas seguras para revisar inventario/Kardex. Nunca analiza el texto variable del backend para tomar decisiones.
 
 **Seguimiento.** Se completa con baja exitosa de producto sin dependencias y conflictos representados para existencia, reserva y documento pendiente. Las pruebas verifican que `active=false` sigue visible/editable según rol, que una baja exitosa desaparece de vistas operativas sin perder el acceso histórico permitido, que un conflicto no elimina la fila y que clics repetidos producen una sola petición.
+
+**Evidencia de cierre (23 de agosto de 2026).** La suspensión reversible se presenta como “Suspendido” y permanece editable; la baja lógica se identifica como terminal, no libera el SKU y conserva un enlace al Kardex por `productId`. El adaptador sólo confirma éxito con el `204` contratado y entonces la lista se vuelve a consultar, sin eliminación optimista. Los tres bloqueos reales del backend siguen compartiendo `409/CONFLICT`: la UI ignora sus mensajes variables, mantiene el producto y muestra una explicación de causas posibles, correlation ID y enlaces de revisión. El bloqueo comienza al abrir la confirmación para impedir dos diálogos o dos peticiones. `npm run generate:api:check` confirmó el cliente sincronizado y `npm run check` aprobó formato, lint, 155 pruebas unitarias/de componente, 52 E2E y builds de desarrollo y producción. No se modificaron backend, OpenAPI ni código generado.
 
 **Pedido sugerido a Codex:**
 

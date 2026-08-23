@@ -1,6 +1,6 @@
 # FrontEnd de Inventario
 
-Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes, `F3-03` los saldos de inventario de `MAIN` y por almacén, `F3-04` la configuración de mínimos y activación por almacén, `F3-05` los ajustes manuales y `F3-06` las alertas y el Kardex; los demás dominios de negocio continúan como entregas posteriores del plan.
+Cliente standalone Angular de Inventory API. `F2-01`–`F2-08` establecieron la fundación, la sesión no persistente, el cliente generado, el sistema visual y las comprobaciones reproducibles. `F3-01` incorporó el catálogo de productos, `F3-02` el catálogo de almacenes, `F3-03` los saldos de inventario de `MAIN` y por almacén, `F3-04` la configuración de mínimos y activación por almacén, `F3-05` los ajustes manuales, `F3-06` las alertas y el Kardex y `F3-07` la baja lógica protegida de productos; los demás dominios de negocio continúan como entregas posteriores del plan.
 
 ## Versiones fijadas
 
@@ -73,7 +73,7 @@ El interceptor añade Bearer únicamente cuando el origen de la petición coinci
 
 La matriz canónica está en `src/app/core/navigation/app-navigation.ts` y alimenta tanto las rutas como el menú y el guard por roles. Ocultar una opción o redirigir a `/forbidden` sólo mejora la experiencia: **la API siempre es la autoridad y debe volver a autorizar cada petición**.
 
-Los catálogos de productos y almacenes son features lazy. Ambos permiten lectura a los tres roles y reservan alta, edición y baja/desactivación para `ADMIN` e `INVENTORY_MANAGER`. Almacenes usa exclusivamente `page` y `size` del servidor: no ofrece ni simula búsqueda local. Su desactivación requiere confirmación, conserva visible el registro inactivo y presenta de forma segura los conflictos por existencias, reservas o documentos abiertos.
+Los catálogos de productos y almacenes son features lazy. Ambos permiten lectura a los tres roles y reservan alta, edición y baja/desactivación para `ADMIN` e `INVENTORY_MANAGER`. En productos, `active=false` significa suspensión reversible y no baja: el registro sigue visible y editable. La baja lógica es terminal para el catálogo operativo, no libera el SKU y sólo se reconcilia tras el `204` de la API; conserva el ID como acceso al Kardex histórico. Un `409` nunca se interpreta por su mensaje: mantiene el producto, muestra correlation ID, enumera únicamente causas posibles y enlaza a inventario, almacenes y Kardex para revisión. Almacenes usa exclusivamente `page` y `size` del servidor: no ofrece ni simula búsqueda local. Su desactivación requiere confirmación, conserva visible el registro inactivo y presenta de forma segura los conflictos por existencias, reservas o documentos abiertos.
 
 `/inventory` muestra exclusivamente los saldos del almacén determinista `MAIN`; es un alias compatible de la API y nunca representa un total multi-almacén. `/warehouses/:id/inventory` consulta una ubicación concreta. Ambas vistas muestran existencias físicas, reservadas y disponibles con paginación remota. Cada página combina saldos con `sku`/`name` desde los settings del mismo almacén mediante `productId`: son dos peticiones por página, no una petición por fila, y cualquier diferencia de almacén, cardinalidad o IDs se rechaza como respuesta inconsistente.
 
@@ -158,13 +158,13 @@ Durante el desarrollo puedes mantenerlas observando cambios:
 npm run test:watch
 ```
 
-Las 149 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes, catálogos, saldos, settings, ajustes manuales, alertas, Kardex y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
+Las 155 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes, catálogos, saldos, settings, ajustes manuales, alertas, Kardex, baja lógica y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
 
 ```powershell
 npm run e2e
 ```
 
-Los 14 escenarios E2E cubren visitante, login y `/me`, menú y rutas de los tres roles, ausencia de persistencia y recarga, refresh rechazado, logout degradado, `403`, `409`, `429` con reloj controlado, correlation ID copiable, navegación por teclado y viewport móvil de `390×844`. Las respuestas difíciles se interceptan con datos inequívocamente sintéticos y nunca contienen secretos reales.
+Los 52 escenarios E2E cubren visitante, login y `/me`, menú y rutas de los tres roles, ausencia de persistencia y recarga, refresh rechazado, logout degradado, `403`, `409`, `429` con reloj controlado, correlation ID copiable, catálogos e inventario multi-almacén, baja lógica, navegación por teclado y viewport móvil de `390×844`. Las respuestas difíciles se interceptan con datos inequívocamente sintéticos y nunca contienen secretos reales.
 
 La integración controlada con la Inventory API real se conserva en las pruebas de backend basadas en PostgreSQL/Testcontainers, incluida `SecuritySessionIntegrationTest`, y el mismo workflow de CI las ejecuta junto con la comprobación del cliente OpenAPI. Los E2E no necesitan una base compartida ni credenciales versionadas, por lo que son deterministas y reproducibles localmente.
 

@@ -3,8 +3,10 @@ import { expect, test } from '@playwright/test';
 import { login } from './support/mock-inventory-api';
 import { installMockProductsApi } from './support/mock-products-api';
 
-test('ADMIN filters, pages and completes product create, edit and delete', async ({ page }) => {
-  const api = await installMockProductsApi(page);
+test('ADMIN filters, pages and completes product create, suspension and logical deletion once', async ({
+  page,
+}) => {
+  const api = await installMockProductsApi(page, {}, { deleteDelayMs: 100 });
   await page.goto('/login');
   await login(page, 'admin');
   await page.getByRole('link', { name: 'Productos' }).click();
@@ -42,17 +44,85 @@ test('ADMIN filters, pages and completes product create, edit and delete', async
   await expect(page.getByRole('heading', { name: 'Editar producto' })).toBeFocused();
   await expect(page.getByLabel('Stock mínimo inicial en MAIN')).toHaveCount(0);
   await page.getByLabel('Nombre').fill('Producto actualizado');
+  await page.getByLabel('Producto activo (desmarcar sólo lo suspende; no lo da de baja)').uncheck();
   await page.getByRole('button', { name: 'Guardar producto' }).click();
   await expect(
     page.getByText('Los cambios del producto se guardaron correctamente.'),
   ).toBeVisible();
   expect(api.updateBodies().at(-1)).not.toHaveProperty('minimumStock');
+  expect(api.updateBodies().at(-1)).toMatchObject({ active: false });
+  await expect(page.getByText('Suspendido', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Editar producto' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Dar de baja' }).click();
+  await page.getByRole('button', { name: 'Dar de baja' }).evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
+  });
+  await expect(page.getByRole('dialog')).toHaveCount(1);
+  await expect(page.getByRole('dialog')).toContainText('no libera el SKU');
+  await expect(page.getByRole('dialog')).toContainText('active=false');
   await page.getByRole('dialog').getByRole('button', { name: 'Dar de baja' }).click();
-  await expect(page.getByText('El producto se dio de baja correctamente.')).toBeVisible();
+  await expect(page.getByText('El producto se dio de baja lógica correctamente.')).toBeVisible();
+  await expect(page.getByText('ID histórico:')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Consultar Kardex histórico' })).toHaveAttribute(
+    'href',
+    /productId=/,
+  );
   expect(api.deleteRequests()).toBe(1);
 });
+
+for (const conflict of [
+  {
+    caseName: 'stock físico',
+    message: 'A product with physical inventory cannot be deleted',
+    correlationId: 'delete-stock-e2e',
+  },
+  {
+    caseName: 'reservas',
+    message: 'A product with inventory reservations cannot be deleted',
+    correlationId: 'delete-reservation-e2e',
+  },
+  {
+    caseName: 'documentos pendientes',
+    message: 'A product used by pending operations cannot be deleted',
+    correlationId: 'delete-document-e2e',
+  },
+]) {
+  test(`a ${conflict.caseName} conflict keeps the product and renders only generic review guidance`, async ({
+    page,
+  }) => {
+    const api = await installMockProductsApi(
+      page,
+      {},
+      {
+        deleteConflict: conflict,
+      },
+    );
+    await page.goto('/login');
+    await login(page, 'inventory');
+    await page.getByRole('link', { name: 'Productos' }).click();
+
+    const firstRow = page.getByRole('row').nth(1);
+    await firstRow.getByRole('button', { name: 'Dar de baja' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Dar de baja' }).click();
+
+    await expect(page.getByRole('alert')).toContainText('La operación entra en conflicto');
+    await expect(page.getByText('El producto se conserva')).toBeVisible();
+    await expect(
+      page.getByText('Puede existir stock físico, una reserva o un documento pendiente'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Referencia para soporte')).toHaveValue(conflict.correlationId);
+    await expect(page.getByText(conflict.message)).toHaveCount(0);
+    await expect(firstRow.getByRole('cell', { name: 'SKU-001' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Revisar inventario MAIN' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Revisar otros almacenes' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Revisar Kardex por ID' })).toHaveAttribute(
+      'href',
+      /productId=/,
+    );
+    expect(api.deleteRequests()).toBe(1);
+  });
+}
 
 test('duplicate SKU renders the stable conflict and a support reference', async ({ page }) => {
   await installMockProductsApi(page);

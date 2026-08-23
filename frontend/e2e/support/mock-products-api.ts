@@ -19,9 +19,18 @@ export interface MockProductsApiState {
   readonly deleteRequests: () => number;
 }
 
+export interface MockProductsBehavior {
+  readonly deleteConflict?: {
+    readonly message: string;
+    readonly correlationId: string;
+  };
+  readonly deleteDelayMs?: number;
+}
+
 export async function installMockProductsApi(
   page: Page,
   authOptions: MockInventoryApiOptions = {},
+  behavior: MockProductsBehavior = {},
 ): Promise<MockProductsApiState> {
   await installMockInventoryApi(page, authOptions);
   let products = initialProducts();
@@ -121,6 +130,17 @@ export async function installMockProductsApi(
 
     if (request.method() === 'DELETE' && id) {
       deleteRequests += 1;
+      if (behavior.deleteDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, behavior.deleteDelayMs));
+      }
+      if (behavior.deleteConflict) {
+        await fulfillJson(route, 409, {
+          code: 'CONFLICT',
+          message: behavior.deleteConflict.message,
+          correlationId: behavior.deleteConflict.correlationId,
+        });
+        return;
+      }
       products = products.filter((candidate) => candidate.id !== id);
       await route.fulfill({ status: 204 });
       return;

@@ -107,7 +107,9 @@
         </mat-form-field>
       }
 
-      <mat-checkbox formControlName="active">Producto activo</mat-checkbox>
+      <mat-checkbox formControlName="active">
+        Producto activo (desmarcar sólo lo suspende; no lo da de baja)
+      </mat-checkbox>
 
       <div class="product-form__actions">
         <button mat-flat-button type="submit" [disabled]="submitting()">

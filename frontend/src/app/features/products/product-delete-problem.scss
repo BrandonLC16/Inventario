@@ -1,0 +1,24 @@
+:host {
+  display: grid;
+  gap: var(--inv-space-3);
+}
+
+.product-delete-review {
+  padding: var(--inv-space-4);
+  border: 1px solid var(--inv-color-border);
+  border-inline-start: 0.25rem solid var(--inv-color-warning);
+  border-radius: var(--inv-radius-md);
+  background: var(--inv-color-warning-soft);
+}
+
+h2,
+p {
+  margin-block-start: 0;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inv-space-3);
+  margin-block-start: var(--inv-space-3);
+}

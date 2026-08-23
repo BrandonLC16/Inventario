@@ -35,6 +35,7 @@ import {
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { LoadingState } from '../../shared/loading-state/loading-state';
 import { OperationFeedback } from '../../shared/operation-feedback/operation-feedback';
+import { ProductDeleteProblem } from './product-delete-problem';
 import {
   ProductListQuery,
   productApiRequest,
@@ -62,6 +63,7 @@ type ProductLoadResult =
     EmptyState,
     LoadingState,
     OperationFeedback,
+    ProductDeleteProblem,
   ],
   templateUrl: './products-list.html',
   styleUrl: './products.scss',
@@ -81,10 +83,16 @@ export class ProductsList {
   protected readonly page = signal<PageResponseProductResponse | null>(null);
   protected readonly problem = signal<ApiProblem | null>(null);
   protected readonly deleteProblem = signal<ApiProblem | null>(null);
+  protected readonly deleteProblemProductId = signal<string | null>(null);
   protected readonly deletingIds = signal<ReadonlySet<string>>(new Set());
   protected readonly feedback = signal<string | null>(
     this.route.snapshot.queryParamMap.get('result') === 'deleted'
-      ? 'El producto se dio de baja correctamente.'
+      ? 'El producto se dio de baja lógica correctamente.'
+      : null,
+  );
+  protected readonly deletedProductId = signal(
+    this.route.snapshot.queryParamMap.get('result') === 'deleted'
+      ? this.route.snapshot.queryParamMap.get('deletedProductId')
       : null,
   );
   protected readonly query = signal(productListQuery(this.route.snapshot.queryParamMap));
@@ -187,12 +195,13 @@ export class ProductsList {
     }
 
     const data: ConfirmationDialogData = {
-      title: 'Dar de baja el producto',
-      message: `Se dará de baja ${product.name ?? product.sku ?? 'el producto seleccionado'}.`,
+      title: 'Dar de baja lógica el producto',
+      message: this.deleteConfirmationMessage(product),
       confirmLabel: 'Dar de baja',
       destructive: true,
     };
 
+    this.setDeleting(product.id, true);
     this.dialog
       .open(ConfirmationDialog, { data })
       .afterClosed()
@@ -200,7 +209,7 @@ export class ProductsList {
         filter((confirmed): confirmed is true => confirmed === true),
         tap(() => {
           this.deleteProblem.set(null);
-          this.setDeleting(product.id!, true);
+          this.deleteProblemProductId.set(null);
         }),
         switchMap(() => this.productsApi.delete(product.id!)),
         finalize(() => this.setDeleting(product.id!, false)),
@@ -208,11 +217,20 @@ export class ProductsList {
       )
       .subscribe({
         next: () => {
-          this.feedback.set('El producto se dio de baja correctamente.');
+          this.feedback.set('El producto se dio de baja lógica correctamente.');
+          this.deletedProductId.set(product.id!);
           this.reloadRequests.next();
         },
-        error: (error: unknown) => this.deleteProblem.set(this.apiErrors.from(error)),
+        error: (error: unknown) => {
+          this.deleteProblemProductId.set(product.id!);
+          this.deleteProblem.set(this.apiErrors.from(error));
+        },
       });
+  }
+
+  private deleteConfirmationMessage(product: ProductResponse): string {
+    const identity = `${product.name ?? 'Producto sin nombre'} · SKU ${product.sku ?? 'sin SKU'} · ID ${product.id}`;
+    return `${identity}. La baja lógica es terminal para el catálogo operativo, no libera el SKU y no equivale a suspender el producto con active=false. La API validará stock, reservas y documentos pendientes. El Kardex histórico se conserva.`;
   }
 
   private setDeleting(id: string, deleting: boolean): void {

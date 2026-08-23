@@ -18,6 +18,7 @@ import {
 } from '../../shared/confirmation-dialog/confirmation-dialog';
 import { LoadingState } from '../../shared/loading-state/loading-state';
 import { OperationFeedback } from '../../shared/operation-feedback/operation-feedback';
+import { ProductDeleteProblem } from './product-delete-problem';
 import { productListQuery, productQueryParams } from './product-query';
 
 type ProductDetailResult =
@@ -35,6 +36,7 @@ type ProductDetailResult =
     ApiErrorMessage,
     LoadingState,
     OperationFeedback,
+    ProductDeleteProblem,
   ],
   templateUrl: './product-detail.html',
   styleUrl: './products.scss',
@@ -103,19 +105,19 @@ export class ProductDetail {
     }
 
     const data: ConfirmationDialogData = {
-      title: 'Dar de baja el producto',
-      message: `Se dará de baja ${current.name ?? current.sku ?? 'el producto seleccionado'}.`,
+      title: 'Dar de baja lógica el producto',
+      message: `${current.name ?? 'Producto sin nombre'} · SKU ${current.sku ?? 'sin SKU'} · ID ${current.id}. La baja lógica es terminal para el catálogo operativo, no libera el SKU y no equivale a suspender el producto con active=false. La API validará stock, reservas y documentos pendientes. El Kardex histórico se conserva.`,
       confirmLabel: 'Dar de baja',
       destructive: true,
     };
 
+    this.deleting.set(true);
     this.dialog
       .open(ConfirmationDialog, { data })
       .afterClosed()
       .pipe(
         filter((confirmed): confirmed is true => confirmed === true),
         tap(() => {
-          this.deleting.set(true);
           this.deleteProblem.set(null);
         }),
         switchMap(() => this.productsApi.delete(current.id!)),
@@ -125,7 +127,11 @@ export class ProductDetail {
       .subscribe({
         next: () =>
           void this.router.navigate(['/products'], {
-            queryParams: { ...this.listQueryParams, result: 'deleted' },
+            queryParams: {
+              ...this.listQueryParams,
+              result: 'deleted',
+              deletedProductId: current.id,
+            },
           }),
         error: (error: unknown) => this.deleteProblem.set(this.apiErrors.from(error)),
       });

@@ -19,8 +19,26 @@
     />
   }
 
+  @if (deletedProductId(); as historicalProductId) {
+    <aside class="product-deletion-trace" aria-label="Trazabilidad de la baja lógica">
+      <p>
+        <strong>ID histórico:</strong> <code>{{ historicalProductId }}</code
+        >. El SKU permanece reservado y los movimientos anteriores siguen disponibles.
+      </p>
+      <a
+        mat-stroked-button
+        routerLink="/inventory/kardex"
+        [queryParams]="{ productId: historicalProductId }"
+      >
+        Consultar Kardex histórico
+      </a>
+    </aside>
+  }
+
   @if (deleteProblem(); as currentDeleteProblem) {
-    <app-api-error-message [problem]="currentDeleteProblem" />
+    @if (deleteProblemProductId(); as productId) {
+      <app-product-delete-problem [problem]="currentDeleteProblem" [productId]="productId" />
+    }
   }
 
   <form class="product-filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
@@ -37,7 +55,7 @@
       <mat-select formControlName="active">
         <mat-option value="">Todos</mat-option>
         <mat-option value="true">Activos</mat-option>
-        <mat-option value="false">Inactivos</mat-option>
+        <mat-option value="false">Suspendidos</mat-option>
       </mat-select>
     </mat-form-field>
     <div class="product-filters__actions">
@@ -80,7 +98,7 @@
               <td data-label="Precio">{{ product.price ?? 0 | currency: 'MXN' }}</td>
               <td data-label="Estado">
                 <span class="status-pill" [class.status-pill--inactive]="product.active === false">
-                  {{ product.active === false ? 'Inactivo' : 'Activo' }}
+                  {{ product.active === false ? 'Suspendido' : 'Activo' }}
                 </span>
               </td>
               <td class="product-table__actions">

@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { map } from 'rxjs';
 
 import { FindAll4RequestParams, ProductsService } from './generated/api/products.service';
 import { ProductRequest } from './generated/model/product-request';
@@ -24,6 +25,12 @@ export class ProductsApiAdapter {
   }
 
   delete(id: string) {
-    return this.productsApi._delete({ id });
+    return this.productsApi._delete({ id }, 'response').pipe(
+      map((response) => {
+        if (response.status !== 204) {
+          throw new Error(`Unexpected product deletion status: ${response.status}`);
+        }
+      }),
+    );
   }
 }

@@ -98,4 +98,25 @@ describe('ProductsApiAdapter', () => {
     expect(deleteRequest.request.method).toBe('DELETE');
     deleteRequest.flush(null, { status: 204, statusText: 'No Content' });
   });
+
+  it('only reconciles a deletion when the generated operation returns the contracted 204', () => {
+    const id = 'f6a621b4-37a2-4952-b5ef-2809ea628f54';
+    let completed = false;
+    let failure: unknown;
+
+    adapter.delete(id).subscribe({
+      next: () => {
+        completed = true;
+      },
+      error: (error: unknown) => {
+        failure = error;
+      },
+    });
+
+    const request = httpTesting.expectOne(`https://api.example.test/api/v1/products/${id}`);
+    request.flush({}, { status: 200, statusText: 'OK' });
+
+    expect(completed).toBe(false);
+    expect(failure).toEqual(new Error('Unexpected product deletion status: 200'));
+  });
 });
