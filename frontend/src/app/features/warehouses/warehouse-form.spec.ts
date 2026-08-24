@@ -51,6 +51,7 @@ describe('WarehouseForm create', () => {
 
   it('uses generated types, leaves code normalization to the server and prevents double submit', () => {
     const component = fixture.componentInstance;
+    const router = TestBed.inject(Router);
     component['form'].setValue({
       code: ' north ',
       name: ' Almacén norte ',
@@ -68,6 +69,11 @@ describe('WarehouseForm create', () => {
       description: 'Centro norte',
       active: true,
     } satisfies WarehouseRequest);
+
+    createResult.next({ id: 'warehouse-from-api', code: 'NORTH', name: 'Almacén norte' });
+    expect(router.navigate).toHaveBeenCalledWith(['/warehouses', 'warehouse-from-api'], {
+      queryParams: { page: 2, size: 25, result: 'created' },
+    });
   });
 
   it('maps a duplicate code conflict without exposing variable server text', () => {
@@ -118,6 +124,7 @@ describe('WarehouseForm edit', () => {
     const fixture = TestBed.createComponent(WarehouseForm);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    const router = TestBed.inject(Router);
     component['form'].patchValue({ active: false });
 
     component['submit']();
@@ -129,6 +136,11 @@ describe('WarehouseForm edit', () => {
       code: 'MAIN',
       name: 'Principal',
       active: false,
+    });
+
+    updateResult.next({ id: 'warehouse-from-api', code: 'MAIN', name: 'Principal', active: false });
+    expect(router.navigate).toHaveBeenCalledWith(['/warehouses', 'warehouse-from-api'], {
+      queryParams: { page: 2, size: 25, result: 'updated' },
     });
   });
 

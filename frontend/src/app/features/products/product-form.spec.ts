@@ -52,6 +52,7 @@ describe('ProductForm create', () => {
 
   it('sends minimumStock only on creation and prevents double submit', () => {
     const component = fixture.componentInstance;
+    const router = TestBed.inject(Router);
     component['form'].setValue({
       sku: ' sku-main ',
       name: ' Producto ',
@@ -73,6 +74,11 @@ describe('ProductForm create', () => {
       active: true,
       minimumStock: 7,
     } satisfies ProductRequest);
+
+    createResult.next({ id: 'product-from-api', sku: 'SKU-MAIN', name: 'Producto' });
+    expect(router.navigate).toHaveBeenCalledWith(['/products', 'product-from-api'], {
+      queryParams: { page: 2, sku: 'ABC', result: 'created' },
+    });
   });
 
   it('maps a duplicate SKU conflict without exposing variable server text', () => {
@@ -105,7 +111,7 @@ describe('ProductForm create', () => {
 });
 
 describe('ProductForm edit', () => {
-  it('loads generated product data and never includes minimumStock in update', async () => {
+  it('loads generated data, prevents duplicate edit and reconciles from the API response', async () => {
     const updateResult = new Subject<ProductResponse>();
     const adapter = {
       create: vi.fn(),
@@ -122,8 +128,10 @@ describe('ProductForm edit', () => {
     const fixture = TestBed.createComponent(ProductForm);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+    const router = TestBed.inject(Router);
     component['form'].patchValue({ name: 'Editado', minimumStock: 99 });
 
+    component['submit']();
     component['submit']();
 
     expect(adapter.get).toHaveBeenCalledWith('product-1');
@@ -132,6 +140,11 @@ describe('ProductForm edit', () => {
     expect(request.name).toBe('Editado');
     expect(request).not.toHaveProperty('minimumStock');
     expect(fixture.nativeElement.textContent).not.toContain('Stock mínimo inicial');
+
+    updateResult.next({ id: 'product-from-api', sku: 'SKU-1', name: 'Servidor', active: true });
+    expect(router.navigate).toHaveBeenCalledWith(['/products', 'product-from-api'], {
+      queryParams: { page: 2, sku: 'ABC', result: 'updated' },
+    });
   });
 
   it('renders an incomplete load as a recoverable API state', async () => {
