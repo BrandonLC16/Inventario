@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 23 de agosto de 2026 la Fase 2 está completada y verificada. El FrontEnd ya dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04, F3-05, F3-06 y F3-07 están completadas** con features lazy para productos, almacenes, saldos, configuración, ajustes, alertas y Kardex, adaptadores manuales sobre el cliente generado, paginación remota, permisos y pruebas unitarias/de componente y E2E. El siguiente corte disponible es F3-08.
+El 24 de agosto de 2026 las Fases 2 y 3 están completadas y verificadas. El FrontEnd dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04, F3-05, F3-06, F3-07 y F3-08 están completadas** con features lazy para productos, almacenes, saldos, configuración, ajustes, alertas y Kardex, adaptadores manuales sobre el cliente generado, paginación remota, permisos, pruebas unitarias/de componente y E2E, y QA visual aprobada en escritorio y móvil. La siguiente entrega disponible es F4-01.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -670,7 +670,7 @@ Secuencia recomendada:
 ```text
 Fase 2 ✓ ─┬→ F3-01 ✓┐
           └→ F3-02 ✓┴→ F3-03 ✓┬→ F3-04 ✓┐
-                               ├→ F3-05 ✓┼→ F3-08
+                               ├→ F3-05 ✓┼→ F3-08 ✓
                                └→ F3-06 ✓┤
 F3-01 + F3-03 ─────────────────→ F3-07 ✓┘
 ```
@@ -686,7 +686,7 @@ F3-01 y F3-02 son independientes después de la Fase 2. F3-04, F3-05 y F3-06 par
 | `F3-05` | Ajustes manuales | `F3-03` | Completado | entrada/salida firmada, rutas MAIN/almacén, confirmación, una sola petición sin replay, reconciliación desde API, rechazos y accesibilidad probados; 133 unit/component y 44 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-06` | Alertas y Kardex | `F3-03`, `F3-04` | Completado | rutas lazy MAIN/almacén para gestores; filtros y paginación remotos en URL; reposición, efectos físicos/reservados, obsolescencia y producto eliminado sin N+1 probados; 149 unit/component y 49 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
 | `F3-07` | Baja de producto protegida | `F3-01`, `F3-03`, `F3-05` | Completado | suspensión y baja separadas; confirmación terminal; `204` + recarga y trazabilidad; tres bloqueos `409`, correlation ID, permisos y doble clic probados; 155 unit/component y 52 E2E aprobadas; cliente sincronizado y `npm run check` en verde |
-| `F3-08` | Permisos, concurrencia y doble envío | `F3-01`–`F3-07` | Bloqueado | matriz en `docs/qa/F3-08-phase-3-matrix.md`; instalación limpia, cliente sincronizado, 155 unit/component, 52 E2E, 181 backend y SpotBugs en verde; falta QA visual porque no hay navegador conectado |
+| `F3-08` | Permisos, concurrencia y doble envío | `F3-01`–`F3-07` | Completado | matriz en `docs/qa/F3-08-phase-3-matrix.md`; instalación limpia, cliente sincronizado, 156 unit/component, 54 E2E, 181 backend y SpotBugs en verde; fechas localizadas, scroll/foco y QA visual `1440×900`/`390×844` aprobados |
 
 Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evidencia mínima por los resultados reales al cerrar cada entrega. Si falta una comprobación, existe una prueba inestable o el contrato no alcanza para implementar el comportamiento sin llamadas por fila, la entrega no está completa: documenta el bloqueo antes de proponer un cambio de API.
 
@@ -794,7 +794,7 @@ Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y reemplaza la evide
 
 **Seguimiento.** Se completa cuando la matriz de aceptación registra cada rol y operación, no hay pruebas omitidas o inestables, el cliente generado permanece sincronizado y pasan `npm ci`, `npm run generate:api:check`, `npm run check`, las pruebas backend de productos/inventario/almacenes y SpotBugs. Registra conteos, builds, budgets y cualquier QA visual manual; sólo entonces marca la Fase 3 completa.
 
-**Verificación parcial (23 de agosto de 2026).** La matriz transversal quedó registrada en `docs/qa/F3-08-phase-3-matrix.md` y se reforzaron las pruebas de alta/edición de productos y almacenes para demostrar doble envío y navegación con el ID devuelto por la API. `npm ci` y `npm run generate:api:check` aprobaron; `npm run check` pasó formato, lint, 155 pruebas unitarias/de componente, 52 E2E y builds de desarrollo y producción sin advertencias de budget. La prueba OpenAPI aprobó con PostgreSQL 17.5 y las 16 migraciones; `mvn verify` pasó 181 pruebas y SpotBugs no encontró hallazgos. F3-08 permanece bloqueada únicamente porque esta sesión no dispone de un navegador conectado para la QA visual manual de escritorio y móvil.
+**Evidencia de cierre (23 y 24 de agosto de 2026).** La matriz transversal quedó registrada en `docs/qa/F3-08-phase-3-matrix.md` y se reforzaron las pruebas de alta/edición de productos y almacenes para demostrar doble envío y navegación con el ID devuelto por la API. `npm ci` y `npm run generate:api:check` aprobaron. La prueba OpenAPI aprobó con PostgreSQL 17.5 y las 16 migraciones; `mvn verify` pasó 181 pruebas y SpotBugs no encontró hallazgos. La QA visual inicial en `1440×900` y `390×844` detectó fechas en inglés (`F3-08-V01`) y scroll conservado detrás del header fijo (`F3-08-V02`); ambos se corrigieron con locale global `es-MX` y restauración de scroll del router. `npm run check` posterior aprobó formato, lint, 156 pruebas unitarias/de componente, 54 E2E y builds sin advertencias de budget. La repetición manual en el navegador integrado confirmó `20 ago 2026` en detalles de producto/almacén, último movimiento y Kardex en ambos viewports; las navegaciones restauraron `scrollY=0`, enfocaron el título y lo mantuvieron visible debajo del encabezado fijo. No se detectaron overflow horizontal, errores ni advertencias de consola. `F3-08` y la Fase 3 están completadas.
 
 **Pedido sugerido a Codex:**
 
@@ -820,6 +820,130 @@ Un responsable administra productos y existencias multi-almacén sin utilizar Sw
 - Recepciones parciales/totales con referencia externa.
 - Tratamiento visual de reintento idempotente: `201` nuevo y `200` ya existente.
 - Validación de pendientes, costos, cantidades y almacén destino.
+- Pruebas de permisos, idempotencia, concurrencia, doble envío y conciliación.
+
+#### Cómo empezar y dar seguimiento con Codex
+
+El 24 de agosto de 2026 las entregas `F3-01`–`F3-08` y la Fase 3 están completadas. Las comprobaciones automatizadas permanecen en verde y la repetición visual manual en escritorio y móvil confirmó las correcciones de locale, restauración de scroll, foco, responsive y consola. Como las Fases 2 y 3 ya satisfacen las dependencias de la Fase 4, **el siguiente cambio disponible es F4-01**, el catálogo de proveedores; no se debe adelantar ninguna entrega posterior.
+
+El listado original de actividades contenía siete puntos operativos. Para obtener ocho entregas verificables y evitar que las pruebas queden implícitas, se añade como octavo punto el cierre transversal de permisos, idempotencia, concurrencia, doble envío y conciliación. Solicita a Codex una entrega por vez; cada pedido debe nombrar el contrato, los roles, las transiciones permitidas, los estados de UI y las verificaciones. Antes de editar, Codex debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, README, controllers, DTOs, services y pruebas existentes.
+
+Secuencia recomendada:
+
+```text
+F3-08 ✓ → F4-01 → F4-02 → F4-03 → F4-04 → F4-05 → F4-06 → F4-07 → F4-08
+```
+
+F4-01 y F4-02 construyen el directorio de abastecimiento; F4-03 y F4-04 completan el documento antes de recibir; F4-05 crea recepciones; F4-06 hace explícita su idempotencia; F4-07 endurece validaciones y F4-08 decide el cierre. Las pruebas correspondientes se escriben dentro de cada entrega y F4-08 sólo agrega la cobertura transversal.
+
+| ID | Entrega | Dependencia | Estado | Evidencia mínima para completar |
+|---|---|---|---|---|
+| `F4-01` | CRUD y filtros de proveedores | `F3-08` completada | Pendiente | rutas lazy, filtros/paginación, normalización, roles y pruebas aprobadas |
+| `F4-02` | Asociaciones proveedor-producto | `F4-01` | Pendiente | asociación paginada sin N+1, preferencia/costos y conflictos probados |
+| `F4-03` | Captura y edición de órdenes `DRAFT` | `F4-01`, `F4-02` | Pendiente | borrador conciliado, renglones únicos, totales y doble envío probados |
+| `F4-04` | Emisión, cancelación e historial | `F4-03` | Pendiente | transiciones y filtros por estado con confirmación y pruebas aprobadas |
+| `F4-05` | Recepciones parciales/totales | `F4-04` | Pendiente | pendientes, referencia externa, historial y conciliación de stock probados |
+| `F4-06` | Reintento idempotente `201`/`200` | `F4-05` | Pendiente | estado HTTP conservado, reintento exacto y `409` diferente probados |
+| `F4-07` | Validación integral de la compra | `F4-03`–`F4-06` | Pendiente | cantidades/costos/destino/transiciones y respuestas obsoletas cubiertos |
+| `F4-08` | Permisos, concurrencia y conciliación | `F4-01`–`F4-07` | Pendiente | matriz unit/component/E2E/backend, QA visual y checks completos en verde |
+
+Actualiza `Estado` a `En curso`, `Bloqueado` o `Completado` y sustituye la evidencia mínima por comandos, conteos y resultados reales. Un `build` exitoso no basta: las mutaciones deben reconciliarse con la respuesta del servidor, las recepciones deben demostrar que no duplican stock y la QA visual de cada entrega debe quedar cerrada.
+
+##### F4-01 — CRUD y filtros de proveedores
+
+**Qué resuelve.** Sustituye el placeholder de `/suppliers` por el directorio que alimentará órdenes y asociaciones. Todas las rutas de proveedores requieren `ADMIN` o `INVENTORY_MANAGER`; `SALES` no tiene acceso de lectura ni escritura.
+
+**Trabajo esperado.** Codex debe crear `features/suppliers/` con rutas lazy para lista, alta, detalle y edición; añadir un adaptador manual sobre `SuppliersService`; e implementar paginación remota y filtros combinables `code`, `name`, `fiscalIdentifier` y `active`. El formulario refleja el contrato: código obligatorio de 32, razón social obligatoria de 160, nombre comercial opcional de 160, identificador fiscal opcional de 32, email válido de 254, teléfono de 32 y estado. El servidor normaliza código/fiscal a mayúsculas y email a minúsculas y exige unicidad de código, fiscal y email cuando existen. La desactivación es lógica, responde `204`, limpia preferencias asociadas y evita usar al proveedor en nuevas órdenes; no borra su historial.
+
+**Seguimiento.** Se completa cuando filtros y página permanecen en URL, consultas anteriores no sobrescriben las nuevas, ambos roles autorizados completan alta/edición/desactivación sin doble envío y `SALES` es rechazado antes de red. Prueba carga, vacío, error, validación, `404`, los tres conflictos de unicidad, confirmación, `204` + recarga, teclado y móvil.
+
+**Pedido sugerido a Codex:**
+
+> Cuando `F3-08` esté completada, implementa únicamente `F4-01`. Lee `AGENTS.md`, la Fase 4 y el contrato real de proveedores. Sustituye el placeholder por una feature lazy con listado, alta, detalle, edición y desactivación; usa un adaptador manual y tipos generados. Implementa filtros/paginación remotos, estados completos, normalización visible y acceso exclusivo de `ADMIN`/`INVENTORY_MANAGER`. Cubre unicidad, `404`, `204`, doble envío y accesibilidad. No cambies backend, generado ni dependencias. Ejecuta sincronización OpenAPI, pruebas y `npm run check` y reporta evidencia.
+
+##### F4-02 — Asociaciones proveedor-producto, SKU y último costo
+
+**Qué resuelve.** Modela cómo cada proveedor abastece productos mediante SKU propio, tiempo de entrega, mínimo de compra, último costo y preferencia. Desactivar al proveedor o la asociación no elimina el registro histórico.
+
+**Trabajo esperado.** Codex debe integrar en `/suppliers/:id` el listado paginado de asociaciones y un formulario para `supplierSku` de 64, `leadTimeDays >= 0`, `minimumOrderQuantity > 0`, `lastUnitCost` opcional no negativo con cuatro decimales, `preferred` y `active`. `preferred=true` exige asociación activa y sólo puede existir un proveedor preferido por producto; la API resuelve la competencia y puede responder `409`. `PUT` crea o reemplaza y `DELETE` desactiva con `204`. Compón nombres/SKU del catálogo por `productId` sin llamadas por fila; no supongas que desactivar el proveedor elimina asociaciones, aunque sí limpia sus preferencias.
+
+**Seguimiento.** Se completa cuando alta/edición/desactivación se reconcilian con API, una asociación inactiva sigue visible, producto inexistente/inactivo y preferido duplicado se presentan sin analizar mensajes variables, y el listado conserva página. Prueba cero en lead time/costo, mínimo positivo, cuatro decimales, preferido inactivo, `404`, `409`, doble envío, ausencia de N+1 y roles.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F4-02` dentro del detalle de proveedor. Usa `SuppliersService` mediante adaptador manual para listar, crear/reemplazar y desactivar asociaciones; compón productos por ID sin N+1. Valida SKU del proveedor, lead time, mínimo, costo de cuatro decimales, activo y preferido; la API decide el único preferido y sus conflictos. Conserva asociaciones inactivas y reconcilia `PUT`/`204` sin optimismo. Añade pruebas de límites, `404`, `409`, doble envío, roles y accesibilidad y ejecuta `npm run check`.
+
+##### F4-03 — Captura y edición de órdenes `DRAFT`
+
+**Qué resuelve.** Permite crear el documento de compra antes de comprometerlo. Sólo un borrador admite reemplazar artículos o cambiar almacén destino; proveedor, moneda y referencia del proveedor quedan fijados por el contrato de creación y no deben aparecer como editables después.
+
+**Trabajo esperado.** Codex debe crear `features/purchases/` y rutas lazy `/purchase-orders`, `/purchase-orders/new` y `/purchase-orders/:id`; añadir adaptador manual y construir un formulario de renglones. La creación requiere proveedor activo, almacén activo, moneda ISO de tres letras, referencia opcional de 128 y entre 1 y 100 productos activos sin duplicados. Cada línea admite SKU proveedor de 64, cantidad entre 1 y 10,000 y costo no negativo con cuatro decimales. Puede precargar SKU/costo desde F4-02, pero los valores enviados son snapshots editables y el total/subtotales definitivos provienen de `PurchaseOrderResponse`. `PUT /items` reemplaza el conjunto y opcionalmente el destino sólo en `DRAFT`.
+
+**Seguimiento.** Se completa cuando crear navega con el ID devuelto, editar conserva identidad/moneda/proveedor/referencia como sólo lectura, añadir/eliminar/reordenar líneas no duplica productos y una sola acción genera una petición. Prueba proveedor/almacén/producto inactivo, moneda, 0/10,001, 101 líneas, costo/decimales, duplicados, total del servidor, `409`, respuestas obsoletas y responsive.
+
+**Pedido sugerido a Codex:**
+
+> Implementa exclusivamente `F4-03`. Crea lista inicial, alta y detalle editable de órdenes `DRAFT` usando el cliente generado mediante adaptador. Valida proveedor/almacén activos, moneda de tres letras, 1–100 productos únicos, cantidades 1–10,000 y costos de cuatro decimales. Permite cambiar sólo artículos y destino después de crear; conserva snapshots y usa totales de la respuesta API. Prevén doble envío y N+1. Añade pruebas unitarias/de componente y E2E y ejecuta sincronización del cliente y `npm run check`.
+
+##### F4-04 — Emisión, cancelación e historial
+
+**Qué resuelve.** Representa el ciclo `DRAFT → ISSUED → PARTIALLY_RECEIVED → RECEIVED`, con cancelación permitida únicamente desde borrador o emitida sin recepciones. Evita mostrar acciones incompatibles con el estado actual.
+
+**Trabajo esperado.** Codex debe completar el listado con filtros remotos `status`, `from`, `to`, `supplierId`, `destinationWarehouseId`, `folio`, `page` y `size`, y validar el rango inclusivo sobre `createdAt`. El detalle muestra folio, estado, actores/fechas, renglones, recibido, pendiente, costos y total. Emitir y cancelar requieren confirmación, bloqueo de doble envío y reconciliación desde `PurchaseOrderResponse`. Repetir emisión sobre una orden ya emitida/recibida o cancelación sobre una ya cancelada devuelve el estado actual; cancelar con cualquier recepción responde `409`. El historial documental conserva creación, emisión y cancelación; el historial de recepciones se completa en F4-05.
+
+**Seguimiento.** Se completa cuando filtros permanecen en URL, las acciones se derivan del estado pero la API sigue siendo autoridad, un cambio concurrente se refleja tras recargar y los estados terminales no ofrecen mutaciones inválidas. Prueba cada transición, reenvío de issue/cancel, cancelación con recepción, rango de fechas, `404`, `409`, `429`, doble clic, roles y navegación accesible.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F4-04`. Completa listado, filtros y detalle del ciclo de compra; muestra únicamente emisión/cancelación compatibles, pero deja la decisión final a la API. Usa confirmaciones, una petición por acción y reconciliación desde la respuesta. Cubre estados DRAFT/ISSUED/PARTIALLY_RECEIVED/RECEIVED/CANCELLED, repeticiones, cancelación con recepción, fechas, 404/409/429 y respuestas concurrentes. Añade pruebas y ejecuta `npm run check` sin modificar backend.
+
+##### F4-05 — Recepciones parciales o totales con referencia externa
+
+**Qué resuelve.** Registra la entrada real en el almacén destino y actualiza pendientes, estado, Kardex y, opcionalmente, último costo de asociaciones existentes dentro de una sola transacción. Sólo órdenes `ISSUED` o `PARTIALLY_RECEIVED` admiten recepción.
+
+**Trabajo esperado.** Codex debe crear el formulario desde los renglones pendientes de la orden. Requiere `externalReference` de hasta 128 caracteres, entre 1 y 100 `purchaseOrderItemId` únicos, cantidades entre 1 y 10,000 sin exceder pendiente y costo no negativo con cuatro decimales. El almacén se muestra como destino fijo de la orden. `updateSupplierProductLastCost` debe explicar que sólo actualiza asociaciones existentes y nunca cambia precio de venta ni crea asociaciones. La UI permite recepción parcial o total, confirma producto/cantidad/costo/destino y no actualiza saldo, pendientes o estado de forma optimista. Tras éxito recarga orden, historial de recepciones e inventario/Kardex relacionado.
+
+**Seguimiento.** Se completa cuando una recepción parcial conserva pendientes, la última lleva a `RECEIVED`, el historial muestra folio, referencia, almacén, actor, fecha y costos, y cualquier fallo multiartículo deja la UI sin éxito parcial. Prueba artículo ajeno/duplicado, cantidad superior a pendiente, costo, máximo de líneas, orden no emitida, destino fijo, actualización opcional de costo, fallo/timeout y doble envío.
+
+**Pedido sugerido a Codex:**
+
+> Implementa únicamente `F4-05`. Añade recepciones parciales/totales desde el detalle de una orden emitida, usando renglones pendientes y destino inmutable. Valida referencia externa, IDs únicos, cantidades/costos y máximo de 100 líneas; explica la bandera de último costo. No hagas actualizaciones optimistas ni reintentos automáticos: tras respuesta concilia orden, historial e inventario/Kardex. Añade pruebas de parcial/total, rollback visible, pendientes, destino, doble envío y accesibilidad. Ejecuta sincronización y `npm run check`.
+
+##### F4-06 — Tratamiento visual del reintento idempotente `201`/`200`
+
+**Qué resuelve.** Distingue una recepción creada ahora de una recepción previamente procesada sin duplicar inventario. El cuerpo puede ser igual en ambos casos; la diferencia fiable es el estado HTTP.
+
+**Trabajo esperado.** El adaptador manual debe invocar el cliente generado observando la respuesta HTTP completa y devolver un resultado tipado: `201` significa creada y `200` significa reintento exacto ya existente. Nunca infiere el resultado por texto, folio o cuerpo. La misma referencia, líneas, cantidades, costos y bandera de actualización devuelve `200`; cambiar cualquier parte devuelve `409`. Ante red incierta, no hay reintento automático: conserva en memoria el payload exacto y ofrece una acción explícita para reenviarlo sin edición. Tanto `201` como `200` disparan la misma reconciliación, pero muestran mensajes diferentes; `409` conserva correlation ID y no presenta éxito.
+
+**Seguimiento.** Se completa cuando las pruebas inspeccionan `HttpResponse.status`, demuestran una sola petición inicial, reintento semánticamente equivalente, conflicto con contenido/bandera diferentes y ausencia de replay automático. Verifica además que datos de recepciones anteriores a V16 con bandera desconocida se muestran como conflicto seguro y nunca como reintento confirmado.
+
+**Pedido sugerido a Codex:**
+
+> Implementa sólo `F4-06`. Conserva el estado HTTP de `receive` en el adaptador: muestra “recepción creada” para `201` y “ya procesada, sin duplicar stock” para `200`. Permite reintento explícito sólo con el payload exacto conservado en memoria; no uses retry automático ni infieras por el cuerpo. Trata cualquier contenido diferente y recepciones legacy no comprobables como `409` con correlation ID. Prueba estados HTTP, bandera/costos/cantidades, doble clic y reconciliación y ejecuta `npm run check`.
+
+##### F4-07 — Validación de pendientes, costos, cantidades y almacén destino
+
+**Qué resuelve.** Endurece los formularios de F4-03 a F4-06 ante datos obsoletos, límites numéricos y confusión entre costo de orden, costo de recepción, último costo de proveedor y precio de venta.
+
+**Trabajo esperado.** Codex debe auditar validaciones de extremo a extremo: moneda uppercase de tres letras; máximo 100 líneas; productos/order-items únicos; cantidades 1–10,000; recepción menor o igual al pendiente vigente; costos no negativos con cuatro decimales; SKU proveedor y referencias dentro de límite; proveedor/almacén/productos activos al crear; y destino editable sólo en `DRAFT`. Antes de confirmar una recepción puede refrescar pendientes, pero la API decide bajo lock. Diferencia costo histórico de orden, costo capturado en cada recepción y `lastUnitCost`; ninguno modifica `Product.price`. Si otra recepción cambia pendientes mientras el formulario está abierto, descarta la suposición local, muestra el rechazo y recarga sin reenviar.
+
+**Seguimiento.** Se completa con pruebas de límites y bordes, redondeo/presentación monetaria sin perder cuatro decimales, respuestas obsoletas, dos recepciones competidoras y cambios de estado mientras un diálogo está abierto. Ningún error debe generar una segunda mutación ni conciliar parcialmente; conserva formulario y correlation ID cuando sea seguro.
+
+**Pedido sugerido a Codex:**
+
+> Implementa exclusivamente `F4-07` como auditoría de validación de compras y recepciones. Contrasta formularios con DTOs/services, cubre todos los límites, costos de cuatro decimales, productos únicos, pendientes vigentes, estados y destino DRAFT. Distingue costo de orden/recepción/último costo/precio de venta. Simula respuestas obsoletas sin atribuir atomicidad al navegador; ante rechazo recarga y nunca reenvía. Añade pruebas de borde, concurrencia visible y accesibilidad y ejecuta las comprobaciones completas.
+
+##### F4-08 — Pruebas de permisos, idempotencia, concurrencia, doble envío y conciliación
+
+**Qué resuelve.** Demuestra que las siete entregas funcionan juntas y que una recepción puede conciliarse con orden, proveedor, almacén, movimiento e inventario exactamente una vez. Las garantías transaccionales continúan probándose con PostgreSQL/Testcontainers, no sólo con mocks de navegador.
+
+**Trabajo esperado.** Codex debe crear una matriz de cierre en `docs/qa/`: `ADMIN` e `INVENTORY_MANAGER` acceden a proveedores/compras y `SALES` no; filtros obsoletos no sobrescriben resultados; todas las mutaciones bloquean doble envío; transiciones reflejan estado del servidor; recepción parcial/total actualiza pendientes; `201` crea un solo movimiento/entrada; `200` no duplica; `409` diferente no modifica; dos recepciones concurrentes no superan pendiente; y el costo opcional sólo afecta asociaciones existentes. Incluye `401`/`403`/`404`/`409`/`429`, correlation ID, teclado, foco, móvil y QA visual.
+
+**Seguimiento.** Se completa cuando no hay pruebas omitidas/inestables, cliente generado y OpenAPI están sincronizados, y pasan `npm ci`, `npm run generate:api:check`, `npm run check`, pruebas backend de proveedores/compras/inventario/concurrencia, `mvn verify` y SpotBugs. Registra conteos, bundles, budgets y QA manual. Sólo entonces actualiza el estado global y marca Fase 4 completa.
+
+**Pedido sugerido a Codex:**
+
+> Cierra la Fase 4 con `F4-08`. Audita `F4-01`–`F4-07`, crea la matriz de QA y completa pruebas unitarias/de componente, E2E y backend para roles, transiciones, respuestas obsoletas, doble envío, recepción parcial/total, `201`/`200`/`409`, concurrencia y conciliación con inventario/Kardex. Ejecuta instalación limpia, sincronización OpenAPI, `npm run check`, `mvn verify` y SpotBugs; realiza QA visual escritorio/móvil. No declares cierre con pruebas omitidas, inestables o verificaciones pendientes; reporta evidencia completa.
 
 **Criterio de salida**
 
@@ -957,7 +1081,7 @@ La solución está desplegada, monitoreada y respaldada; los responsables aprueb
 ```text
 Fase 0 ✓ → Fase 1 ✓
                     └─→ Fase 2 (completada: F2-01–F2-08)
-                         ├─→ Fase 3 ─┬→ Fase 4
+                         ├─→ Fase 3 ✓┬→ Fase 4
                          │           ├→ Fase 5
                          │           └→ Fase 6
                          └─→ Fase 7

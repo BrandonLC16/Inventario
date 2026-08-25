@@ -158,13 +158,13 @@ Durante el desarrollo puedes mantenerlas observando cambios:
 npm run test:watch
 ```
 
-Las 155 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes, catálogos, saldos, settings, ajustes manuales, alertas, Kardex, baja lógica y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
+Las 156 pruebas unitarias/de componente cubren la política de roles, guards, sesión en memoria, refresh single-flight y fallido, logout degradado, interceptor por origen, errores comunes, catálogos, saldos, settings, ajustes manuales, alertas, Kardex, baja lógica, localización y accesibilidad de componentes. Los E2E arrancan por sí solos el servidor Angular en `127.0.0.1:4200` y ejecutan Chromium sin reintentos:
 
 ```powershell
 npm run e2e
 ```
 
-Los 52 escenarios E2E cubren visitante, login y `/me`, menú y rutas de los tres roles, ausencia de persistencia y recarga, refresh rechazado, logout degradado, `403`, `409`, `429` con reloj controlado, correlation ID copiable, catálogos e inventario multi-almacén, baja lógica, navegación por teclado y viewport móvil de `390×844`. Las respuestas difíciles se interceptan con datos inequívocamente sintéticos y nunca contienen secretos reales.
+Los 54 escenarios E2E cubren visitante, login y `/me`, menú y rutas de los tres roles, ausencia de persistencia y recarga, refresh rechazado, logout degradado, `403`, `409`, `429` con reloj controlado, correlation ID copiable, catálogos e inventario multi-almacén, baja lógica, fechas localizadas, restauración de scroll, navegación por teclado y viewport móvil de `390×844`. Las respuestas difíciles se interceptan con datos inequívocamente sintéticos y nunca contienen secretos reales.
 
 La integración controlada con la Inventory API real se conserva en las pruebas de backend basadas en PostgreSQL/Testcontainers, incluida `SecuritySessionIntegrationTest`, y el mismo workflow de CI las ejecuta junto con la comprobación del cliente OpenAPI. Los E2E no necesitan una base compartida ni credenciales versionadas, por lo que son deterministas y reproducibles localmente.
 

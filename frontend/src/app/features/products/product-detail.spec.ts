@@ -1,3 +1,6 @@
+import { LOCALE_ID } from '@angular/core';
+import { registerLocaleData } from '@angular/common';
+import localeEsMx from '@angular/common/locales/es-MX';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
@@ -9,6 +12,8 @@ import { ProductDetail } from './product-detail';
 
 describe('ProductDetail', () => {
   let fixture: ComponentFixture<ProductDetail>;
+
+  beforeAll(() => registerLocaleData(localeEsMx));
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -35,12 +40,15 @@ describe('ProductDetail', () => {
                 description: 'Detalle',
                 price: 10,
                 active: true,
+                createdAt: '2026-08-20T12:00:00Z',
+                updatedAt: '2026-08-20T12:30:00Z',
               }),
             delete: vi.fn(),
           },
         },
         { provide: SessionService, useValue: { hasAnyRole: () => false } },
         { provide: MatDialog, useValue: { open: vi.fn() } },
+        { provide: LOCALE_ID, useValue: 'es-MX' },
       ],
     }).compileComponents();
 
@@ -57,5 +65,12 @@ describe('ProductDetail', () => {
     expect(backLink?.getAttribute('href')).toContain('sku=ABC');
     expect(element.textContent).not.toContain('Editar producto');
     expect(element.textContent).not.toContain('Dar de baja');
+  });
+
+  it('renders API dates with the configured Spanish locale', () => {
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+
+    expect(text).toContain('20 ago 2026');
+    expect(text).not.toContain('Aug 20, 2026');
   });
 });

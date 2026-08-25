@@ -26,6 +26,8 @@ test('ADMIN filters, pages and completes product create, suspension and logical 
   await expect(page).toHaveURL(/page=1/);
   await page.getByRole('row').nth(1).getByRole('link', { name: 'Ver' }).click();
   await expect(page.getByRole('heading', { name: 'Detalle de producto' })).toBeFocused();
+  await expect(page.getByText(/20 ago 2026/).first()).toBeVisible();
+  await expect(page.getByText(/Aug 20, 2026/)).toHaveCount(0);
   await page.getByRole('link', { name: 'Volver al listado' }).click();
   await expect(page).toHaveURL(/page=1/);
 
@@ -184,3 +186,39 @@ test('product list is operable by keyboard and fits a mobile viewport', async ({
     ),
   ).toBe(true);
 });
+
+for (const viewport of [
+  { label: 'desktop', width: 1440, height: 900 },
+  { label: 'mobile', width: 390, height: 844 },
+]) {
+  test(`new navigation starts below the fixed header on ${viewport.label}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await installMockProductsApi(page);
+    await page.goto('/login');
+    await login(page, 'sales');
+    if (viewport.width < 960) {
+      await page.locator('.menu-button').click();
+    }
+    await page.locator('[data-nav-id="products"]').click();
+    await expect(page.getByRole('row')).toHaveCount(21);
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+
+    if (viewport.width < 960) {
+      await page.locator('.menu-button').click();
+    }
+    await page.locator('[data-nav-id="dashboard"]').click();
+    const heading = page.getByRole('heading', { name: 'Resumen' });
+    await expect(heading).toBeFocused();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+    const headingBox = await heading.boundingBox();
+    const headerBox = await page.locator('.shell__header').boundingBox();
+    expect(headingBox).not.toBeNull();
+    expect(headerBox).not.toBeNull();
+    expect(headingBox?.y ?? 0).toBeGreaterThanOrEqual(
+      (headerBox?.y ?? 0) + (headerBox?.height ?? 0),
+    );
+  });
+}
