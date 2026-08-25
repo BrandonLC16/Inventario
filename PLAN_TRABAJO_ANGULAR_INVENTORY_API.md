@@ -661,7 +661,7 @@ La aplicación compila en producción, autentica de forma segura y protege naveg
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 24 de agosto de 2026 las Fases 2 y 3 están completadas y verificadas. El FrontEnd dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04, F3-05, F3-06, F3-07 y F3-08 están completadas** con features lazy para productos, almacenes, saldos, configuración, ajustes, alertas y Kardex, adaptadores manuales sobre el cliente generado, paginación remota, permisos, pruebas unitarias/de componente y E2E, y QA visual aprobada en escritorio y móvil. La siguiente entrega disponible es F4-01.
+El 24 de agosto de 2026 las Fases 2 y 3 están completadas y verificadas. El FrontEnd dispone de sesión en memoria, navegación por roles, sistema visual, manejo común de errores, cliente OpenAPI generado y pruebas E2E. **F3-01, F3-02, F3-03, F3-04, F3-05, F3-06, F3-07 y F3-08 están completadas** con features lazy para productos, almacenes, saldos, configuración, ajustes, alertas y Kardex, adaptadores manuales sobre el cliente generado, paginación remota, permisos, pruebas unitarias/de componente y E2E, y QA visual aprobada en escritorio y móvil. `F4-01` también está completada con el catálogo lazy de proveedores; la siguiente entrega disponible es `F4-02`.
 
 Solicita a Codex una entrega por vez. Antes de editar debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, el README y los controllers/DTOs/pruebas del dominio. Cada pedido debe conservar el contrato existente, indicar roles y estados de UI, exigir pruebas y terminar con evidencia. No se actualizarán dependencias ni el backend durante esta fase salvo que una brecha del contrato se demuestre y se documente antes de modificar ambos lados.
 
@@ -824,21 +824,21 @@ Un responsable administra productos y existencias multi-almacén sin utilizar Sw
 
 #### Cómo empezar y dar seguimiento con Codex
 
-El 24 de agosto de 2026 las entregas `F3-01`–`F3-08` y la Fase 3 están completadas. Las comprobaciones automatizadas permanecen en verde y la repetición visual manual en escritorio y móvil confirmó las correcciones de locale, restauración de scroll, foco, responsive y consola. Como las Fases 2 y 3 ya satisfacen las dependencias de la Fase 4, **el siguiente cambio disponible es F4-01**, el catálogo de proveedores; no se debe adelantar ninguna entrega posterior.
+El 24 de agosto de 2026 las entregas `F3-01`–`F3-08`, la Fase 3 y `F4-01` están completadas. El catálogo lazy de proveedores quedó sincronizado con el contrato real, con roles, estados, normalización, paginación remota y comprobaciones automatizadas en verde. **El siguiente cambio disponible es F4-02**, las asociaciones proveedor-producto; no se debe adelantar ninguna entrega posterior.
 
 El listado original de actividades contenía siete puntos operativos. Para obtener ocho entregas verificables y evitar que las pruebas queden implícitas, se añade como octavo punto el cierre transversal de permisos, idempotencia, concurrencia, doble envío y conciliación. Solicita a Codex una entrega por vez; cada pedido debe nombrar el contrato, los roles, las transiciones permitidas, los estados de UI y las verificaciones. Antes de editar, Codex debe leer `AGENTS.md`, el `AGENTS.md` del cliente API cuando corresponda, esta fase, README, controllers, DTOs, services y pruebas existentes.
 
 Secuencia recomendada:
 
 ```text
-F3-08 ✓ → F4-01 → F4-02 → F4-03 → F4-04 → F4-05 → F4-06 → F4-07 → F4-08
+F3-08 ✓ → F4-01 ✓ → F4-02 → F4-03 → F4-04 → F4-05 → F4-06 → F4-07 → F4-08
 ```
 
 F4-01 y F4-02 construyen el directorio de abastecimiento; F4-03 y F4-04 completan el documento antes de recibir; F4-05 crea recepciones; F4-06 hace explícita su idempotencia; F4-07 endurece validaciones y F4-08 decide el cierre. Las pruebas correspondientes se escriben dentro de cada entrega y F4-08 sólo agrega la cobertura transversal.
 
 | ID | Entrega | Dependencia | Estado | Evidencia mínima para completar |
 |---|---|---|---|---|
-| `F4-01` | CRUD y filtros de proveedores | `F3-08` completada | Pendiente | rutas lazy, filtros/paginación, normalización, roles y pruebas aprobadas |
+| `F4-01` | CRUD y filtros de proveedores | `F3-08` completada | Completado | OpenAPI 1/1 y proveedores backend 3/3; cliente sincronizado; `npm run check`: 176 unit/component, 61 E2E y builds sin warnings |
 | `F4-02` | Asociaciones proveedor-producto | `F4-01` | Pendiente | asociación paginada sin N+1, preferencia/costos y conflictos probados |
 | `F4-03` | Captura y edición de órdenes `DRAFT` | `F4-01`, `F4-02` | Pendiente | borrador conciliado, renglones únicos, totales y doble envío probados |
 | `F4-04` | Emisión, cancelación e historial | `F4-03` | Pendiente | transiciones y filtros por estado con confirmación y pruebas aprobadas |

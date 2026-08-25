@@ -1,0 +1,287 @@
+:host {
+  display: block;
+}
+
+.suppliers-page {
+  display: grid;
+  gap: var(--inv-space-6);
+  max-inline-size: var(--inv-content-max);
+  margin-inline: auto;
+}
+
+.suppliers-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--inv-space-5);
+  padding: clamp(var(--inv-space-5), 4vw, var(--inv-space-8));
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-lg);
+  background: linear-gradient(135deg, var(--inv-color-surface), var(--inv-color-primary-soft));
+  box-shadow: var(--inv-elevation-1);
+}
+
+.suppliers-eyebrow,
+.supplier-detail-card__code {
+  margin: 0;
+  color: var(--inv-color-primary);
+  font-size: var(--inv-font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: var(--inv-space-2) 0;
+  font-size: var(--inv-font-size-display);
+  line-height: var(--inv-line-height-tight);
+  letter-spacing: -0.04em;
+  outline: none;
+}
+
+.suppliers-header p:last-child {
+  max-inline-size: 48rem;
+  margin-block-end: 0;
+  color: var(--inv-color-text-muted);
+}
+
+.supplier-filters,
+.supplier-form,
+.supplier-detail-card {
+  padding: var(--inv-space-5);
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-lg);
+  background: var(--inv-color-surface);
+  box-shadow: var(--inv-elevation-1);
+}
+
+.supplier-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--inv-space-3);
+}
+
+.supplier-filters__actions,
+.supplier-actions,
+.supplier-form__actions,
+.supplier-pagination > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--inv-space-2);
+}
+
+.supplier-filters__actions {
+  grid-column: 1 / -1;
+}
+
+.supplier-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--inv-color-border);
+  border-radius: var(--inv-radius-lg);
+  background: var(--inv-color-surface);
+}
+
+.supplier-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.supplier-table th,
+.supplier-table td {
+  padding: var(--inv-space-3) var(--inv-space-4);
+  border-block-end: 1px solid var(--inv-color-border);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.supplier-table th {
+  color: var(--inv-color-text-muted);
+  font-size: var(--inv-font-size-sm);
+}
+
+.supplier-table td small {
+  display: block;
+  color: var(--inv-color-text-muted);
+}
+
+.supplier-table__actions {
+  display: flex;
+  justify-content: end;
+  gap: var(--inv-space-1);
+  white-space: nowrap;
+}
+
+.status-pill {
+  display: inline-flex;
+  padding: var(--inv-space-1) var(--inv-space-2);
+  border-radius: 999px;
+  background: var(--inv-color-accent-soft);
+  color: var(--inv-color-accent);
+  font-size: var(--inv-font-size-sm);
+  font-weight: 700;
+}
+
+.status-pill--inactive {
+  background: var(--inv-color-surface-subtle);
+  color: var(--inv-color-text-muted);
+}
+
+.supplier-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--inv-space-4);
+}
+
+.supplier-pagination p,
+.supplier-detail-card__heading p:last-child {
+  margin: 0;
+  color: var(--inv-color-text-muted);
+}
+
+.supplier-detail-card {
+  display: grid;
+  gap: var(--inv-space-6);
+}
+
+.supplier-detail-card__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--inv-space-4);
+}
+
+.supplier-detail-card h2 {
+  margin: var(--inv-space-2) 0;
+  font-size: var(--inv-font-size-xl);
+}
+
+.supplier-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--inv-space-5);
+  margin: 0;
+}
+
+.supplier-details dt {
+  color: var(--inv-color-text-muted);
+  font-size: var(--inv-font-size-sm);
+  font-weight: 700;
+}
+
+.supplier-details dd {
+  margin: var(--inv-space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.supplier-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--inv-space-4);
+}
+
+.supplier-form__required,
+.supplier-form__normalization,
+.supplier-form__actions {
+  grid-column: 1 / -1;
+}
+
+.supplier-form__required,
+.supplier-form__normalization {
+  margin: 0;
+  color: var(--inv-color-text-muted);
+  font-size: var(--inv-font-size-sm);
+}
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (width < 64rem) {
+  .supplier-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (width < 44rem) {
+  .suppliers-header,
+  .supplier-pagination,
+  .supplier-detail-card__heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .supplier-filters,
+  .supplier-form,
+  .supplier-details {
+    grid-template-columns: 1fr;
+  }
+
+  .supplier-filters__actions,
+  .supplier-form__required,
+  .supplier-form__normalization,
+  .supplier-form__actions {
+    grid-column: auto;
+  }
+
+  .supplier-table-wrap {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .supplier-table,
+  .supplier-table tbody,
+  .supplier-table tr,
+  .supplier-table td {
+    display: block;
+  }
+
+  .supplier-table thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .supplier-table tr {
+    margin-block-end: var(--inv-space-3);
+    padding: var(--inv-space-4);
+    border: 1px solid var(--inv-color-border);
+    border-radius: var(--inv-radius-md);
+    background: var(--inv-color-surface);
+  }
+
+  .supplier-table td {
+    display: grid;
+    grid-template-columns: minmax(6rem, 38%) 1fr;
+    gap: var(--inv-space-2);
+    padding: var(--inv-space-2) 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .supplier-table td::before {
+    content: attr(data-label);
+    color: var(--inv-color-text-muted);
+    font-size: var(--inv-font-size-sm);
+    font-weight: 700;
+  }
+
+  .supplier-table__actions {
+    display: flex !important;
+    justify-content: start;
+    margin-block-start: var(--inv-space-2);
+  }
+
+  .supplier-table__actions::before {
+    content: none !important;
+  }
+}

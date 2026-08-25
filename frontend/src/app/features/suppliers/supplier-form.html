@@ -1,0 +1,131 @@
+<section class="suppliers-page" [attr.aria-labelledby]="'supplier-form-title'">
+  <header class="suppliers-header">
+    <div>
+      <p class="suppliers-eyebrow">Directorio de abastecimiento</p>
+      <h1 id="supplier-form-title" tabindex="-1">{{ title }}</h1>
+      <p>Los datos guardados se reconciliarán con la respuesta normalizada del servidor.</p>
+    </div>
+    <a mat-stroked-button [routerLink]="cancelTarget()" [queryParams]="listQueryParams">Cancelar</a>
+  </header>
+
+  @if (localError(); as message) {
+    <app-operation-feedback tone="error" [message]="message" />
+  }
+  @if (problem(); as currentProblem) {
+    <app-api-error-message
+      [problem]="currentProblem"
+      [retryAllowed]="loadFailed()"
+      (retry)="retryLoad()"
+    />
+  }
+  @if (uniquenessConflict()) {
+    <app-operation-feedback
+      tone="warning"
+      message="El código, el identificador fiscal y el correo deben ser únicos cuando se informan. Revisa los tres valores antes de volver a guardar."
+    />
+  }
+
+  @if (loading()) {
+    <app-loading-state label="Cargando proveedor para editar" />
+  } @else {
+    <form class="supplier-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <p class="supplier-form__required">Los campos marcados con * son obligatorios.</p>
+      <p class="supplier-form__normalization" role="note">
+        Al guardar, el código y el identificador fiscal se muestran en mayúsculas y el correo en
+        minúsculas. Los espacios exteriores se eliminan.
+      </p>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Código</mat-label>
+        <input matInput formControlName="code" maxlength="32" autocomplete="off" />
+        <mat-hint>Se normaliza a mayúsculas</mat-hint>
+        <mat-hint align="end">{{ form.controls.code.value.length }}/32</mat-hint>
+        @if (form.controls.code.touched && form.controls.code.hasError('required')) {
+          <mat-error>El código es obligatorio.</mat-error>
+        } @else if (form.controls.code.hasError('maxlength')) {
+          <mat-error>El código admite hasta 32 caracteres.</mat-error>
+        } @else if (form.controls.code.hasError('api')) {
+          <mat-error>{{ form.controls.code.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Razón social</mat-label>
+        <input matInput formControlName="legalName" maxlength="160" />
+        <mat-hint align="end">{{ form.controls.legalName.value.length }}/160</mat-hint>
+        @if (form.controls.legalName.touched && form.controls.legalName.hasError('required')) {
+          <mat-error>La razón social es obligatoria.</mat-error>
+        } @else if (form.controls.legalName.hasError('maxlength')) {
+          <mat-error>La razón social admite hasta 160 caracteres.</mat-error>
+        } @else if (form.controls.legalName.hasError('api')) {
+          <mat-error>{{ form.controls.legalName.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Nombre comercial</mat-label>
+        <input matInput formControlName="commercialName" maxlength="160" />
+        <mat-hint align="end">{{ form.controls.commercialName.value.length }}/160</mat-hint>
+        @if (form.controls.commercialName.hasError('maxlength')) {
+          <mat-error>El nombre comercial admite hasta 160 caracteres.</mat-error>
+        } @else if (form.controls.commercialName.hasError('api')) {
+          <mat-error>{{ form.controls.commercialName.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Identificador fiscal</mat-label>
+        <input matInput formControlName="fiscalIdentifier" maxlength="32" autocomplete="off" />
+        <mat-hint>Se normaliza a mayúsculas</mat-hint>
+        <mat-hint align="end">{{ form.controls.fiscalIdentifier.value.length }}/32</mat-hint>
+        @if (form.controls.fiscalIdentifier.hasError('maxlength')) {
+          <mat-error>El identificador fiscal admite hasta 32 caracteres.</mat-error>
+        } @else if (form.controls.fiscalIdentifier.hasError('api')) {
+          <mat-error>{{ form.controls.fiscalIdentifier.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Correo</mat-label>
+        <input matInput type="email" formControlName="email" maxlength="254" autocomplete="email" />
+        <mat-hint>Se normaliza a minúsculas</mat-hint>
+        <mat-hint align="end">{{ form.controls.email.value.length }}/254</mat-hint>
+        @if (form.controls.email.hasError('email')) {
+          <mat-error>Ingresa un correo válido.</mat-error>
+        } @else if (form.controls.email.hasError('maxlength')) {
+          <mat-error>El correo admite hasta 254 caracteres.</mat-error>
+        } @else if (form.controls.email.hasError('api')) {
+          <mat-error>{{ form.controls.email.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Teléfono</mat-label>
+        <input matInput type="tel" formControlName="phone" maxlength="32" autocomplete="tel" />
+        <mat-hint align="end">{{ form.controls.phone.value.length }}/32</mat-hint>
+        @if (form.controls.phone.hasError('maxlength')) {
+          <mat-error>El teléfono admite hasta 32 caracteres.</mat-error>
+        } @else if (form.controls.phone.hasError('api')) {
+          <mat-error>{{ form.controls.phone.getError('api') }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-checkbox formControlName="active">
+        Proveedor activo y disponible para nuevas órdenes
+      </mat-checkbox>
+
+      <div class="supplier-form__actions">
+        <button mat-flat-button type="submit" [disabled]="submitting() || retryAfter.blocked()">
+          @if (submitting()) {
+            Guardando…
+          } @else if (retryAfter.blocked()) {
+            Disponible en {{ retryAfter.remainingSeconds() }} s
+          } @else {
+            Guardar proveedor
+          }
+        </button>
+        <a mat-button [routerLink]="cancelTarget()" [queryParams]="listQueryParams">Cancelar</a>
+      </div>
+    </form>
+  }
+</section>

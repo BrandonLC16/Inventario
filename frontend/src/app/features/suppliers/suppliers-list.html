@@ -1,0 +1,152 @@
+<section class="suppliers-page" aria-labelledby="suppliers-title">
+  <header class="suppliers-header">
+    <div>
+      <p class="suppliers-eyebrow">Abastecimiento</p>
+      <h1 id="suppliers-title" tabindex="-1">Proveedores</h1>
+      <p>Consulta y administra el directorio que alimenta las órdenes de compra.</p>
+    </div>
+    <a mat-flat-button routerLink="new" [queryParams]="detailQueryParams()">Nuevo proveedor</a>
+  </header>
+
+  @if (feedback(); as message) {
+    <app-operation-feedback
+      tone="success"
+      [message]="message"
+      [dismissible]="true"
+      (dismiss)="feedback.set(null)"
+    />
+  }
+
+  @if (deactivateProblem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" />
+  }
+
+  <form class="supplier-filters" [formGroup]="filterForm" (ngSubmit)="applyFilters()">
+    <mat-form-field appearance="outline">
+      <mat-label>Código</mat-label>
+      <input matInput formControlName="code" maxlength="32" autocomplete="off" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Nombre o razón social</mat-label>
+      <input matInput formControlName="name" maxlength="160" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Identificador fiscal</mat-label>
+      <input matInput formControlName="fiscalIdentifier" maxlength="32" autocomplete="off" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Estado</mat-label>
+      <mat-select formControlName="active">
+        <mat-option value="">Todos</mat-option>
+        <mat-option value="true">Activos</mat-option>
+        <mat-option value="false">Inactivos</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <div class="supplier-filters__actions">
+      <button mat-flat-button type="submit">Aplicar filtros</button>
+      <button mat-button type="button" (click)="clearFilters()">Limpiar</button>
+    </div>
+  </form>
+
+  @if (loading()) {
+    <app-loading-state label="Cargando proveedores" />
+  } @else if (problem(); as currentProblem) {
+    <app-api-error-message [problem]="currentProblem" [retryAllowed]="true" (retry)="retry()" />
+  } @else if (suppliers().length === 0) {
+    <app-empty-state
+      title="No hay proveedores para mostrar"
+      description="Prueba con otros filtros o limpia la búsqueda."
+      actionLabel="Limpiar filtros"
+      (action)="clearFilters()"
+    />
+  } @else {
+    <div class="supplier-table-wrap">
+      <table class="supplier-table">
+        <caption class="visually-hidden">
+          Proveedores encontrados con los filtros actuales
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Código</th>
+            <th scope="col">Razón social</th>
+            <th scope="col">Identificador fiscal</th>
+            <th scope="col">Contacto</th>
+            <th scope="col">Estado</th>
+            <th scope="col"><span class="visually-hidden">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (supplier of suppliers(); track supplier.id ?? $index) {
+            <tr>
+              <td data-label="Código">{{ supplier.code ?? '—' }}</td>
+              <td data-label="Razón social">
+                {{ supplier.legalName ?? '—' }}
+                @if (supplier.commercialName) {
+                  <small>{{ supplier.commercialName }}</small>
+                }
+              </td>
+              <td data-label="Identificador fiscal">{{ supplier.fiscalIdentifier || '—' }}</td>
+              <td data-label="Contacto">
+                {{ supplier.email || supplier.phone || '—' }}
+              </td>
+              <td data-label="Estado">
+                <span class="status-pill" [class.status-pill--inactive]="supplier.active === false">
+                  {{ supplier.active === false ? 'Inactivo' : 'Activo' }}
+                </span>
+              </td>
+              <td class="supplier-table__actions">
+                @if (supplier.id; as id) {
+                  <a mat-button [routerLink]="[id]" [queryParams]="detailQueryParams()">Ver</a>
+                  <a mat-button [routerLink]="[id, 'edit']" [queryParams]="detailQueryParams()">
+                    Editar
+                  </a>
+                  @if (supplier.active !== false) {
+                    <button
+                      mat-button
+                      type="button"
+                      [disabled]="deactivatingIds().has(id) || retryAfter.blocked()"
+                      (click)="requestDeactivate(supplier)"
+                    >
+                      @if (deactivatingIds().has(id)) {
+                        Procesando…
+                      } @else if (retryAfter.blocked()) {
+                        Disponible en {{ retryAfter.remainingSeconds() }} s
+                      } @else {
+                        Desactivar
+                      }
+                    </button>
+                  }
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="supplier-pagination" aria-label="Paginación de proveedores">
+      <p>
+        Página {{ (page()?.page ?? query().page) + 1 }} de {{ page()?.totalPages ?? 1 }} ·
+        {{ page()?.totalElements ?? suppliers().length }} proveedores
+      </p>
+      <div>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.first !== false"
+          (click)="goToPage((page()?.page ?? query().page) - 1)"
+        >
+          Anterior
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="page()?.last !== false"
+          (click)="goToPage((page()?.page ?? query().page) + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    </nav>
+  }
+</section>
